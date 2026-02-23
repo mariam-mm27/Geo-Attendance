@@ -7,11 +7,11 @@ Geo-Attendance is a secure attendance management system designed to make classro
 ----------------------------------------------
 ###Team Members : 1- Mariam Khaled Ramadan Mohamed 2- Mariam Khaled Mostafa Mohamed 3- Mariam Hany Hussien Aly 4- Mariam Mohamed Ibrahim Ismail 5- Shimaa Abd El Fattah Gamil 6- Alaa Mostafa Hanfy Tantawy
 -----------------------
-Project Overview
+##  Project Overview
 Traditional attendance systems are vulnerable to proxy attendance and manual errors.
 Geo-Attendance solves this problem by generating short-lived QR codes during lectures, which students must scan in real time to mark attendance.
 --------------------------------------
-Problem Statement
+##  Problem Statement
 Time wasted on manual attendance Lecturers lose valuable lecture time taking roll calls.
 
 Proxy attendance Students can sign attendance for absent peers.
@@ -20,7 +20,7 @@ Static QR code abuse Fixed QR codes can be shared remotely.
 
 Difficult reporting Manual records make analytics unreliable.
 ------------------------------------------
-Proposed Solution
+##  Proposed Solution
 Geo-Attendance uses:
 - Dynamic QR codes refreshed every **15 seconds**
 - Time-gated attendance sessions
