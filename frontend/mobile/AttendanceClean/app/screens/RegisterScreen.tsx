@@ -96,6 +96,12 @@ export default function RegisterScreen({ navigation }: any) {
         <Text style={styles.buttonText}>Register</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+            style={[styles.button, { backgroundColor: COLORS.secondary }]}
+>
+          <Text style={styles.buttonText}>Sign up with Google</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity onPress={() => navigation.navigate("Login")}>
         <Text style={styles.link}>Already have an account? Login</Text>
       </TouchableOpacity>
