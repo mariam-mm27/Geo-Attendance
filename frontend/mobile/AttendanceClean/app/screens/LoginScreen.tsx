@@ -74,6 +74,13 @@ export default function LoginScreen({ navigation }: any) {
       <TouchableOpacity style={styles.button} onPress={handleLogin}>
         <Text style={styles.buttonText}>Login</Text>
       </TouchableOpacity>
+      
+
+      <TouchableOpacity
+              style={[styles.button, { backgroundColor: COLORS.secondary }]}
+>
+        <Text style={styles.buttonText}>Login with Google</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.navigate("Register")}>
         <Text style={styles.link}>Don't have an account? Register</Text>
