@@ -1,18 +1,45 @@
 import React, { useState } from "react";
-import { View, TextInput, Button, Text, StyleSheet, TouchableOpacity } from "react-native";
+import {
+  TextInput,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+} from "react-native";
 import AuthLayout from "../components/AuthInput";
 import RolePicker from "../components/RoleSelector";
 import { COLORS } from "../theme/color";
 
 export default function LoginScreen({ navigation }: any) {
+  const [role, setRole] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("");
+  const [error, setError] = useState("");
 
   const handleLogin = () => {
-    if (!role) return alert("Please select role");
+    setError("");
 
-    // Clear inputs
+    if (!role || !email || !password) {
+      setError("All fields are required.");
+      return;
+    }
+
+    if (
+      role === "student" &&
+      !email.endsWith("@std.sci.cu.edu.eg")
+    ) {
+      setError("Invalid student email domain.");
+      return;
+    }
+
+    if (
+      role === "professor" &&
+      !email.endsWith("@gmail.com")
+    ) {
+      setError("Invalid professor email domain.");
+      return;
+    }
+
+    // Clear
     setEmail("");
     setPassword("");
 
@@ -42,13 +69,11 @@ export default function LoginScreen({ navigation }: any) {
         onChangeText={setPassword}
       />
 
-      <View style={styles.button}>
-        <Button title="Login" color={COLORS.primary} onPress={handleLogin} />
-      </View>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <View style={styles.button}>
-        <Button title="Login with Google" color={COLORS.secondary} />
-      </View>
+      <TouchableOpacity style={styles.button} onPress={handleLogin}>
+        <Text style={styles.buttonText}>Login</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.navigate("Register")}>
         <Text style={styles.link}>Don't have an account? Register</Text>
@@ -62,14 +87,26 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     padding: 12,
     borderRadius: 8,
-    marginBottom: 15,
+    marginBottom: 12,
   },
   button: {
-    marginBottom: 10,
+    backgroundColor: COLORS.primary,
+    padding: 12,
+    borderRadius: 8,
+  },
+  buttonText: {
+    color: "white",
+    textAlign: "center",
+    fontWeight: "bold",
   },
   link: {
-    textAlign: "center",
     color: COLORS.accent,
-    marginTop: 10,
+    textAlign: "center",
+    marginTop: 15,
+  },
+  error: {
+    color: "red",
+    marginBottom: 10,
+    textAlign: "center",
   },
 });
