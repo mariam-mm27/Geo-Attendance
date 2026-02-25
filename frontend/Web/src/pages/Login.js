@@ -6,10 +6,15 @@ function Login() {
   const [role, setRole] = useState("");
 
   const handleLogin = () => {
-    if (!email.endsWith("@sci.cu.edu.eg")) {
-      alert("Email must end with @sci.cu.edu.eg");
-      return;
-    }
+    if (role === "Professor" && !email.endsWith("@sci.cu.edu.eg")) {
+  alert("Professor must use @sci.cu.edu.eg email");
+  return;
+}
+
+if (role === "Student" && !email.endsWith("@std.sci.cu.edu.eg")) {
+  alert("Student must use @std.sci.cu.edu.eg email");
+  return;
+}
 
     if (!role) {
       alert("Please select role");

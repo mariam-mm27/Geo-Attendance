@@ -120,6 +120,22 @@ function Register() {
         >
           Register
         </button>
+        <button
+  onClick={() => alert("Google Sign Up (Firebase not connected yet)")}
+  style={{
+    width: "100%",
+    marginTop: "15px",
+    padding: "10px",
+    borderRadius: "8px",
+    background: "#1B8F85",
+    color: "white",
+    border: "none",
+    cursor: "pointer",
+    fontWeight: "bold"
+  }}
+>
+  Sign up with Google
+</button>
         
       </div>
     </div>
