@@ -33,7 +33,7 @@ export default function LoginScreen({ navigation }: any) {
 
     if (
       role === "professor" &&
-      !email.endsWith("@gmail.com")
+      !email.endsWith("@sci.cu.edu.eg")
     ) {
       setError("Invalid professor email domain.");
       return;
