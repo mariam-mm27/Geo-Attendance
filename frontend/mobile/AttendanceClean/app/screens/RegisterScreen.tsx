@@ -1,5 +1,11 @@
 import React, { useState } from "react";
-import { TextInput, Button, StyleSheet, View } from "react-native";
+import {
+  TextInput,
+  View,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+} from "react-native";
 import AuthLayout from "../components/AuthInput";
 import RolePicker from "../components/RoleSelector";
 import { COLORS } from "../theme/color";
@@ -7,19 +13,39 @@ import { COLORS } from "../theme/color";
 export default function RegisterScreen({ navigation }: any) {
   const [role, setRole] = useState("");
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
   const [id, setId] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
   const handleRegister = () => {
-    if (!role) return alert("Select role");
+    setError("");
 
-    // Clear everything
+    if (!role || !name || !email || !password || (role === "student" && !id)) {
+      setError("All fields are required.");
+      return;
+    }
+
+    if (
+      role === "student" &&
+      !email.endsWith("@std.sci.cu.edu.eg")
+    ) {
+      setError("Student email must end with @std.sci.cu.edu.eg");
+      return;
+    }
+
+    if (
+      role === "professor" &&
+      !email.endsWith("@gmail.com")
+    ) {
+      setError("Professor email must end with @gmail.com");
+      return;
+    }
+
+    // Clear fields
     setName("");
-    setPhone("");
-    setEmail("");
     setId("");
+    setEmail("");
     setPassword("");
 
     if (role === "student") {
@@ -33,43 +59,27 @@ export default function RegisterScreen({ navigation }: any) {
     <AuthLayout>
       <RolePicker role={role} setRole={setRole} />
 
-      {role === "student" && (
-        <>
-          <TextInput
-            placeholder="Name"
-            style={styles.input}
-            value={name}
-            onChangeText={setName}
-          />
-          <TextInput
-            placeholder="Phone Number"
-            style={styles.input}
-            value={phone}
-            onChangeText={setPhone}
-          />
-          <TextInput
-            placeholder="Email"
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-          />
-        </>
-      )}
+      <TextInput
+        placeholder="Name"
+        style={styles.input}
+        value={name}
+        onChangeText={setName}
+      />
 
-      {role === "professor" && (
+      {role === "student" && (
         <TextInput
-          placeholder="Email"
+          placeholder="ID"
           style={styles.input}
-          value={email}
-          onChangeText={setEmail}
+          value={id}
+          onChangeText={setId}
         />
       )}
 
       <TextInput
-        placeholder="ID"
+        placeholder="Email"
         style={styles.input}
-        value={id}
-        onChangeText={setId}
+        value={email}
+        onChangeText={setEmail}
       />
 
       <TextInput
@@ -80,13 +90,15 @@ export default function RegisterScreen({ navigation }: any) {
         onChangeText={setPassword}
       />
 
-      <View style={styles.button}>
-        <Button title="Register" color={COLORS.primary} onPress={handleRegister} />
-      </View>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <View style={styles.button}>
-        <Button title="Signup with Google" color={COLORS.secondary} />
-      </View>
+      <TouchableOpacity style={styles.button} onPress={handleRegister}>
+        <Text style={styles.buttonText}>Register</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+        <Text style={styles.link}>Already have an account? Login</Text>
+      </TouchableOpacity>
     </AuthLayout>
   );
 }
@@ -96,9 +108,27 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     padding: 12,
     borderRadius: 8,
-    marginBottom: 15,
+    marginBottom: 12,
   },
   button: {
+    backgroundColor: COLORS.primary,
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 5,
+  },
+  buttonText: {
+    color: "white",
+    textAlign: "center",
+    fontWeight: "bold",
+  },
+  link: {
+    color: COLORS.accent,
+    textAlign: "center",
+    marginTop: 15,
+  },
+  error: {
+    color: "red",
     marginBottom: 10,
+    textAlign: "center",
   },
 });
