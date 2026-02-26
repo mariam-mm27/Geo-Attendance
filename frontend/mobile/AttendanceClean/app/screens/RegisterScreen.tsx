@@ -9,7 +9,7 @@ import {
 import AuthLayout from "../components/AuthInput";
 import RolePicker from "../components/RoleSelector";
 import { COLORS } from "../theme/color";
-
+import { validateRegister } from "../utils/validation";
 export default function RegisterScreen({ navigation }: any) {
   const [role, setRole] = useState("");
   const [name, setName] = useState("");
@@ -17,43 +17,34 @@ export default function RegisterScreen({ navigation }: any) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+const handleRegister = () => {
+  setError("");
 
-  const handleRegister = () => {
-    setError("");
+  const errorMessage = validateRegister({
+    role,
+    name,
+    id,
+    email,
+    password,
+  });
 
-    if (!role || !name || !email || !password || (role === "student" && !id)) {
-      setError("All fields are required.");
-      return;
-    }
+  if (errorMessage) {
+    setError(errorMessage);
+    return;
+  }
 
-    if (
-      role === "student" &&
-      !email.endsWith("@std.sci.cu.edu.eg")
-    ) {
-      setError("Student email must end with @std.sci.cu.edu.eg");
-      return;
-    }
+  // هنا بعد ما validation عدى
+  setName("");
+  setId("");
+  setEmail("");
+  setPassword("");
 
-    if (
-      role === "professor" &&
-      !email.endsWith("@gmail.com")
-    ) {
-      setError("Professor email must end with @gmail.com");
-      return;
-    }
-
-    // Clear fields
-    setName("");
-    setId("");
-    setEmail("");
-    setPassword("");
-
-    if (role === "student") {
-      navigation.replace("StudentHome");
-    } else {
-      navigation.replace("ProfessorHome");
-    }
-  };
+  if (role === "student") {
+    navigation.replace("StudentHome");
+  } else {
+    navigation.replace("ProfessorHome");
+  }
+};
 
   return (
     <AuthLayout>
