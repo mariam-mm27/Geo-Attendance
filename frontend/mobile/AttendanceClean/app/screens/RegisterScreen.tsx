@@ -68,10 +68,10 @@ export default function RegisterScreen({ navigation }: any) {
       navigation.replace("ProfessorHome");
     }
 
-  } catch (err) {
-    console.log(err);
-    setError("Registration failed. Please try again.");
-  }
+  } catch (err: any) {
+  console.log("REGISTER ERROR:", err);
+  setError(err.message || "Registration failed");
+}
 };
 
   return (
