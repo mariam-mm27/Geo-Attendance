@@ -10,6 +10,9 @@ import AuthLayout from "../components/AuthInput";
 import RolePicker from "../components/RoleSelector";
 import { COLORS } from "../theme/color";
 import { validateRegister } from "../utils/validation";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "../firebase";
 export default function RegisterScreen({ navigation }: any) {
   const [role, setRole] = useState("");
   const [name, setName] = useState("");
@@ -17,9 +20,11 @@ export default function RegisterScreen({ navigation }: any) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-const handleRegister = () => {
+
+  const handleRegister = async () => {
   setError("");
 
+  // 1️⃣ Validation
   const errorMessage = validateRegister({
     role,
     name,
@@ -33,16 +38,39 @@ const handleRegister = () => {
     return;
   }
 
-  // هنا بعد ما validation عدى
-  setName("");
-  setId("");
-  setEmail("");
-  setPassword("");
+  try {
+    // 2️⃣ Create user in Firebase Auth
+    const cred = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
 
-  if (role === "student") {
-    navigation.replace("StudentHome");
-  } else {
-    navigation.replace("ProfessorHome");
+    // 3️⃣ Save user in Firestore
+    await setDoc(doc(db, "users", cred.user.uid), {
+      name,
+      email,
+      role,
+      studentId: role === "student" ? id : null,
+      createdAt: serverTimestamp(),
+    });
+
+    // 4️⃣ Clear fields
+    setName("");
+    setId("");
+    setEmail("");
+    setPassword("");
+
+    // 5️⃣ Navigation AFTER success only
+    if (role === "student") {
+      navigation.replace("StudentHome");
+    } else {
+      navigation.replace("ProfessorHome");
+    }
+
+  } catch (err) {
+    console.log(err);
+    setError("Registration failed. Please try again.");
   }
 };
 
