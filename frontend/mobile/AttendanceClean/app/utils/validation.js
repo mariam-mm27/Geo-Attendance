@@ -32,8 +32,8 @@ export const validateRegister = ({
       return "Student ID must contain numbers only.";
     }
 
-    if (id.length !== 8) {
-      return "Student ID must be exactly 8 digits.";
+    if (id.length !== 7) {
+      return "Student ID must be exactly 7 digits.";
     }
   }
 
