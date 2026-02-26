@@ -9,44 +9,70 @@ import AuthLayout from "../components/AuthInput";
 import RolePicker from "../components/RoleSelector";
 import { COLORS } from "../theme/color";
 
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../firebase";
+
 export default function LoginScreen({ navigation }: any) {
   const [role, setRole] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setError("");
 
+    // 1️⃣ Validation
     if (!role || !email || !password) {
       setError("All fields are required.");
       return;
     }
 
-    if (
-      role === "student" &&
-      !email.endsWith("@std.sci.cu.edu.eg")
-    ) {
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (role === "student" && !cleanEmail.endsWith("@std.sci.cu.edu.eg")) {
       setError("Invalid student email domain.");
       return;
     }
 
-    if (
-      role === "professor" &&
-      !email.endsWith("@gmail.com")
-    ) {
+    if (role === "professor" && !cleanEmail.endsWith("@gmail.com")) {
       setError("Invalid professor email domain.");
       return;
     }
 
-    // Clear
-    setEmail("");
-    setPassword("");
+    try {
+      // 2️⃣ Login with Firebase Auth
+      const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
 
-    if (role === "student") {
-      navigation.replace("StudentHome");
-    } else {
-      navigation.replace("ProfessorHome");
+      // 3️⃣ Check Firestore if user exists
+      const userRef = doc(db, "users", cred.user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        // User not fully registered → logout
+        await auth.signOut();
+        setError("Your account is not fully registered yet. Please register first.");
+        return;
+      }
+
+      const userData = userSnap.data();
+
+      // 4️⃣ Redirect according to role
+      if (userData.role === "student") {
+        navigation.replace("StudentHome");
+      } else if (userData.role === "professor") {
+        navigation.replace("ProfessorHome");
+      } else {
+        setError("Invalid user role.");
+      }
+
+      // 5️⃣ Clear fields
+      setEmail("");
+      setPassword("");
+
+    } catch (err: any) {
+      console.log("LOGIN ERROR:", err);
+      setError(err.message || "Login failed");
     }
   };
 
@@ -74,11 +100,10 @@ export default function LoginScreen({ navigation }: any) {
       <TouchableOpacity style={styles.button} onPress={handleLogin}>
         <Text style={styles.buttonText}>Login</Text>
       </TouchableOpacity>
-      
 
       <TouchableOpacity
-              style={[styles.button, { backgroundColor: COLORS.secondary }]}
->
+        style={[styles.button, { backgroundColor: COLORS.secondary }]}
+      >
         <Text style={styles.buttonText}>Login with Google</Text>
       </TouchableOpacity>
 
