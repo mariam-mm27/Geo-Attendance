@@ -1,9 +1,21 @@
-// backend/src/services/user.service.js
-const db = require("../config/firebase");
+import { db } from "../config/firebase.js";
 
 const USERS_COLLECTION = "users";
 
-async function saveUser(user) {
+export const createUserDocument = async (uid, data) => {
+  try {
+    await db.collection(USERS_COLLECTION).doc(uid).set({
+      ...data,
+      createdAt: new Date(),
+    });
+    console.log("User document created!");
+  } catch (err) {
+    console.error("Error creating user document:", err.message);
+    throw err;
+  }
+};
+
+export const saveUser = async (user) => {
   try {
     await db.collection(USERS_COLLECTION).doc(user.uid).set({
       name: user.name,
@@ -17,9 +29,9 @@ async function saveUser(user) {
     console.error("Error saving user:", err.message);
     throw err;
   }
-}
+};
 
-async function getUserById(uid) {
+export const getUserById = async (uid) => {
   try {
     const docRef = db.collection(USERS_COLLECTION).doc(uid);
     const docSnap = await docRef.get();
@@ -28,9 +40,9 @@ async function getUserById(uid) {
     console.error("Error fetching user:", err.message);
     throw err;
   }
-}
+};
 
-async function updateUser(uid, data) {
+export const updateUser = async (uid, data) => {
   try {
     const docRef = db.collection(USERS_COLLECTION).doc(uid);
     await docRef.update(data);
@@ -39,6 +51,4 @@ async function updateUser(uid, data) {
     console.error("Error updating user:", err.message);
     throw err;
   }
-}
-
-module.exports = { saveUser, getUserById, updateUser };
+};
