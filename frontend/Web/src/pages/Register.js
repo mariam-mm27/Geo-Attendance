@@ -8,32 +8,41 @@ function Register() {
   const [role, setRole] = useState("");
 
   const handleRegister = () => {
-    if (!email.endsWith("@sci.cu.edu.eg")) {
-      alert("Email must end with @sci.cu.edu.eg");
+    if (role === "Professor" && !email.endsWith("@sci.cu.edu.eg")) {
+      alert("Professor must use @sci.cu.edu.eg email");
       return;
     }
 
-    alert("Register success (Frontend only)");
+    if (role === "Student" && !email.endsWith("@std.sci.cu.edu.eg")) {
+      alert("Student must use @std.sci.cu.edu.eg email");
+      return;
+    }
+
+    alert("Register success");
+    
+
   };
 
   return (
-    <div style={{
-      background: "#F8FAFC",
-      height: "100vh",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center"
-    }}>
-      <div style={{
-        width: "350px",
-        padding: "30px",
-        borderRadius: "12px",
-        border: "1px solid #CBD5E1",
-        background: "white"
-      }}>
-        <h2 style={{ color: "#173B66", textAlign: "center" }}>
-          Register
-        </h2>
+    <div
+      style={{
+        background: "#F8FAFC",
+        height: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <div
+        style={{
+          width: "350px",
+          padding: "30px",
+          borderRadius: "12px",
+          border: "1px solid #CBD5E1",
+          background: "white",
+        }}
+      >
+        <h2 style={{ color: "#173B66", textAlign: "center" }}>Register</h2>
 
         <select
           style={{
@@ -41,7 +50,7 @@ function Register() {
             padding: "10px",
             marginTop: "15px",
             borderRadius: "8px",
-            border: "1px solid #CBD5E1"
+            border: "1px solid #CBD5E1",
           }}
           value={role}
           onChange={(e) => setRole(e.target.value)}
@@ -59,7 +68,7 @@ function Register() {
             padding: "10px",
             marginTop: "15px",
             borderRadius: "8px",
-            border: "1px solid #CBD5E1"
+            border: "1px solid #CBD5E1",
           }}
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -72,7 +81,7 @@ function Register() {
             padding: "10px",
             marginTop: "15px",
             borderRadius: "8px",
-            border: "1px solid #CBD5E1"
+            border: "1px solid #CBD5E1",
           }}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -85,7 +94,7 @@ function Register() {
             padding: "10px",
             marginTop: "15px",
             borderRadius: "8px",
-            border: "1px solid #CBD5E1"
+            border: "1px solid #CBD5E1",
           }}
           value={id}
           onChange={(e) => setId(e.target.value)}
@@ -99,7 +108,7 @@ function Register() {
             padding: "10px",
             marginTop: "15px",
             borderRadius: "8px",
-            border: "1px solid #CBD5E1"
+            border: "1px solid #CBD5E1",
           }}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -115,28 +124,27 @@ function Register() {
             background: "#173B66",
             color: "white",
             border: "none",
-            cursor: "pointer"
+            cursor: "pointer",
           }}
         >
           Register
         </button>
         <button
-  onClick={() => alert("Google Sign Up (Firebase not connected yet)")}
-  style={{
-    width: "100%",
-    marginTop: "15px",
-    padding: "10px",
-    borderRadius: "8px",
-    background: "#1B8F85",
-    color: "white",
-    border: "none",
-    cursor: "pointer",
-    fontWeight: "bold"
-  }}
->
-  Sign up with Google
-</button>
-        
+          onClick={() => alert("Google Sign Up (Firebase not connected yet)")}
+          style={{
+            width: "100%",
+            marginTop: "15px",
+            padding: "10px",
+            borderRadius: "8px",
+            background: "#1B8F85",
+            color: "white",
+            border: "none",
+            cursor: "pointer",
+            fontWeight: "bold",
+          }}
+        >
+          Sign up with Google
+        </button>
       </div>
     </div>
   );
