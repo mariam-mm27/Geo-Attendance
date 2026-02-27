@@ -1,30 +1,56 @@
 import { useState } from "react";
-
+import { validateLogin } from "../utils/validation";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../firebase";
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
 
-  const handleLogin = () => {
-    if (role === "Professor" && !email.endsWith("@sci.cu.edu.eg")) {
-  alert("Professor must use @sci.cu.edu.eg email");
-  return;
-}
+ const handleLogin = async () => {
+  // 1️⃣ UI validation
+  const error = validateLogin({ email, password });
+  if (error) {
+    alert(error);
+    return;
+  }
 
-if (role === "Student" && !email.endsWith("@std.sci.cu.edu.eg")) {
-  alert("Student must use @std.sci.cu.edu.eg email");
-  return;
-}
+  try {
+    // 2️⃣ Firebase Auth
+    const cred = await signInWithEmailAndPassword(auth, email, password);
 
-    if (!role) {
-      alert("Please select role");
+    // 3️⃣ Get user profile from Firestore
+    const userRef = doc(db, "users", cred.user.uid);
+    const userSnap = await getDoc(userRef);
+
+    if (!userSnap.exists()) {
+      alert("Account not registered properly.");
       return;
     }
 
-    if (role === "Admin") window.location.href = "/admin";
-    else if (role === "Professor") window.location.href = "/professor";
-    else window.location.href = "/student";
-  };
+    const userData = userSnap.data();
+
+    // 4️⃣ Role check (from Firestore)
+    if (userData.role !== role.toLowerCase()) {
+      alert("Selected role does not match your account.");
+      return;
+    }
+
+    // 5️⃣ Redirect
+    if (userData.role === "admin") {
+      window.location.href = "/admin";
+    } else if (userData.role === "professor") {
+      window.location.href = "/professor";
+    } else {
+      window.location.href = "/student";
+    }
+
+  } catch (err) {
+  console.log(err);
+  alert(err.message);
+}
+};
 
   return (
     <div style={{
@@ -72,9 +98,9 @@ if (role === "Student" && !email.endsWith("@std.sci.cu.edu.eg")) {
           }}
         >
           <option value="">Select Role</option>
-          <option value="Student">Student</option>
-          <option value="Professor">Professor</option>
-          <option value="Admin">Admin</option>
+          <option value="student">Student</option>
+          <option value="professor">Professor</option>
+          <option value="admin">Admin</option>
         </select>
 
         {/* Email */}
