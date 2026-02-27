@@ -61,12 +61,7 @@ export default function RegisterScreen({ navigation }: any) {
     setEmail("");
     setPassword("");
 
-    // 5️⃣ Navigation AFTER success only
-    if (role === "student") {
-      navigation.replace("StudentHome");
-    } else {
-      navigation.replace("ProfessorHome");
-    }
+    navigation.replace("Login");
 
   } catch (err: any) {
   console.log("REGISTER ERROR:", err);
