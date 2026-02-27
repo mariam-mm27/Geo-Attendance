@@ -36,9 +36,9 @@ export default function RegisterScreen({ navigation }: any) {
 
     if (
       role === "professor" &&
-      !email.endsWith("@gmail.com")
+      !email.endsWith("@sci.cu.edu.eg")
     ) {
-      setError("Professor email must end with @gmail.com");
+      setError("Professor email must end with @sci.cu.edu.eg");
       return;
     }
 
