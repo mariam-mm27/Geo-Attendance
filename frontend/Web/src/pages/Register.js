@@ -95,9 +95,7 @@ function Register() {
           <option value="Student">Student</option>
           <option value="Professor">Professor</option>
 
-          <option value="student">Student</option>
-          <option value="professor">Professor</option>
-          <option value="admin">Admin</option>
+      
         </select>
 
         <input
