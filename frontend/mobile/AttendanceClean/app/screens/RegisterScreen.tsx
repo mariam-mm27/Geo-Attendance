@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   TextInput,
-  View,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -9,10 +8,12 @@ import {
 import AuthLayout from "../components/AuthInput";
 import RolePicker from "../components/RoleSelector";
 import { COLORS } from "../theme/color";
-import { validateRegister } from "../utils/validation";
+import { signOut } from "firebase/auth";
+
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "../firebase";
+import { auth, db } from "../firebase"; // عدلي المسار لو مختلف
+
 export default function RegisterScreen({ navigation }: any) {
   const [role, setRole] = useState("");
   const [name, setName] = useState("");
@@ -20,58 +21,62 @@ export default function RegisterScreen({ navigation }: any) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
   setError("");
 
-  // 1️⃣ Validation
-  const errorMessage = validateRegister({
-    role,
-    name,
-    id,
-    email,
-    password,
-  });
+  if (!role || !name || !email || !password || (role === "student" && !id)) {
+    setError("All fields are required.");
+    return;
+  }
 
-  if (errorMessage) {
-    setError(errorMessage);
+  if (role === "student" && !email.endsWith("@std.sci.cu.edu.eg")) {
+    setError("Student email must end with @std.sci.cu.edu.eg");
+    return;
+  }
+
+  if (role === "professor" && !email.endsWith("@sci.cu.edu.eg")) {
+    setError("Professor email must end with @sci.cu.edu.eg");
     return;
   }
 
   try {
-    // 2️⃣ Create user in Firebase Auth
-    const cred = await createUserWithEmailAndPassword(
+    setLoading(true);
+
+    // ✅ 1- تسجيل في Firebase Auth
+    const userCredential = await createUserWithEmailAndPassword(
       auth,
-      email,
+      email.trim(),
       password
     );
 
-    // 3️⃣ Save user in Firestore
-    await setDoc(doc(db, "users", cred.user.uid), {
-      name,
-      email,
-      role,
+    const user = userCredential.user;
+
+    // ✅ 2- تخزين في Firestore وربطه بالـ UID
+    await setDoc(doc(db, "users", user.uid), {
+      uid: user.uid,
+      name: name.trim(),
+      email: email.trim(),
+      role: role,
       studentId: role === "student" ? id : null,
       createdAt: serverTimestamp(),
     });
 
-    // 4️⃣ Clear fields
-    setName("");
-    setId("");
-    setEmail("");
-    setPassword("");
+    console.log("User registered & saved successfully");
 
-    // 5️⃣ Navigation AFTER success only
-    if (role === "student") {
-      navigation.replace("StudentHome");
-    } else {
-      navigation.replace("ProfessorHome");
-    }
+    // ✅ 3- Logout علشان ميحولكيش على Home
+    await signOut(auth);
 
-  } catch (err: any) {
-  console.log("REGISTER ERROR:", err);
-  setError(err.message || "Registration failed");
-}
+    // ✅ 4- يروح Login
+    navigation.replace("Login");
+
+  } catch (error: any) {
+    console.log("Register Error:", error.code);
+    setError(error.message);
+  } finally {
+    setLoading(false);
+  }
 };
 
   return (
@@ -99,6 +104,7 @@ export default function RegisterScreen({ navigation }: any) {
         style={styles.input}
         value={email}
         onChangeText={setEmail}
+        autoCapitalize="none"
       />
 
       <TextInput
@@ -111,14 +117,14 @@ export default function RegisterScreen({ navigation }: any) {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <TouchableOpacity style={styles.button} onPress={handleRegister}>
-        <Text style={styles.buttonText}>Register</Text>
-      </TouchableOpacity>
-
       <TouchableOpacity
-            style={[styles.button, { backgroundColor: COLORS.secondary }]}
->
-          <Text style={styles.buttonText}>Sign up with Google</Text>
+        style={styles.button}
+        onPress={handleRegister}
+        disabled={loading}
+      >
+        <Text style={styles.buttonText}>
+          {loading ? "Registering..." : "Register"}
+        </Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.navigate("Login")}>
