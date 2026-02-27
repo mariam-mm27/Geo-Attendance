@@ -16,6 +16,6 @@ build/
 # OS files
 .DS_Store
 Thumbs.db
-.expo/
-tsconfig.json
+
+backend/geo-attendance-f0d04-firebase-adminsdk-fbsvc-09b2e10fe1.json
 
