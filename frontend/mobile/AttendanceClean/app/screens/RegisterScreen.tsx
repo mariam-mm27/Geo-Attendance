@@ -48,11 +48,7 @@ export default function RegisterScreen({ navigation }: any) {
     setEmail("");
     setPassword("");
 
-    if (role === "student") {
-      navigation.replace("StudentHome");
-    } else {
-      navigation.replace("ProfessorHome");
-    }
+    navigation.replace("Login");
   };
 
   return (
