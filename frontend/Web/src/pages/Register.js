@@ -92,8 +92,8 @@ function Register() {
           onChange={(e) => setRole(e.target.value)}
         >
           <option value="">Select Role</option>
-          <option value="Student">Student</option>
-          <option value="Professor">Professor</option>
+          <option value="student">Student</option>
+          <option value="professor">Professor</option>
 
       
         </select>
