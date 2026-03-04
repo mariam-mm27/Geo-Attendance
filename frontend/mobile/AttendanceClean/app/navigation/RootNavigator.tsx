@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useContext } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { AuthContext } from "../context/AuthContext";
 
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
@@ -10,32 +11,37 @@ import ProfessorHome from "../screens/ProfessorHomeScreen";
 const Stack = createNativeStackNavigator();
 
 export default function RootNavigator() {
+  const { user, role } = useContext(AuthContext);
+
   return (
     <NavigationContainer>
       <Stack.Navigator>
-        {/* Login has NO back button */}
-        <Stack.Screen 
-          name="Login" 
-          component={LoginScreen}
-          options={{  title: "Login"}}
-        />
-
-        {/* All other screens have back button */}
-        <Stack.Screen 
-          name="Register" 
-          component={RegisterScreen}
-          options={{ title: "Register" }}
-        />
-        <Stack.Screen 
-          name="StudentHome" 
-          component={StudentHome}
-          options={{ title: "Student Home Page" }}
-        />
-        <Stack.Screen 
-          name="ProfessorHome" 
-          component={ProfessorHome}
-          options={{ title: "Professor Home Page" }}
-        />
+        {!user ? (
+          <>
+            <Stack.Screen
+              name="Login"
+              component={LoginScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Register"
+              component={RegisterScreen}
+              options={{ title: "Register" }}
+            />
+          </>
+        ) : role === "student" ? (
+          <Stack.Screen
+            name="StudentHome"
+            component={StudentHome}
+            options={{ headerShown: false }}
+          />
+        ) : role === "professor" ? (
+          <Stack.Screen
+            name="ProfessorHome"
+            component={ProfessorHome}
+            options={{ headerShown: false }}
+          />
+        ) : null}
       </Stack.Navigator>
     </NavigationContainer>
   );
