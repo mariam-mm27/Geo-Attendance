@@ -24,20 +24,62 @@ export default function LoginScreen({ navigation }: any) {
   const { setUser, setRole: setUserRole } = useContext(AuthContext); // 🔹 auth context
 
   const handleLogin = async () => {
-    setError("");
+  setError("");
 
-    // 1️⃣ Validation
-    if (!role || !email || !password) {
-      setError("All fields are required.");
+  if (!role || !email || !password) {
+    setError("All fields are required.");
+    return;
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  if (role === "student" && !cleanEmail.endsWith("@std.sci.cu.edu.eg")) {
+    setError("Invalid student email domain.");
+    return;
+  }
+
+  if (role === "professor" && !cleanEmail.endsWith("@sci.cu.edu.eg")) {
+    setError("Invalid professor email domain.");
+    return;
+  }
+
+  try {
+    const cred = await signInWithEmailAndPassword(
+      auth,
+      cleanEmail,
+      password
+    );
+
+    const userRef = doc(db, "users", cred.user.uid);
+    const userSnap = await getDoc(userRef);
+
+    if (!userSnap.exists()) {
+      await auth.signOut();
+      setError("Your account is not fully registered yet.");
       return;
     }
 
-    const cleanEmail = email.trim().toLowerCase();
+    const userData = userSnap.data();
 
-    if (role === "student" && !cleanEmail.endsWith("@std.sci.cu.edu.eg")) {
-      setError("Invalid student email domain.");
+    if (userData.role !== role) {
+      await auth.signOut();
+      setError("Selected role does not match your account.");
       return;
     }
+
+ feature-login
+    // ✅ هنا بقى نعمل Navigation
+    if (userData.role === "student") {
+      navigation.replace("StudentHome");
+    } else if (userData.role === "professor") {
+      navigation.replace("ProfessorHome");
+    }
+
+  } catch (err: any) {
+    console.log("LOGIN ERROR:", err.code);
+    setError(err.message || "Login failed");
+  }
+};
 
     if (role === "professor" && !cleanEmail.endsWith("@sci.cu.edu.eg")) {
       setError("Invalid professor email domain.");
@@ -90,6 +132,7 @@ export default function LoginScreen({ navigation }: any) {
       setError(err.message || "Login failed");
     }
   };
+ main
 
   return (
     <AuthLayout>
