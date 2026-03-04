@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import {
   TextInput,
   TouchableOpacity,
@@ -13,11 +13,15 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
+import { AuthContext } from "../context/AuthContext"; // 🔹 مهم
+
 export default function LoginScreen({ navigation }: any) {
   const [role, setRole] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+
+  const { setUser, setRole: setUserRole } = useContext(AuthContext); // 🔹 auth context
 
   const handleLogin = async () => {
   setError("");
@@ -63,6 +67,7 @@ export default function LoginScreen({ navigation }: any) {
       return;
     }
 
+ feature-login
     // ✅ هنا بقى نعمل Navigation
     if (userData.role === "student") {
       navigation.replace("StudentHome");
@@ -75,6 +80,59 @@ export default function LoginScreen({ navigation }: any) {
     setError(err.message || "Login failed");
   }
 };
+
+    if (role === "professor" && !cleanEmail.endsWith("@sci.cu.edu.eg")) {
+      setError("Invalid professor email domain.");
+      return;
+    }
+
+    try {
+      // 2️⃣ Login with Firebase Auth
+      const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
+
+      // 3️⃣ Check Firestore if user exists
+      const userRef = doc(db, "users", cred.user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        // User not fully registered → logout
+        await auth.signOut();
+        setError("Your account is not fully registered yet. Please register first.");
+        return;
+      }
+
+      const userData = userSnap.data();
+
+      // 4️⃣ Security: role check
+      if (userData.role !== role.toLowerCase()) {
+        await auth.signOut();
+        setError("Selected role does not match your account.");
+        return;
+      }
+
+      // 5️⃣ Save user in AuthContext
+      setUser(cred.user);
+      setUserRole(userData.role);
+
+      // 6️⃣ Redirect حسب role
+      if (userData.role === "student") {
+        navigation.replace("StudentHome");
+      } else if (userData.role === "professor") {
+        navigation.replace("ProfessorHome");
+      } else {
+        setError("Invalid user role.");
+      }
+
+      // 7️⃣ Clear fields
+      setEmail("");
+      setPassword("");
+
+    } catch (err: any) {
+      console.log("LOGIN ERROR:", err);
+      setError(err.message || "Login failed");
+    }
+  };
+ main
 
   return (
     <AuthLayout>

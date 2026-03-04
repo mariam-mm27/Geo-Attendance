@@ -1,29 +1,65 @@
 import { useState } from "react";
+import { validateLogin } from "../utils/validation";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../firebase";
+import { useNavigate } from "react-router-dom";
 
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
 
-  const handleLogin = () => {
-    if (role === "Professor" && !email.endsWith("@sci.cu.edu.eg")) {
-  alert("Professor must use @sci.cu.edu.eg email");
-  return;
-}
+  const navigate = useNavigate();
 
-if (role === "Student" && !email.endsWith("@std.sci.cu.edu.eg")) {
-  alert("Student must use @std.sci.cu.edu.eg email");
-  return;
-}
-
+  const handleLogin = async () => {
+    // 1️⃣ UI validation
     if (!role) {
-      alert("Please select role");
+      alert("Please select a role");
       return;
     }
 
-    if (role === "Admin") window.location.href = "/admin";
-    else if (role === "Professor") window.location.href = "/professor";
-    else window.location.href = "/student";
+    const error = validateLogin({ email, password });
+    if (error) {
+      alert(error);
+      return;
+    }
+
+    try {
+      // 2️⃣ Firebase Auth
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+
+      // 3️⃣ Get user profile from Firestore
+      const userRef = doc(db, "users", cred.user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        alert("Account not registered properly.");
+        return;
+      }
+
+      const userData = userSnap.data();
+      const realRole = userData.role;
+
+      // 4️⃣ Security check (IMPORTANT 🔐)
+      if (realRole !== role.toLowerCase()) {
+        alert("Selected role does not match your account.");
+        return;
+      }
+
+      // 5️⃣ Redirect safely
+      if (realRole === "admin") {
+        navigate("/admin");
+      } else if (realRole === "professor") {
+        navigate("/professor");
+      } else {
+        navigate("/student");
+      }
+
+    } catch (err) {
+      console.log(err);
+      alert("Invalid email or password.");
+    }
   };
 
   return (
@@ -72,9 +108,9 @@ if (role === "Student" && !email.endsWith("@std.sci.cu.edu.eg")) {
           }}
         >
           <option value="">Select Role</option>
-          <option value="Student">Student</option>
-          <option value="Professor">Professor</option>
-          <option value="Admin">Admin</option>
+          <option value="student">Student</option>
+          <option value="professor">Professor</option>
+          <option value="admin">Admin</option>
         </select>
 
         {/* Email */}
@@ -122,25 +158,29 @@ if (role === "Student" && !email.endsWith("@std.sci.cu.edu.eg")) {
         >
           Login
         </button>
+
         <button
-  onClick={() => alert("Google Login (Firebase not connected yet)")}
-  style={{
-    width: "100%",
-    marginTop: "15px",
-    padding: "10px",
-    borderRadius: "8px",
-    background: "#1B8F85",
-    color: "white",
-    border: "none",
-    cursor: "pointer",
-    fontWeight: "bold"
-  }}
->
-  Login with Google
-</button>
+          onClick={() => alert("Google Login (Firebase not connected yet)")}
+          style={{
+            width: "100%",
+            marginTop: "15px",
+            padding: "10px",
+            borderRadius: "8px",
+            background: "#1B8F85",
+            color: "white",
+            border: "none",
+            cursor: "pointer",
+            fontWeight: "bold"
+          }}
+        >
+          Login with Google
+        </button>
 
         <p style={{ textAlign: "center", marginTop: "15px" }}>
-          Don't have account? <a href="/register" style={{ color: "#E68A45" }}>Register here</a>
+          Don't have account?{" "}
+          <a href="/register" style={{ color: "#E68A45" }}>
+            Register here
+          </a>
         </p>
 
       </div>
