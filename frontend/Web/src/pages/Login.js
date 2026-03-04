@@ -3,54 +3,64 @@ import { validateLogin } from "../utils/validation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import { useNavigate } from "react-router-dom";
+
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
 
- const handleLogin = async () => {
-  // 1️⃣ UI validation
-  const error = validateLogin({ email, password });
-  if (error) {
-    alert(error);
-    return;
-  }
+  const navigate = useNavigate();
 
-  try {
-    // 2️⃣ Firebase Auth
-    const cred = await signInWithEmailAndPassword(auth, email, password);
-
-    // 3️⃣ Get user profile from Firestore
-    const userRef = doc(db, "users", cred.user.uid);
-    const userSnap = await getDoc(userRef);
-
-    if (!userSnap.exists()) {
-      alert("Account not registered properly.");
+  const handleLogin = async () => {
+    // 1️⃣ UI validation
+    if (!role) {
+      alert("Please select a role");
       return;
     }
 
-    const userData = userSnap.data();
-
-    // 4️⃣ Role check (from Firestore)
-    if (userData.role !== role.toLowerCase()) {
-      alert("Selected role does not match your account.");
+    const error = validateLogin({ email, password });
+    if (error) {
+      alert(error);
       return;
     }
 
-    // 5️⃣ Redirect
-    if (userData.role === "admin") {
-      window.location.href = "/admin";
-    } else if (userData.role === "professor") {
-      window.location.href = "/professor";
-    } else {
-      window.location.href = "/student";
-    }
+    try {
+      // 2️⃣ Firebase Auth
+      const cred = await signInWithEmailAndPassword(auth, email, password);
 
-  } catch (err) {
-  console.log(err);
-  alert(err.message);
-}
-};
+      // 3️⃣ Get user profile from Firestore
+      const userRef = doc(db, "users", cred.user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        alert("Account not registered properly.");
+        return;
+      }
+
+      const userData = userSnap.data();
+      const realRole = userData.role;
+
+      // 4️⃣ Security check (IMPORTANT 🔐)
+      if (realRole !== role.toLowerCase()) {
+        alert("Selected role does not match your account.");
+        return;
+      }
+
+      // 5️⃣ Redirect safely
+      if (realRole === "admin") {
+        navigate("/admin");
+      } else if (realRole === "professor") {
+        navigate("/professor");
+      } else {
+        navigate("/student");
+      }
+
+    } catch (err) {
+      console.log(err);
+      alert("Invalid email or password.");
+    }
+  };
 
   return (
     <div style={{
@@ -148,25 +158,29 @@ function Login() {
         >
           Login
         </button>
+
         <button
-  onClick={() => alert("Google Login (Firebase not connected yet)")}
-  style={{
-    width: "100%",
-    marginTop: "15px",
-    padding: "10px",
-    borderRadius: "8px",
-    background: "#1B8F85",
-    color: "white",
-    border: "none",
-    cursor: "pointer",
-    fontWeight: "bold"
-  }}
->
-  Login with Google
-</button>
+          onClick={() => alert("Google Login (Firebase not connected yet)")}
+          style={{
+            width: "100%",
+            marginTop: "15px",
+            padding: "10px",
+            borderRadius: "8px",
+            background: "#1B8F85",
+            color: "white",
+            border: "none",
+            cursor: "pointer",
+            fontWeight: "bold"
+          }}
+        >
+          Login with Google
+        </button>
 
         <p style={{ textAlign: "center", marginTop: "15px" }}>
-          Don't have account? <a href="/register" style={{ color: "#E68A45" }}>Register here</a>
+          Don't have account?{" "}
+          <a href="/register" style={{ color: "#E68A45" }}>
+            Register here
+          </a>
         </p>
 
       </div>
