@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import {
   TextInput,
   TouchableOpacity,
@@ -13,11 +13,15 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
+import { AuthContext } from "../context/AuthContext"; // 🔹 مهم
+
 export default function LoginScreen({ navigation }: any) {
   const [role, setRole] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+
+  const { setUser, setRole: setUserRole } = useContext(AuthContext); // 🔹 auth context
 
   const handleLogin = async () => {
     setError("");
@@ -35,7 +39,7 @@ export default function LoginScreen({ navigation }: any) {
       return;
     }
 
-    if (role === "professor" && !cleanEmail.endsWith("@gmail.com")) {
+    if (role === "professor" && !cleanEmail.endsWith("@sci.cu.edu.eg")) {
       setError("Invalid professor email domain.");
       return;
     }
@@ -57,7 +61,18 @@ export default function LoginScreen({ navigation }: any) {
 
       const userData = userSnap.data();
 
-      // 4️⃣ Redirect according to role
+      // 4️⃣ Security: role check
+      if (userData.role !== role.toLowerCase()) {
+        await auth.signOut();
+        setError("Selected role does not match your account.");
+        return;
+      }
+
+      // 5️⃣ Save user in AuthContext
+      setUser(cred.user);
+      setUserRole(userData.role);
+
+      // 6️⃣ Redirect حسب role
       if (userData.role === "student") {
         navigation.replace("StudentHome");
       } else if (userData.role === "professor") {
@@ -66,7 +81,7 @@ export default function LoginScreen({ navigation }: any) {
         setError("Invalid user role.");
       }
 
-      // 5️⃣ Clear fields
+      // 7️⃣ Clear fields
       setEmail("");
       setPassword("");
 
