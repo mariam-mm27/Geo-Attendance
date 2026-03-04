@@ -1,6 +1,14 @@
+ feature-login
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../context/AuthContext";
+
+import React, { useContext } from "react";
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { AuthContext } from "../context/AuthContext";
+
+ main
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
 import ProfessorHome from "../screens/ProfessorHomeScreen";
@@ -10,6 +18,7 @@ import { View, ActivityIndicator } from "react-native";
 const Stack = createNativeStackNavigator();
 
 export default function RootNavigator() {
+ feature-login
   const { user, role, loading } = useAuth();
 
   if (loading) {
@@ -36,5 +45,40 @@ export default function RootNavigator() {
         <Stack.Screen name="Login" component={LoginScreen} />
       )}
     </Stack.Navigator>
+
+  const { user, role } = useContext(AuthContext);
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator>
+        {!user ? (
+          <>
+            <Stack.Screen
+              name="Login"
+              component={LoginScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Register"
+              component={RegisterScreen}
+              options={{ title: "Register" }}
+            />
+          </>
+        ) : role === "student" ? (
+          <Stack.Screen
+            name="StudentHome"
+            component={StudentHome}
+            options={{ headerShown: false }}
+          />
+        ) : role === "professor" ? (
+          <Stack.Screen
+            name="ProfessorHome"
+            component={ProfessorHome}
+            options={{ headerShown: false }}
+          />
+        ) : null}
+      </Stack.Navigator>
+    </NavigationContainer>
+ main
   );
 }
