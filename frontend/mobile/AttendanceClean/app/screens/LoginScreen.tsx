@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState } from "react";
 import {
   TextInput,
   TouchableOpacity,
@@ -13,7 +13,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
-import { AuthContext } from "../context/AuthContext"; // 🔹 مهم
+import { useAuth } from "../context/AuthContext"; // ✅ بدل AuthContext
 
 export default function LoginScreen({ navigation }: any) {
   const [role, setRole] = useState("");
@@ -21,7 +21,7 @@ export default function LoginScreen({ navigation }: any) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const { setUser, setRole: setUserRole } = useContext(AuthContext); // 🔹 auth context
+  const { setUser, setRole: setUserRole } = useAuth(); // ✅ الحل
 
   const handleLogin = async () => {
     setError("");

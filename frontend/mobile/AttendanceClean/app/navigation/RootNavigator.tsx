@@ -11,37 +11,54 @@ import ProfessorHome from "../screens/ProfessorHomeScreen";
 const Stack = createNativeStackNavigator();
 
 export default function RootNavigator() {
-  const { user, role } = useContext(AuthContext);
+  const auth = useContext(AuthContext);
+
+  if (!auth) return null;
+
+  const { user, role } = auth;
 
   return (
     <NavigationContainer>
-      <Stack.Navigator>
-        {!user ? (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+
+        {/* لو مفيش يوزر */}
+        {!user && (
           <>
             <Stack.Screen
               name="Login"
               component={LoginScreen}
-              options={{ headerShown: false }}
             />
             <Stack.Screen
               name="Register"
               component={RegisterScreen}
-              options={{ title: "Register" }}
             />
           </>
-        ) : role === "student" ? (
+        )}
+
+        {/* لو Student */}
+        {user && role === "student" && (
           <Stack.Screen
             name="StudentHome"
             component={StudentHome}
-            options={{ headerShown: false }}
           />
-        ) : role === "professor" ? (
+        )}
+
+        {/* لو Professor */}
+        {user && role === "professor" && (
           <Stack.Screen
             name="ProfessorHome"
             component={ProfessorHome}
-            options={{ headerShown: false }}
           />
-        ) : null}
+        )}
+
+        {/* fallback لو role لسه null */}
+        {user && !role && (
+          <Stack.Screen
+            name="Login"
+            component={LoginScreen}
+          />
+        )}
+
       </Stack.Navigator>
     </NavigationContainer>
   );

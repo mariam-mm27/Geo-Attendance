@@ -1,11 +1,15 @@
-import React, { useContext } from 'react';
-import { View, Text, Button } from 'react-native';
+import React, { useContext } from "react";
+import { View, Text, Button } from "react-native";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import { AuthContext } from "../context/AuthContext";
 
 export default function ProfessorHomeScreen() {
-  const { setUser, setRole } = useContext(AuthContext);
+  const authContext = useContext(AuthContext);
+
+  if (!authContext) return null;
+
+  const { setUser, setRole } = authContext;
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -17,7 +21,7 @@ export default function ProfessorHomeScreen() {
     <View style={{ padding: 20 }}>
       <Text>Hello this is the professor home page</Text>
 
-      
+      <Button title="Logout" onPress={handleLogout} />
     </View>
   );
 }
