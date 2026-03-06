@@ -5,11 +5,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
-  Alert
+  Alert,
 } from "react-native";
+import { useContext } from "react";
 import { signOut } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { AuthContext } from "../context/AuthContext";
 
 type Student = {
   name: string;
@@ -18,7 +20,6 @@ type Student = {
 };
 
 export default function StudentHomeScreen({ navigation }: any) {
-
   const [student, setStudent] = useState<Student>({
     name: "",
     id: "",
@@ -26,9 +27,7 @@ export default function StudentHomeScreen({ navigation }: any) {
   });
 
   useEffect(() => {
-
     const getStudentData = async () => {
-
       const user = auth.currentUser;
 
       if (!user) {
@@ -36,12 +35,10 @@ export default function StudentHomeScreen({ navigation }: any) {
       }
 
       try {
-
         const docRef = doc(db, "users", user.uid);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-
           const data = docSnap.data() as {
             name: string;
             studentId: string;
@@ -51,65 +48,60 @@ export default function StudentHomeScreen({ navigation }: any) {
           setStudent({
             name: data.name,
             id: data.studentId,
-            email: data.email
+            email: data.email,
           });
-
         }
-
       } catch (error) {
         console.log("Error fetching student data:", error);
         Alert.alert("Error", "Failed to load student data");
       }
-
     };
 
     getStudentData();
-
   }, []);
 
-  const handleLogout = () => {
+  const authContext = useContext(AuthContext);
 
-    Alert.alert(
-      "Log Out",
-      "Are you sure you want to log out?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Log Out",
-          style: "destructive",
-          onPress: logoutUser
-        }
-      ]
-    );
+  if (!authContext) return null;
 
+  const { setUser, setRole } = authContext;
+
+  const handleLogout = async () => {
+    // Alert.alert("Log Out", "Are you sure you want to log out?", [
+    //   { text: "Cancel", style: "cancel" },
+    //   {
+    //     text: "Log Out",
+    //     style: "destructive",
+    //     onPress: logoutUser,
+    //   },
+    // ]);
+    await signOut(auth);
+    setUser(null);
+    setRole(null);
+    navigation.replace("Login");
   };
 
-  const logoutUser = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.log("Logout error:", error);
-    }
-  };
+  // const logoutUser = async () => {
+  //   try {
+  //     await signOut(auth);
+  //   } catch (error) {
+  //     console.log("Logout error:", error);
+  //   }
+  // };
 
   return (
     <SafeAreaView style={styles.container}>
-
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Student Dashboard</Text>
 
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={handleLogout}
-        >
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </View>
 
       {/* Personal Info */}
       <View style={styles.card}>
-
         <Text style={styles.cardTitle}>Personal Information</Text>
 
         <View style={styles.row}>
@@ -126,7 +118,6 @@ export default function StudentHomeScreen({ navigation }: any) {
           <Text style={styles.label}>Email</Text>
           <Text style={styles.value}>{student.email}</Text>
         </View>
-
       </View>
 
       {/* Scan Button */}
@@ -136,13 +127,11 @@ export default function StudentHomeScreen({ navigation }: any) {
       >
         <Text style={styles.buttonText}>Scan QR</Text>
       </TouchableOpacity>
-
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-
   container: {
     flex: 1,
     backgroundColor: "#F4F6FA",
@@ -190,7 +179,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 15,
-    color: "#3F5BD9"
+    color: "#3F5BD9",
   },
 
   row: {
@@ -222,5 +211,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
-
 });
