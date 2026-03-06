@@ -13,40 +13,6 @@
   }
 }
 
-.dashboard-container {
-  background-color: #f1f5f9;
-  min-height: 100vh;
-  padding: 40px 20px;
-  font-family: 'Inter', sans-serif;
-}
-
-.profile-card {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-  margin-bottom: 30px;
-}
-
-.subject-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
-}
-
-.subject-card {
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
-  border: 1px solid #e2e8f0;
-  transition: transform 0.2s;
-}
-
-.subject-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-}
-
 .App-header {
   background-color: #282c34;
   min-height: 100vh;

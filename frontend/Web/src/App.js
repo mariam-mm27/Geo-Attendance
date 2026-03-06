@@ -1,45 +1,27 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./utils/AuthContex";
 import PrivateRoute from "./utils/PrivateRoute";
-import { Toaster } from "react-hot-toast";
 
-import Login from "./Login";
-import Register from "./Register";
-import Reports from "./pages/Reports";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import ProfessorProfile from "./pages/Professor/ProfessorProfile";
-import StudentProfile from "./pages/Student/StudentProfile";
-import CourseDetails from "./pages/admin/CourseDetails";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Admin from "./pages/Admin";
+import Student from "./pages/Student";
+import Professor from "./pages/Professor";
+import Profile from "./pages/Profile";
 
 function App() {
   return (
     <AuthProvider>
-
-      <Toaster position="top-right" />
-
-      <BrowserRouter>
-
-        <Routes>
-
-          <Route path="/" element={<Login />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-
-          <Route
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+          Security
+         <Route
             path="/admin"
             element={
               <PrivateRoute allowedRoles={["admin"]}>
-                <AdminDashboard />
-              </PrivateRoute>
-            }
-          />
-
-          <Route
-            path="/professor"
-            element={
-              <PrivateRoute allowedRoles={["professor"]}>
-                <ProfessorProfile />
+                <Admin />
               </PrivateRoute>
             }
           />
@@ -48,35 +30,26 @@ function App() {
             path="/student"
             element={
               <PrivateRoute allowedRoles={["student"]}>
-                <StudentProfile />
-              </PrivateRoute>
-            }
-          />
-
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-
-          <Route
-            path="/reports/:courseId"
-            element={
-              <PrivateRoute allowedRoles={["admin", "professor"]}>
-                <Reports />
+                <Student />
               </PrivateRoute>
             }
           />
 
           <Route
-            path="/details/:type/:id"
+            path="/professor"
             element={
-              <PrivateRoute allowedRoles={["admin"]}>
-                <CourseDetails />
+              <PrivateRoute allowedRoles={["professor"]}>
+                <Professor />
               </PrivateRoute>
             }
           />
-
-        </Routes>
-
-      </BrowserRouter>
-
+        <Route path="/admin" element={<Admin />} />
+        <Route path="/student" element={<Student />} />
+        <Route path="/professor" element={<Professor />} />
+        <Route path="/profile" element={<Profile />} />
+ main
+      </Routes>
+    </BrowserRouter>
     </AuthProvider>
   );
 }
