@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom"; 
 import { auth, db } from "../../firebase"; 
 import { doc, getDoc } from "firebase/firestore";
@@ -21,8 +21,10 @@ const StudentProfile = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   useEffect(() => {
+    // Prevent back navigation
     window.history.pushState(null, null, window.location.href);
-    window.onpopstate = () => window.history.go(1);
+    const stopBack = () => window.history.pushState(null, null, window.location.href);
+    window.addEventListener("popstate", stopBack);
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -35,12 +37,18 @@ const StudentProfile = () => {
         window.location.replace("/login"); 
       }
     });
-    return () => unsubscribe();
+    
+    return () => {
+      window.removeEventListener("popstate", stopBack);
+      unsubscribe();
+    };
   }, []);
 
   const handleLogout = async () => {
-    await signOut(auth); 
-    window.location.replace("/login"); 
+    await signOut(auth);
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.href = "/login";
   };
 
   return (

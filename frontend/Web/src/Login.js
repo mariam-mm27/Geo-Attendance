@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { validateLogin } from "./utils/validation";
 import { 
   signInWithEmailAndPassword, 
@@ -15,6 +15,93 @@ function Login() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
   const navigate = useNavigate();
+  const formRef = useRef(null);
+
+
+  useEffect(() => {
+   
+    setEmail("");
+    setPassword("");
+    setRole("");
+    
+    if (formRef.current) {
+      formRef.current.reset();
+    }
+    
+    const clearAllInputs = () => {
+      const inputs = document.querySelectorAll('input, select');
+      inputs.forEach(input => {
+        if (input instanceof HTMLInputElement) {
+          input.value = '';
+          input.defaultValue = '';
+        } else if (input instanceof HTMLSelectElement) {
+          input.selectedIndex = 0;
+        }
+      });
+    };
+    
+    clearAllInputs();
+    setTimeout(clearAllInputs, 50);
+    setTimeout(clearAllInputs, 100);
+    setTimeout(clearAllInputs, 200);
+    
+    window.history.pushState(null, '', window.location.href);
+    const handlePopState = () => {
+      window.history.pushState(null, '', window.location.href);
+    };
+    window.addEventListener('popstate', handlePopState);
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
+  useEffect(() => {
+    const clearForm = () => {
+      setEmail("");
+      setPassword("");
+      setRole("");
+      
+      if (formRef.current) {
+        formRef.current.reset();
+      }
+      
+      setTimeout(() => {
+        const inputs = document.querySelectorAll('input, select');
+        inputs.forEach(input => {
+          if (input instanceof HTMLInputElement) {
+            input.value = '';
+          } else if (input instanceof HTMLSelectElement) {
+            input.selectedIndex = 0;
+          }
+        });
+      }, 0);
+    };
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        clearForm();
+      }
+    };
+    
+    const handleFocus = () => {
+      clearForm();
+    };
+    
+    const handlePageShow = (event) => {
+      clearForm();
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('pageshow', handlePageShow);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, []);
 
   const allowedAdminEmails = [
     "alaatantawy352@gmail.com",
@@ -25,7 +112,6 @@ function Login() {
     "mariam10182005@gmail.com"
   ];
 
-  // دالة تسجيل الدخول بـ جوجل
   const handleGoogleLogin = async () => {
     if (!role) {
       alert("Please select a role first!");
@@ -37,7 +123,6 @@ function Login() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      // التأكد من وجود اليوزر في Firestore
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
 
@@ -56,7 +141,6 @@ function Login() {
     }
   };
 
-  // دالة مشتركة للتوجيه (عشان منكررش الكود)
   const redirectUser = (userData, userEmail) => {
     const userRoleInDB = userData.role ? userData.role.toLowerCase().trim() : "";
     const selectedRole = role.toLowerCase().trim();
@@ -117,37 +201,75 @@ function Login() {
           <h2 style={{ color: "#173B66", fontSize: "24px", marginBottom: "20px" }}>Login</h2>
         </div>
 
-        <select value={role} onChange={(e) => setRole(e.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid #CBD5E1", height: "42px", fontSize: "14px", color: "#000", background: "white", marginBottom: "15px" }}>
-          <option value="" disabled>Select Role</option>
-          <option value="student">Student</option>
-          <option value="professor">Professor</option>
-          <option value="admin">Admin</option>
-        </select>
+        <form ref={formRef} onSubmit={(e) => e.preventDefault()}>
+          <select 
+            value={role} 
+            onChange={(e) => setRole(e.target.value)} 
+            style={{ 
+              width: "100%", 
+              padding: "10px 12px", 
+              borderRadius: "8px", 
+              border: "1px solid #CBD5E1", 
+              height: "42px", 
+              fontSize: "15px", 
+              color: role ? "#000" : "#64748B", 
+              background: "white", 
+              marginBottom: "15px",
+              fontWeight: role ? "600" : "normal"
+            }}
+            autoComplete="off"
+          >
+            <option value="" style={{ color: "#94A3B8", backgroundColor: "#F8FAFC" }}>-- Select Your Role --</option>
+            <option value="student" style={{ color: "#000", fontWeight: "600", backgroundColor: "white", padding: "10px" }}>Student</option>
+            <option value="professor" style={{ color: "#000", fontWeight: "600", backgroundColor: "white", padding: "10px" }}> Professor</option>
+            <option value="admin" style={{ color: "#000", fontWeight: "600", backgroundColor: "white", padding: "10px" }}>Admin</option>
+          </select>
 
-        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: "100%", padding: "10px", marginBottom: "15px", borderRadius: "8px", border: "1px solid #CBD5E1", boxSizing: "border-box" }} />
-        <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: "100%", padding: "10px", marginBottom: "20px", borderRadius: "8px", border: "1px solid #CBD5E1", boxSizing: "border-box" }} />
+          <input 
+            type="email" 
+            placeholder="Email" 
+            value={email} 
+            onChange={(e) => setEmail(e.target.value)} 
+            style={{ width: "100%", padding: "10px", marginBottom: "15px", borderRadius: "8px", border: "1px solid #CBD5E1", boxSizing: "border-box" }}
+            autoComplete="off"
+          />
+          
+          <input 
+            type="password" 
+            placeholder="Password" 
+            value={password} 
+            onChange={(e) => setPassword(e.target.value)} 
+            style={{ width: "100%", padding: "10px", marginBottom: "20px", borderRadius: "8px", border: "1px solid #CBD5E1", boxSizing: "border-box" }}
+            autoComplete="off"
+          />
 
-        <button onClick={handleLogin} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "#173B66", color: "white", border: "none", cursor: "pointer", fontWeight: "bold", fontSize: "16px" }}>
-          Login
-        </button>
+          <button 
+            type="button"
+            onClick={handleLogin} 
+            style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "#173B66", color: "white", border: "none", cursor: "pointer", fontWeight: "bold", fontSize: "16px" }}
+          >
+            Login
+          </button>
 
-       <button 
-  onClick={handleGoogleLogin} 
-  style={{ 
-    width: "100%", 
-    marginTop: "12px", 
-    padding: "10px", 
-    borderRadius: "8px", 
-    background: "#1B8F85", 
-    color: "white", 
-    border: "none", 
-    cursor: "pointer", 
-    fontWeight: "bold", 
-    fontSize: "15px"
-  }}
->
-  Login with Google
-</button>
+          <button 
+            type="button"
+            onClick={handleGoogleLogin} 
+            style={{ 
+              width: "100%", 
+              marginTop: "12px", 
+              padding: "10px", 
+              borderRadius: "8px", 
+              background: "#1B8F85", 
+              color: "white", 
+              border: "none", 
+              cursor: "pointer", 
+              fontWeight: "bold", 
+              fontSize: "15px"
+            }}
+          >
+            Login with Google
+          </button>
+        </form>
 
         <p style={{ textAlign: "center", marginTop: "15px", color: "#64748B", fontSize: "14px" }}>
           Don't have account? <a href="/register" style={{ color: "#E68A45", textDecoration: "none", fontWeight: "bold" }}>Register here</a>

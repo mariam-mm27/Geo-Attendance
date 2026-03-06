@@ -3,7 +3,7 @@ import { validateRegister } from "./utils/validation";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
-import { useNavigate } from "react-router-dom"; // 1. استيراد التنقل
+import { useNavigate } from "react-router-dom"; 
 
 function Register() {
   const [name, setName] = useState("");
@@ -12,7 +12,7 @@ function Register() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
   const [adminCode, setAdminCode] = useState("");
-  const navigate = useNavigate(); // 2. تعريف التنقل
+  const navigate = useNavigate(); 
 
   const handleRegister = async () => {
     const error = validateRegister({
@@ -70,10 +70,10 @@ function Register() {
       display: "flex",
       justifyContent: "center",
       alignItems: "center",
-      position: "relative" // ضروري لمكان السهم
+      position: "relative" 
     }}>
       
-      {/* 3. سهم الرجوع للـ Login */}
+      {}
       <div 
         onClick={() => navigate("/login")}
         style={{
@@ -101,20 +101,21 @@ function Register() {
           Create Account
         </h2>
 
-        {/* 4. تعديل لون الـ Select ومنع الـ Autofill */}
         <select
           style={{
             width: "100%", padding: "12px", marginTop: "10px",
             borderRadius: "8px", border: "1px solid #CBD5E1", outline: "none",
-            color: "#000", // اللون الأسود الواضح
-            background: "white"
+            color: role ? "#000" : "#64748B",
+            background: "white",
+            fontSize: "15px",
+            fontWeight: role ? "600" : "normal"
           }}
           value={role}
           onChange={(e) => setRole(e.target.value)}
         >
-          <option value="" style={{ color: "#64748B" }}>Select Role</option>
-          <option value="student">Student</option>
-          <option value="professor">Professor</option>
+          <option value="" disabled style={{ color: "#94A3B8", backgroundColor: "#F8FAFC" }}>-- Select Your Role --</option>
+          <option value="student" style={{ color: "#000", fontWeight: "600", backgroundColor: "white" }}> Student</option>
+          <option value="professor" style={{ color: "#000", fontWeight: "600", backgroundColor: "white" }}> Professor</option>
         </select>
 
         <input
@@ -169,21 +170,11 @@ function Register() {
           style={{
             width: "100%", marginTop: "25px", padding: "12px",
             borderRadius: "8px", background: "#173B66",
-            color: "white", border: "none", cursor: "pointer", fontWeight: "bold"
+            color: "white", border: "none", cursor: "pointer", fontWeight: "bold",
+            fontSize: "15px"
           }}
         >
           Register
-        </button>
-        
-        <button
-          onClick={() => alert("Google Sign Up Coming Soon")}
-          style={{
-            width: "100%", marginTop: "15px", padding: "12px",
-            borderRadius: "8px", background: "#1B8F85",
-            color: "white", border: "none", cursor: "pointer", fontWeight: "bold"
-          }}
-        >
-          Sign up with Google
         </button>
 
         <p style={{ textAlign: "center", marginTop: "20px", fontSize: "14px", color: "#64748B" }}>
