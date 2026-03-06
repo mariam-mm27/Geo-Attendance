@@ -40,6 +40,7 @@ const ResetPasswordPage = () => {
       setLoading(false);
     }
   };
+  
   const handleBackNavigation = () => {
     if (userRole === "professor") {
       navigate("/professor");
@@ -52,7 +53,6 @@ const ResetPasswordPage = () => {
 
   return (
     <div style={styles.container}>
-      {}
       <div style={styles.backWrapper} onClick={handleBackNavigation}>
         <span style={styles.backArrow}>←</span>
         <span style={styles.backText}>Back</span>
