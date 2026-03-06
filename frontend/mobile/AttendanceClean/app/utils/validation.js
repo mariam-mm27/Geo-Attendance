@@ -41,8 +41,8 @@ export const validateRegister = ({
     return "Student email must end with @std.sci.cu.edu.eg";
   }
 
-  if (role === "professor" && !email.endsWith("@gmail.com")) {
-    return "Professor email must end with @gmail.com";
+  if (role === "professor" && !email.endsWith("@sci.cu.edu.eg")) {
+    return "Professor email must end with @sci.cu.edu.eg";
   }
 
   return null;
