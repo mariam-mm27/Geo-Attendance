@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useContext } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { AuthContext } from "../context/AuthContext";
 
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
@@ -10,32 +11,54 @@ import ProfessorHome from "../screens/ProfessorHomeScreen";
 const Stack = createNativeStackNavigator();
 
 export default function RootNavigator() {
+  const auth = useContext(AuthContext);
+
+  if (!auth) return null;
+
+  const { user, role } = auth;
+
   return (
     <NavigationContainer>
-      <Stack.Navigator>
-        {/* Login has NO back button */}
-        <Stack.Screen 
-          name="Login" 
-          component={LoginScreen}
-          options={{  title: "Login"}}
-        />
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
 
-        {/* All other screens have back button */}
-        <Stack.Screen 
-          name="Register" 
-          component={RegisterScreen}
-          options={{ title: "Register" }}
-        />
-        <Stack.Screen 
-          name="StudentHome" 
-          component={StudentHome}
-          options={{ title: "Student Home Page" }}
-        />
-        <Stack.Screen 
-          name="ProfessorHome" 
-          component={ProfessorHome}
-          options={{ title: "Professor Home Page" }}
-        />
+        {/* لو مفيش يوزر */}
+        {!user && (
+          <>
+            <Stack.Screen
+              name="Login"
+              component={LoginScreen}
+            />
+            <Stack.Screen
+              name="Register"
+              component={RegisterScreen}
+            />
+          </>
+        )}
+
+        {/* لو Student */}
+        {user && role === "student" && (
+          <Stack.Screen
+            name="StudentHome"
+            component={StudentHome}
+          />
+        )}
+
+        {/* لو Professor */}
+        {user && role === "professor" && (
+          <Stack.Screen
+            name="ProfessorHome"
+            component={ProfessorHome}
+          />
+        )}
+
+        {/* fallback لو role لسه null */}
+        {user && !role && (
+          <Stack.Screen
+            name="Login"
+            component={LoginScreen}
+          />
+        )}
+
       </Stack.Navigator>
     </NavigationContainer>
   );
