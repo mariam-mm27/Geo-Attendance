@@ -21,15 +21,23 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const preventNavigation = () => {
-      window.history.pushState(null, '', window.location.href);
+    // Aggressive back button prevention
+    const preventBack = () => {
+      window.history.forward();
     };
     
-    window.history.pushState(null, '', window.location.href);
-    window.addEventListener('popstate', preventNavigation);
+    // Push multiple states to make it harder to go back
+    window.history.pushState(null, null, window.location.href);
+    window.history.pushState(null, null, window.location.href);
+    window.history.pushState(null, null, window.location.href);
+    
+    window.addEventListener('popstate', preventBack);
+    
+    // Also prevent on page load
+    setTimeout(preventBack, 0);
     
     return () => {
-      window.removeEventListener('popstate', preventNavigation);
+      window.removeEventListener('popstate', preventBack);
     };
   }, []);
 
