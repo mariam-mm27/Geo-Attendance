@@ -22,6 +22,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+
       if (firebaseUser) {
         setUser(firebaseUser);
 
@@ -33,20 +34,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } else {
           setRole(null);
         }
+
       } else {
         setUser(null);
         setRole(null);
       }
 
       setLoading(false);
+
     });
 
     return unsubscribe;
+
   }, []);
 
   return (
     <AuthContext.Provider value={{ user, role, loading, setUser, setRole }}>
-      {children}
+      {loading ? null : children}
     </AuthContext.Provider>
   );
 };

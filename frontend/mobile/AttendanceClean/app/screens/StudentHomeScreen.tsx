@@ -1,27 +1,226 @@
-import React, { useContext } from "react";
-import { View, Text, Button } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  SafeAreaView,
+  Alert
+} from "react-native";
 import { signOut } from "firebase/auth";
-import { auth } from "../firebase";
-import { AuthContext } from "../context/AuthContext";
+import { auth, db } from "../firebase";
+import { doc, getDoc } from "firebase/firestore";
 
-export default function StudentHomeScreen() {
-  const authContext = useContext(AuthContext);
+type Student = {
+  name: string;
+  id: string;
+  email: string;
+};
 
-  if (!authContext) return null;
+export default function StudentHomeScreen({ navigation }: any) {
 
-  const { setUser, setRole } = authContext;
+  const [student, setStudent] = useState<Student>({
+    name: "",
+    id: "",
+    email: "",
+  });
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    setUser(null);
-    setRole(null);
+  useEffect(() => {
+
+    const getStudentData = async () => {
+
+      const user = auth.currentUser;
+
+      if (!user) {
+        return;
+      }
+
+      try {
+
+        const docRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+
+          const data = docSnap.data() as {
+            name: string;
+            studentId: string;
+            email: string;
+          };
+
+          setStudent({
+            name: data.name,
+            id: data.studentId,
+            email: data.email
+          });
+
+        }
+
+      } catch (error) {
+        console.log("Error fetching student data:", error);
+        Alert.alert("Error", "Failed to load student data");
+      }
+
+    };
+
+    getStudentData();
+
+  }, []);
+
+  const handleLogout = () => {
+
+    Alert.alert(
+      "Log Out",
+      "Are you sure you want to log out?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Log Out",
+          style: "destructive",
+          onPress: logoutUser
+        }
+      ]
+    );
+
+  };
+
+  const logoutUser = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.log("Logout error:", error);
+    }
   };
 
   return (
-    <View style={{ padding: 20 }}>
-      <Text>Hello this is the student home page</Text>
+    <SafeAreaView style={styles.container}>
 
-      <Button title="Logout" onPress={handleLogout} />
-    </View>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Student Dashboard</Text>
+
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+        >
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Personal Info */}
+      <View style={styles.card}>
+
+        <Text style={styles.cardTitle}>Personal Information</Text>
+
+        <View style={styles.row}>
+          <Text style={styles.label}>Name</Text>
+          <Text style={styles.value}>{student.name}</Text>
+        </View>
+
+        <View style={styles.row}>
+          <Text style={styles.label}>Student ID</Text>
+          <Text style={styles.value}>{student.id}</Text>
+        </View>
+
+        <View style={styles.row}>
+          <Text style={styles.label}>Email</Text>
+          <Text style={styles.value}>{student.email}</Text>
+        </View>
+
+      </View>
+
+      {/* Scan Button */}
+      <TouchableOpacity
+        style={styles.scanButton}
+        onPress={() => navigation.navigate("ScanQR")}
+      >
+        <Text style={styles.buttonText}>Scan QR</Text>
+      </TouchableOpacity>
+
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+
+  container: {
+    flex: 1,
+    backgroundColor: "#F4F6FA",
+    padding: 20,
+  },
+
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+
+  title: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#3F5BD9",
+  },
+
+  logoutButton: {
+    backgroundColor: "#3F5BD9",
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+  },
+
+  logoutText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
+  card: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 15,
+    color: "#3F5BD9"
+  },
+
+  row: {
+    marginBottom: 15,
+  },
+
+  label: {
+    fontSize: 14,
+    color: "#7A7A7A",
+  },
+
+  value: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+
+  scanButton: {
+    marginTop: 20,
+    alignSelf: "flex-start",
+    backgroundColor: "#3F5BD9",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+
+  buttonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
+});

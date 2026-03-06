@@ -1,63 +1,30 @@
-import React, { useContext } from "react";
+import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { AuthContext } from "../context/AuthContext";
 
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
-import StudentHome from "../screens/StudentHomeScreen";
-import ProfessorHome from "../screens/ProfessorHomeScreen";
+import StudentHomeScreen from "../screens/StudentHomeScreen";
+import ProfessorHomeScreen from "../screens/ProfessorHomeScreen";
+import ScanQRScreen from "../screens/ScanQRScreen";
 
 const Stack = createNativeStackNavigator();
 
 export default function RootNavigator() {
-  const auth = useContext(AuthContext);
-
-  if (!auth) return null;
-
-  const { user, role } = auth;
-
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
 
-        {/* لو مفيش يوزر */}
-        {!user && (
-          <>
-            <Stack.Screen
-              name="Login"
-              component={LoginScreen}
-            />
-            <Stack.Screen
-              name="Register"
-              component={RegisterScreen}
-            />
-          </>
-        )}
+        {/* يبدأ باللوج ان */}
+        <Stack.Screen name="Login" component={LoginScreen} />
 
-        {/* لو Student */}
-        {user && role === "student" && (
-          <Stack.Screen
-            name="StudentHome"
-            component={StudentHome}
-          />
-        )}
+        <Stack.Screen name="Register" component={RegisterScreen} />
 
-        {/* لو Professor */}
-        {user && role === "professor" && (
-          <Stack.Screen
-            name="ProfessorHome"
-            component={ProfessorHome}
-          />
-        )}
+        <Stack.Screen name="StudentHome" component={StudentHomeScreen} />
 
-        {/* fallback لو role لسه null */}
-        {user && !role && (
-          <Stack.Screen
-            name="Login"
-            component={LoginScreen}
-          />
-        )}
+        <Stack.Screen name="ProfessorHome" component={ProfessorHomeScreen} />
+
+        <Stack.Screen name="ScanQR" component={ScanQRScreen} />
 
       </Stack.Navigator>
     </NavigationContainer>
