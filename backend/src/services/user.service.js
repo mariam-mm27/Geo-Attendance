@@ -52,13 +52,3 @@ export const updateUser = async (uid, data) => {
     throw err;
   }
 };
-
-export const getStudents = async () => {
-  const snapshot = await db.collection(USERS_COLLECTION).where("role", "==", "student").get();
-  return snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
-};
-
-export const getProfessors = async () => {
-  const snapshot = await db.collection(USERS_COLLECTION).where("role", "==", "professor").get();
-  return snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
-};
