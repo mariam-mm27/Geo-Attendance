@@ -5,16 +5,13 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon src/app.js",
-    "start": "node src/app.js"
-  },
+  "dev": "nodemon src/app.js",
+  "start": "node src/app.js"
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "nodemon": "^3.1.14"
-  },
-  "dependencies": {
-    "firebase-admin": "^13.7.0"
   }
 }
