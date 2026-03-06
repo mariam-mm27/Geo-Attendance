@@ -1,11 +1,24 @@
 // backend/src/config/firebase.js
-const admin = require("firebase-admin");
-const serviceAccount = require("../../geo-attendance-f0d04-firebase-adminsdk-fbsvc-09b2e10fe1.json"); // تأكدي المسار
+import admin from "firebase-admin";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+
+const serviceAccountPath = join(process.cwd(), "backend", "serviceAccount.json");
+
+let serviceAccount;
+try {
+  serviceAccount = JSON.parse(readFileSync(serviceAccountPath, "utf-8"));
+} catch (err) {
+  console.error("Error reading serviceAccount.json:", err.message);
+  process.exit(1);
+}
+
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.cert(serviceAccount),
 });
 
-const db = admin.firestore();
+export const db = admin.firestore();
 
-module.exports = db;
+console.log("Firebase initialized and Firestore connected!");
