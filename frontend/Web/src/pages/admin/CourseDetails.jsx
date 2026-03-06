@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";       
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { FaArrowLeft, FaBook, FaUsers, FaChartBar, FaClock } from "react-icons/fa";
