@@ -13,7 +13,6 @@ function Login() {
   const navigate = useNavigate();
 
   const handleLogin = async () => {
-    // 1️⃣ UI validation
     if (!role) {
       alert("Please select a role");
       return;
@@ -26,10 +25,8 @@ function Login() {
     }
 
     try {
-      // 2️⃣ Firebase Auth
       const cred = await signInWithEmailAndPassword(auth, email, password);
 
-      // 3️⃣ Get user profile from Firestore
       const userRef = doc(db, "users", cred.user.uid);
       const userSnap = await getDoc(userRef);
 
@@ -41,13 +38,11 @@ function Login() {
       const userData = userSnap.data();
       const realRole = userData.role;
 
-      // 4️⃣ Security check (IMPORTANT 🔐)
       if (realRole !== role.toLowerCase()) {
         alert("Selected role does not match your account.");
         return;
       }
 
-      // 5️⃣ Redirect safely
       if (realRole === "admin") {
         navigate("/admin");
       } else if (realRole === "professor") {

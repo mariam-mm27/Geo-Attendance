@@ -5,6 +5,7 @@ import Login from "./Login";
 import Register from "./Register";
 import Reports from "./pages/Reports";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ProfessorProfile from "./pages/Professor/ProfessorProfile";
 import StudentProfile from "./pages/Student/StudentProfile";
@@ -17,6 +18,7 @@ function App() {
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/professor" element={<ProfessorProfile />} />

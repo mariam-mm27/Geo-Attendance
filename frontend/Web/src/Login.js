@@ -4,7 +4,8 @@ import {
   signInWithEmailAndPassword, 
   signOut, 
   GoogleAuthProvider, 
-  signInWithPopup 
+  signInWithPopup,
+  sendPasswordResetEmail
 } from "firebase/auth"; 
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
@@ -14,6 +15,8 @@ function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
   const navigate = useNavigate();
   const formRef = useRef(null);
 
@@ -188,12 +191,88 @@ function Login() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!resetEmail.trim()) {
+      alert("Please enter your email address");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(resetEmail)) {
+      alert("Please enter a valid email address");
+      return;
+    }
+
+    try {
+      console.log("Attempting to send password reset email to:", resetEmail.trim());
+      
+      const actionCodeSettings = {
+        url: window.location.origin + '/forgot-password',
+        handleCodeInApp: true
+      };
+      
+      await sendPasswordResetEmail(auth, resetEmail.trim(), actionCodeSettings);
+      
+      console.log("Password reset email sent successfully");
+      alert("Password reset email sent successfully! Please check your inbox and spam folder.");
+      setShowForgotPassword(false);
+      setResetEmail("");
+    } catch (error) {
+      console.error("Password reset error:", error);
+      console.error("Error code:", error.code);
+      console.error("Error message:", error.message);
+      
+      if (error.code === 'auth/user-not-found') {
+        alert("No account found with this email address.");
+      } else if (error.code === 'auth/invalid-email') {
+        alert("Invalid email address.");
+      } else if (error.code === 'auth/missing-email') {
+        alert("Please enter an email address.");
+      } else {
+        alert("Error: " + error.message + "\n\nPlease check the console for details.");
+      }
+    }
+  };
+
   return (
     <div style={{ background: "#F8FAFC", height: "100vh", display: "flex", justifyContent: "center", alignItems: "center", position: "relative" }}>
       <div onClick={() => navigate("/register")} style={{ position: "absolute", top: "20px", left: "20px", display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", color: "#173B66", fontWeight: "bold" }}>
         <span style={{ fontSize: "24px" }}>←</span>
         <span>Register</span>
       </div>
+
+      {showForgotPassword && (
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 }} onClick={() => setShowForgotPassword(false)}>
+          <div style={{ background: "white", padding: "30px", borderRadius: "12px", width: "400px", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ color: "#173B66", marginTop: 0, marginBottom: "10px" }}>Reset Password</h2>
+            <p style={{ color: "#64748B", fontSize: "14px", marginBottom: "20px" }}>Enter your email address and we'll send you a link to reset your password.</p>
+            
+            <input 
+              type="email" 
+              placeholder="Enter your email" 
+              value={resetEmail} 
+              onChange={(e) => setResetEmail(e.target.value)} 
+              style={{ width: "100%", padding: "12px", marginBottom: "20px", borderRadius: "8px", border: "1px solid #CBD5E1", boxSizing: "border-box" }}
+              autoComplete="off"
+            />
+            
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button 
+                onClick={handleForgotPassword} 
+                style={{ flex: 1, padding: "12px", borderRadius: "8px", background: "#173B66", color: "white", border: "none", cursor: "pointer", fontWeight: "bold" }}
+              >
+                Send Reset Link
+              </button>
+              <button 
+                onClick={() => { setShowForgotPassword(false); setResetEmail(""); }} 
+                style={{ flex: 1, padding: "12px", borderRadius: "8px", background: "#E2E8F0", color: "#64748B", border: "none", cursor: "pointer", fontWeight: "bold" }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ width: "350px", padding: "30px", borderRadius: "12px", border: "1px solid #CBD5E1", background: "white", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)" }}>
         <div style={{ textAlign: "center" }}>
@@ -239,9 +318,18 @@ function Login() {
             placeholder="Password" 
             value={password} 
             onChange={(e) => setPassword(e.target.value)} 
-            style={{ width: "100%", padding: "10px", marginBottom: "20px", borderRadius: "8px", border: "1px solid #CBD5E1", boxSizing: "border-box" }}
+            style={{ width: "100%", padding: "10px", marginBottom: "10px", borderRadius: "8px", border: "1px solid #CBD5E1", boxSizing: "border-box" }}
             autoComplete="off"
           />
+
+          <div style={{ textAlign: "right", marginBottom: "20px" }}>
+            <span 
+              onClick={() => setShowForgotPassword(true)} 
+              style={{ color: "#173B66", fontSize: "14px", cursor: "pointer", textDecoration: "underline" }}
+            >
+              Forgot Password?
+            </span>
+          </div>
 
           <button 
             type="button"
