@@ -5,6 +5,7 @@ import {
   Text,
   StyleSheet,
 } from "react-native";
+
 import AuthLayout from "../components/AuthInput";
 import RolePicker from "../components/RoleSelector";
 import { COLORS } from "../theme/color";
@@ -13,7 +14,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
-import { useAuth } from "../context/AuthContext"; // ✅ بدل AuthContext
+import { useAuth } from "../context/AuthContext";
 
 export default function LoginScreen({ navigation }: any) {
   const [role, setRole] = useState("");
@@ -21,76 +22,87 @@ export default function LoginScreen({ navigation }: any) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const { setUser, setRole: setUserRole } = useAuth(); // ✅ الحل
+  const { setUser, setRole: setUserRole } = useAuth();
 
   const handleLogin = async () => {
     setError("");
 
     // 1️⃣ Validation
     if (!role || !email || !password) {
-      setError("All fields are required.");
+      setError("All fields are required");
       return;
     }
 
     const cleanEmail = email.trim().toLowerCase();
 
+    // Student domain check
     if (role === "student" && !cleanEmail.endsWith("@std.sci.cu.edu.eg")) {
-      setError("Invalid student email domain.");
+      setError("Invalid student email domain");
       return;
     }
 
-    if (
-      role === "professor" &&
-      !email.endsWith("@sci.cu.edu.eg")
-    ) {
-      setError("Invalid professor email domain.");
+    // Professor domain check
+    if (role === "professor" && !cleanEmail.endsWith("@sci.cu.edu.eg")) {
+      setError("Invalid professor email domain");
       return;
     }
 
     try {
-      // 2️⃣ Login with Firebase Auth
-      const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
+      // 2️⃣ Login with Firebase
+      const cred = await signInWithEmailAndPassword(
+        auth,
+        cleanEmail,
+        password
+      );
 
-      // 3️⃣ Check Firestore if user exists
+      // 3️⃣ Get user data from Firestore
       const userRef = doc(db, "users", cred.user.uid);
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
-        // User not fully registered → logout
         await auth.signOut();
-        setError("Your account is not fully registered yet. Please register first.");
+        setError("Account not registered. Please register first.");
         return;
       }
 
       const userData = userSnap.data();
 
-      // 4️⃣ Security: role check
-      if (userData.role !== role.toLowerCase()) {
+      // 4️⃣ Role security check
+      if (userData.role.toLowerCase() !== role.toLowerCase()) {
         await auth.signOut();
-        setError("Selected role does not match your account.");
+        setError("Selected role does not match your account");
         return;
       }
 
-      // 5️⃣ Save user in AuthContext
+      // 5️⃣ Save in context
       setUser(cred.user);
       setUserRole(userData.role);
 
-      // 6️⃣ Redirect حسب role
-      if (userData.role === "student") {
+      // 6️⃣ Navigate based on role
+      if (userData.role.toLowerCase() === "student") {
         navigation.replace("StudentHome");
-      } else if (userData.role === "professor") {
+      } else if (userData.role.toLowerCase() === "professor") {
         navigation.replace("ProfessorHome");
       } else {
-        setError("Invalid user role.");
+        setError("Invalid user role");
       }
 
-      // 7️⃣ Clear fields
+      // 7️⃣ Clear inputs
       setEmail("");
       setPassword("");
 
     } catch (err: any) {
       console.log("LOGIN ERROR:", err);
-      setError(err.message || "Login failed");
+
+      if (err.code === "auth/user-not-found") {
+        setError("User not found");
+      } else if (err.code === "auth/wrong-password") {
+        setError("Incorrect password");
+      } else if (err.code === "auth/invalid-email") {
+        setError("Invalid email format");
+      } else {
+        setError("Login failed. Please try again.");
+      }
     }
   };
 
@@ -103,6 +115,7 @@ export default function LoginScreen({ navigation }: any) {
         style={styles.input}
         value={email}
         onChangeText={setEmail}
+        autoCapitalize="none"
       />
 
       <TextInput
@@ -126,7 +139,9 @@ export default function LoginScreen({ navigation }: any) {
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.navigate("Register")}>
-        <Text style={styles.link}>Don't have an account? Register</Text>
+        <Text style={styles.link}>
+          Don't have an account? Register
+        </Text>
       </TouchableOpacity>
     </AuthLayout>
   );
@@ -143,6 +158,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     padding: 12,
     borderRadius: 8,
+    marginTop: 5,
   },
   buttonText: {
     color: "white",
