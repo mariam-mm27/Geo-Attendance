@@ -1,14 +1,13 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../../firebase";
-import { doc, getDoc, collection, addDoc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, collection, onSnapshot } from "firebase/firestore";
 import { signOut, onAuthStateChanged } from "firebase/auth";
 
 const ProfessorProfile = () => {
   const navigate = useNavigate();
   const [profData, setProfData] = useState({ name: "", email: "" });
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
@@ -18,10 +17,6 @@ const ProfessorProfile = () => {
     { id: "CS205", name: "Database Management", code: "CS205", count: "...", room: "Hall C", time: "01:00 PM - 03:00 PM" },
     { id: "CS101", name: "Introduction to CS", code: "CS101", count: "...", room: "Main Hall", time: "03:00 PM - 05:00 PM" },
   ]);
-
-  const [selectedCourse, setSelectedCourse] = useState("");
-  const [newStudent, setNewStudent] = useState({ name: "", id: "", email: "" });
-  const [error, setError] = useState("");
   useEffect(() => {
     const stopBack = () => window.history.pushState(null, null, window.location.href);
     window.history.pushState(null, null, window.location.href);
@@ -37,6 +32,13 @@ const ProfessorProfile = () => {
       }
     });
 
+    return () => {
+      window.removeEventListener("popstate", stopBack);
+      unsubscribeAuth();
+    };
+  }, [navigate]);
+
+  useEffect(() => {
     const listeners = courses.map(course => {
       return onSnapshot(collection(db, "courses", course.id, "students"), (snapshot) => {
         setCourses(prev => prev.map(c => 
@@ -46,32 +48,9 @@ const ProfessorProfile = () => {
     });
 
     return () => {
-      window.removeEventListener("popstate", stopBack);
-      unsubscribeAuth();
       listeners.forEach(unsub => unsub());
     };
-  }, [navigate]);
-
-  const handleAddStudent = async () => {
-    const emailSuffix = "@std.sci.cu.edu.eg";
-    if (!newStudent.name || !newStudent.id || !newStudent.email) return setError("Fill all fields!");
-    if (!newStudent.email.endsWith(emailSuffix)) return setError(`Must end with ${emailSuffix}`);
-
-    try {
-      await addDoc(collection(db, "courses", selectedCourse, "students"), {
-        name: newStudent.name,
-        studentId: newStudent.id,
-        email: newStudent.email,
-        attendance: "0%"
-      });
-      
-      setIsModalOpen(false);
-      setNewStudent({ name: "", id: "", email: "" });
-      setError("");
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
-    } catch (e) { setError("Error adding student."); }
-  };
+  }, []);
 
   if (loading) return <div style={styles.loader}>Loading...</div>;
   return (
@@ -96,7 +75,12 @@ const ProfessorProfile = () => {
           <div style={styles.menuBtn} onClick={() => setIsSidebarOpen(true)}>☰</div>
           <div style={styles.navTitle}>Professor Dashboard</div>
         </div>
-        <button onClick={() => signOut(auth)} style={styles.logoutBtn}>Logout</button>
+        <button onClick={async () => {
+          await signOut(auth);
+          localStorage.clear();
+          sessionStorage.clear();
+          window.location.href = "/login";
+        }} style={styles.logoutBtn}>Logout</button>
       </nav>
 
       <main style={styles.mainContent}>
@@ -123,7 +107,6 @@ const ProfessorProfile = () => {
             <div key={course.id} style={styles.courseCard}>
               <div style={styles.cardHeader}>
                 <span style={styles.codeBadge}>{course.code}</span>
-                <button onClick={() => { setSelectedCourse(course.id); setIsModalOpen(true); }} style={styles.addStudentBtn}>+ Add Student</button>
               </div>
               <h3 style={styles.courseTitle}>{course.name}</h3>
               <div style={styles.courseDetails}>
@@ -136,22 +119,6 @@ const ProfessorProfile = () => {
           ))}
         </div>
       </main>
-
-      {isModalOpen && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <h3 style={{ color: "#173B66", marginTop: 0 }}>Add New Student</h3>
-            {error && <p style={styles.errorMessage}>{error}</p>}
-            <input type="text" placeholder="Name" style={styles.input} value={newStudent.name} onChange={e => setNewStudent({...newStudent, name: e.target.value})} />
-            <input type="text" placeholder="ID" style={styles.input} value={newStudent.id} onChange={e => setNewStudent({...newStudent, id: e.target.value})} />
-            <input type="email" placeholder="Email (@std.sci.cu.edu.eg)" style={styles.input} value={newStudent.email} onChange={e => setNewStudent({...newStudent, email: e.target.value})} />
-            <div style={styles.modalActions}>
-              <button onClick={handleAddStudent} style={styles.confirmBtn}>Confirm</button>
-              <button onClick={() => setIsModalOpen(false)} style={styles.cancelBtn}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -182,17 +149,9 @@ const styles = {
   courseCard: { backgroundColor: "white", padding: "25px", borderRadius: "20px", boxShadow: "0 10px 20px rgba(0,0,0,0.05)" },
   cardHeader: { display: "flex", justifyContent: "space-between", marginBottom: "15px" },
   codeBadge: { backgroundColor: "#F1F5F9", color: "#173B66", padding: "4px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: "bold" },
-  addStudentBtn: { backgroundColor: "#173B66", color: "white", border: "none", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontSize: "11px" },
   courseTitle: { fontSize: "19px", color: "#173B66", fontWeight: "bold", marginBottom: "15px" },
   courseDetails: { marginBottom: "20px", borderTop: "1px solid #F1F5F9", paddingTop: "15px" },
   reportBtn: { width: "100%", padding: "12px", borderRadius: "10px", border: "none", backgroundColor: "#173B66", color: "white", fontWeight: "bold", cursor: "pointer" },
-  modalOverlay: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.4)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 6500 },
-  modalContent: { backgroundColor: "white", padding: "30px", borderRadius: "20px", width: "380px" },
-  input: { width: "100%", padding: "12px", margin: "8px 0", borderRadius: "8px", border: "1px solid #CBD5E1", boxSizing: "border-box" },
-  errorMessage: { color: "#EF4444", fontSize: "12px" },
-  modalActions: { display: "flex", gap: "10px", marginTop: "15px" },
-  confirmBtn: { flex: 1, padding: "12px", backgroundColor: "#173B66", color: "white", border: "none", borderRadius: "8px", cursor: "pointer" },
-  cancelBtn: { flex: 1, padding: "12px", backgroundColor: "white", color: "#64748B", border: "1px solid #E2E8F0", borderRadius: "8px", cursor: "pointer" },
   loader: { textAlign: "center", marginTop: "100px", color: "#173B66", fontWeight: "bold" },
   sectionHeading: { color: "#173B66", fontSize: "22px", fontWeight: "bold", marginBottom: "20px" }
 };

@@ -27,7 +27,7 @@ function App() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/reports/:courseId" element={<Reports />} />
           
-          {/* دي صفحة التفاصيل اللي كانت ناقصة */}
+          {}
           <Route path="/details/:type/:id" element={<CourseDetails />} />
         </Routes>
       </Router>

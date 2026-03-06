@@ -52,7 +52,7 @@ const ResetPasswordPage = () => {
 
   return (
     <div style={styles.container}>
-      {/* سهم الباك الأزرق */}
+      {}
       <div style={styles.backWrapper} onClick={handleBackNavigation}>
         <span style={styles.backArrow}>←</span>
         <span style={styles.backText}>Back</span>
