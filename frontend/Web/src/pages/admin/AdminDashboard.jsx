@@ -3,7 +3,6 @@ import { auth, db } from "../../firebase";
 import { signOut } from "firebase/auth";
 import { collection, getDocs, addDoc, deleteDoc, doc, getDoc } from "firebase/firestore";
 import { FaUserGraduate, FaChalkboardTeacher, FaSignOutAlt, FaPlus, FaUserShield } from "react-icons/fa";
-import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import UsersTable from "./UsersTable";
 import SubjectsTable from "./SubjectsTable";
@@ -163,14 +162,12 @@ const AdminDashboard = () => {
       localStorage.clear();
       sessionStorage.clear();
       
-      toast.success("Logged out successfully");
-      
       window.history.replaceState(null, '', '/login');
       
       navigate("/login", { replace: true });
       window.location.href = "/login";
     } catch (error) {
-      toast.error("Logout failed");
+      console.error("Logout failed:", error);
     }
   };
 
@@ -178,10 +175,8 @@ const AdminDashboard = () => {
     try {
       const docRef = await addDoc(collection(db, "professors"), newProf);
       setProfs([...profs, { id: docRef.id, ...newProf }]);
-      toast.success("Professor added successfully!");
     } catch (error) {
       console.error("Error adding professor:", error);
-      toast.error("Failed to add professor");
     }
   };
 
@@ -189,10 +184,10 @@ const AdminDashboard = () => {
     try {
       const docRef = await addDoc(collection(db, "students"), newStudent);
       setStudents([...students, { id: docRef.id, ...newStudent }]);
-      toast.success("Student added successfully!");
+      alert("Student added successfully!");
     } catch (error) {
       console.error("Error adding student:", error);
-      toast.error("Failed to add student");
+      alert("Failed to add student");
     }
   };
 
@@ -200,10 +195,10 @@ const AdminDashboard = () => {
     try {
       await deleteDoc(doc(db, "professors", id));
       setProfs(profs.filter(prof => prof.id !== id));
-      toast.success("Professor deleted successfully!");
+      alert("Professor deleted successfully!");
     } catch (error) {
       console.error("Error deleting professor:", error);
-      toast.error("Failed to delete professor");
+      alert("Failed to delete professor");
     }
   };
 
@@ -211,10 +206,10 @@ const AdminDashboard = () => {
     try {
       await deleteDoc(doc(db, "students", id));
       setStudents(students.filter(student => student.id !== id));
-      toast.success("Student deleted successfully!");
+      alert("Student deleted successfully!");
     } catch (error) {
       console.error("Error deleting student:", error);
-      toast.error("Failed to delete student");
+      alert("Failed to delete student");
     }
   };
 

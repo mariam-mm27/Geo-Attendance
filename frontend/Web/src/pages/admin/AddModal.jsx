@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { toast } from "react-hot-toast";
 
 const AddModal = ({ type, onClose, onAdd }) => {
   const [name, setName] = useState("");
@@ -17,26 +16,26 @@ const AddModal = ({ type, onClose, onAdd }) => {
   const handleSubmit = () => {
    
     if (!name.trim()) {
-      toast.error("Please enter a name");
+      alert("Please enter a name");
       return;
     }
 
     if (!email.trim()) {
-      toast.error("Please enter an email");
+      alert("Please enter an email");
       return;
     }
 
     if (!validateEmail(email)) {
       if (type === "professors") {
-        toast.error("Professor email must end with @sci.cu.edu.eg");
+        alert("Professor email must end with @sci.cu.edu.eg");
       } else {
-        toast.error("Student email must end with @std.sci.cu.edu.eg");
+        alert("Student email must end with @std.sci.cu.edu.eg");
       }
       return;
     }
 
     if (type === "students" && !code.trim()) {
-      toast.error("Please enter a student ID");
+      alert("Please enter a student ID");
       return;
     }
 

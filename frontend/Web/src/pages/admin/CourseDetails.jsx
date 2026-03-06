@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase";
-import { toast } from "react-hot-toast";
 import { FaArrowLeft, FaBook, FaUsers, FaChartBar, FaClock } from "react-icons/fa";
 
 const CourseDetails = () => {
