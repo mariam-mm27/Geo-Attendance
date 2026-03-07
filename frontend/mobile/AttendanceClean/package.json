@@ -14,10 +14,7 @@
     "@react-navigation/native-stack": "^7.13.0",
     "expo": "~54.0.33",
     "expo-auth-session": "^7.0.10",
-<<<<<<< HEAD
-=======
     "expo-barcode-scanner": "^13.0.1",
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
     "expo-status-bar": "~3.0.9",
     "expo-web-browser": "^15.0.10",
     "firebase": "^12.9.0",
@@ -25,10 +22,7 @@
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "^2.30.0",
-<<<<<<< HEAD
-=======
     "react-native-qrcode-svg": "^6.3.21",
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
     "react-native-safe-area-context": "^5.7.0",
     "react-native-screens": "^4.24.0",
     "react-native-web": "^0.21.0"

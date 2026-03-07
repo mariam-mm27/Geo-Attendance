@@ -1,12 +1,3 @@
-<<<<<<< HEAD
-import React, { useContext } from "react";
-import { View, Text, Button } from "react-native";
-import { signOut } from "firebase/auth";
-import { auth } from "../firebase";
-import { AuthContext } from "../context/AuthContext";
-
-export default function StudentHomeScreen() {
-=======
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -69,7 +60,6 @@ export default function StudentHomeScreen({ navigation }: any) {
     getStudentData();
   }, []);
 
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
   const authContext = useContext(AuthContext);
 
   if (!authContext) return null;
@@ -77,42 +67,21 @@ export default function StudentHomeScreen({ navigation }: any) {
   const { setUser, setRole } = authContext;
 
   const handleLogout = async () => {
-<<<<<<< HEAD
-    await signOut(auth);
-    setUser(null);
-    setRole(null);
+    try {
+      await signOut(auth);
+      setUser(null);
+      setRole(null);
+      
+      // Clear navigation stack and go to login
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
+    } catch (error) {
+      console.log("Logout error:", error);
+      Alert.alert("Error", "Failed to logout");
+    }
   };
-
-  return (
-    <View style={{ padding: 20 }}>
-      <Text>Hello this is the student home page</Text>
-
-      <Button title="Logout" onPress={handleLogout} />
-    </View>
-  );
-}
-=======
-    // Alert.alert("Log Out", "Are you sure you want to log out?", [
-    //   { text: "Cancel", style: "cancel" },
-    //   {
-    //     text: "Log Out",
-    //     style: "destructive",
-    //     onPress: logoutUser,
-    //   },
-    // ]);
-    await signOut(auth);
-    setUser(null);
-    setRole(null);
-    navigation.replace("Login");
-  };
-
-  // const logoutUser = async () => {
-  //   try {
-  //     await signOut(auth);
-  //   } catch (error) {
-  //     console.log("Logout error:", error);
-  //   }
-  // };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -168,18 +137,20 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
+    paddingHorizontal: 0,
   },
 
   title: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "700",
-    color: "#3F5BD9",
+    color: "#173B66",
+    flex: 1,
   },
 
   logoutButton: {
-    backgroundColor: "#3F5BD9",
-    paddingVertical: 6,
-    paddingHorizontal: 14,
+    backgroundColor: "#173B66",
+    paddingVertical: 10,
+    paddingHorizontal: 18,
     borderRadius: 8,
   },
 
@@ -204,7 +175,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 15,
-    color: "#3F5BD9",
+    color: "#173B66",
   },
 
   row: {
@@ -225,9 +196,9 @@ const styles = StyleSheet.create({
   scanButton: {
     marginTop: 20,
     alignSelf: "flex-start",
-    backgroundColor: "#3F5BD9",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    backgroundColor: "#173B66",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 8,
   },
 
@@ -237,4 +208,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f

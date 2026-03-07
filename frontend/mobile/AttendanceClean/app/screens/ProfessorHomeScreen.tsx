@@ -1,12 +1,3 @@
-<<<<<<< HEAD
-import React, { useContext } from "react";
-import { View, Text, Button } from "react-native";
-import { signOut } from "firebase/auth";
-import { auth } from "../firebase";
-import { AuthContext } from "../context/AuthContext";
-
-export default function ProfessorHomeScreen() {
-=======
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -114,7 +105,9 @@ export default function ProfessorSessionScreen({ route, navigation }: any) {
     }
 
     try {
+      console.log("Creating session for course:", selectedCourseId);
       const sessionId = await createSession(selectedCourseId, 10);
+      console.log("Session created with ID:", sessionId);
 
       const selectedCourse = courses.find((c) => c.id === selectedCourseId);
 
@@ -136,12 +129,14 @@ export default function ProfessorSessionScreen({ route, navigation }: any) {
         ...prev,
         [selectedCourseId]: prev[selectedCourseId] + 1,
       }));
+
+      Alert.alert("✅ Success", "Session created successfully!");
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      console.error("Create session error:", error);
+      Alert.alert("❌ Error", error.message || "Failed to create session");
     }
   };
 
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
   const authContext = useContext(AuthContext);
 
   if (!authContext) return null;
@@ -149,46 +144,21 @@ export default function ProfessorSessionScreen({ route, navigation }: any) {
   const { setUser, setRole } = authContext;
 
   const handleLogout = async () => {
-<<<<<<< HEAD
-    await signOut(auth);
-    setUser(null);
-    setRole(null);
+    try {
+      await signOut(auth);
+      setUser(null);
+      setRole(null);
+      
+      // Clear navigation stack and go to login
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
+    } catch (error) {
+      console.log("Logout error:", error);
+      Alert.alert("Error", "Failed to logout");
+    }
   };
-
-  return (
-    <View style={{ padding: 20 }}>
-      <Text>Hello this is the professor home page</Text>
-
-      <Button title="Logout" onPress={handleLogout} />
-    </View>
-  );
-}
-=======
-    // Alert.alert("Log Out", "Are you sure you want to log out?", [
-    //   {
-    //     text: "Cancel",
-    //     style: "cancel",
-    //   },
-    //   {
-    //     text: "Log Out",
-    //     style: "destructive",
-    //     onPress: () => logoutUser(),
-    //   },
-    // ]);
-    await signOut(auth);
-    setUser(null);
-    setRole(null);
-    navigation.replace("Login");
-  };
-
-  // const logoutUser = async () => {
-  //   try {
-  //     await signOut(auth);
-  //     navigation.replace("Login");
-  //   } catch (error) {
-  //     console.log("Logout error:", error);
-  //   }
-  // };
 
   const formatTime = (seconds: number): string => {
     const min = Math.floor(seconds / 60);
@@ -200,9 +170,7 @@ export default function ProfessorSessionScreen({ route, navigation }: any) {
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <View style={{ width: 80 }} />
           <Text style={styles.screenTitle}>Professor Dashboard</Text>
-
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
@@ -298,24 +266,27 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
+    paddingHorizontal: 0,
   },
 
   screenTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "bold",
-    color: "#2f4fa3",
+    color: "#173B66",
+    flex: 1,
   },
 
   logoutButton: {
-    backgroundColor: "#2f4fa3",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    backgroundColor: "#173B66",
+    paddingVertical: 10,
+    paddingHorizontal: 18,
     borderRadius: 8,
   },
 
   logoutText: {
     color: "#fff",
     fontWeight: "bold",
+    fontSize: 14,
   },
 
   card: {
@@ -333,7 +304,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#2f4fa3",
+    color: "#173B66",
     marginBottom: 14,
   },
 
@@ -351,7 +322,7 @@ const styles = StyleSheet.create({
   },
 
   courseName: {
-    color: "#2f4fa3",
+    color: "#173B66",
     fontWeight: "bold",
   },
 
@@ -369,7 +340,7 @@ const styles = StyleSheet.create({
   },
 
   createButton: {
-    backgroundColor: "#2f4fa3",
+    backgroundColor: "#173B66",
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 10,
@@ -388,7 +359,7 @@ const styles = StyleSheet.create({
   qrTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#2f4fa3",
+    color: "#173B66",
     marginBottom: 16,
     alignSelf: "flex-start",
   },
@@ -409,4 +380,3 @@ const styles = StyleSheet.create({
     borderColor: "#e5e7eb",
   },
 });
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f

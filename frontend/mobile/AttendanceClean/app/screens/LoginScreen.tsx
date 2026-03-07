@@ -13,7 +13,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
-import { useAuth } from "../context/AuthContext"; // ✅ بدل AuthContext
+import { useAuth } from "../context/AuthContext";
 
 export default function LoginScreen({ navigation }: any) {
   const [role, setRole] = useState("");
@@ -21,12 +21,29 @@ export default function LoginScreen({ navigation }: any) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const { setUser, setRole: setUserRole } = useAuth(); // ✅ الحل
+  const { setUser, setRole: setUserRole } = useAuth();
+
+  React.useEffect(() => {
+    const clearFields = () => {
+      setRole("");
+      setEmail("");
+      setPassword("");
+      setError("");
+    };
+    
+    clearFields();
+    
+    // Also clear when screen comes into focus
+    const unsubscribe = navigation.addListener('focus', () => {
+      clearFields();
+    });
+    
+    return unsubscribe;
+  }, [navigation]);
 
   const handleLogin = async () => {
     setError("");
 
-    // 1️⃣ Validation
     if (!role || !email || !password) {
       setError("All fields are required.");
       return;
@@ -45,15 +62,12 @@ export default function LoginScreen({ navigation }: any) {
     }
 
     try {
-      // 2️⃣ Login with Firebase Auth
       const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
 
-      // 3️⃣ Check Firestore if user exists
       const userRef = doc(db, "users", cred.user.uid);
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
-        // User not fully registered → logout
         await auth.signOut();
         setError("Your account is not fully registered yet. Please register first.");
         return;
@@ -61,48 +75,37 @@ export default function LoginScreen({ navigation }: any) {
 
       const userData = userSnap.data();
 
-      // 4️⃣ Security: role check
       if (userData.role !== role.toLowerCase()) {
         await auth.signOut();
         setError("Selected role does not match your account.");
         return;
       }
 
-      // 5️⃣ Save user in AuthContext
       setUser(cred.user);
       setUserRole(userData.role);
 
-      // 6️⃣ Redirect حسب role
       if (userData.role === "student") {
-<<<<<<< HEAD
-        navigation.replace("StudentHome");
+        navigation.replace("StudentHome", {
+          user: {
+            name: userData.name,
+            id: cred.user.uid,
+            email: cred.user.email,
+          }
+        });
       } else if (userData.role === "professor") {
-        navigation.replace("ProfessorHome");
-      } else {
-        setError("Invalid user role.");
+        navigation.replace("ProfessorHome", {
+          user: {
+            name: userData.name,
+            id: cred.user.uid,
+            email: cred.user.email,
+          }
+        });
       }
-=======
-  navigation.replace("StudentHome", {
-    user: {
-      name: userData.name,
-      id: cred.user.uid,
-      email: cred.user.email,
-    }
-  });
-} else if (userData.role === "professor") {
-  navigation.replace("ProfessorHome", {
-    user: {
-      name: userData.name,
-      id: cred.user.uid,
-      email: cred.user.email,
-    }
-  });
-}
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
 
-      // 7️⃣ Clear fields
+      // Clear fields after successful login
       setEmail("");
       setPassword("");
+      setRole("");
 
     } catch (err: any) {
       console.log("LOGIN ERROR:", err);
@@ -119,6 +122,10 @@ export default function LoginScreen({ navigation }: any) {
         style={styles.input}
         value={email}
         onChangeText={setEmail}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="off"
+        textContentType="none"
       />
 
       <TextInput
@@ -127,7 +134,18 @@ export default function LoginScreen({ navigation }: any) {
         style={styles.input}
         value={password}
         onChangeText={setPassword}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="off"
+        textContentType="none"
       />
+
+      <TouchableOpacity 
+        onPress={() => navigation.navigate("ForgotPassword")}
+        style={styles.forgotPasswordContainer}
+      >
+        <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+      </TouchableOpacity>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -154,6 +172,15 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     marginBottom: 12,
+  },
+  forgotPasswordContainer: {
+    alignSelf: "flex-end",
+    marginBottom: 15,
+  },
+  forgotPasswordText: {
+    color: COLORS.primary,
+    fontSize: 14,
+    textDecorationLine: "underline",
   },
   button: {
     backgroundColor: COLORS.primary,
