@@ -61,6 +61,53 @@ const StudentProfile = () => {
 
   return (
     <div style={{ backgroundColor: "#F1F5F9", minHeight: "100vh", position: "relative" }}>
+      {/* Sidebar */}
+      {isSidebarOpen && (
+        <div style={{
+          position: "fixed", 
+          top: 0, 
+          left: 0, 
+          width: "250px", 
+          height: "100%", 
+          backgroundColor: "white", 
+          boxShadow: "2px 0 5px rgba(0,0,0,0.1)", 
+          zIndex: 1000, 
+          padding: "80px 20px"
+        }}>
+          <h3 style={{ color: colors.primary }}>Settings</h3>
+          
+          <button 
+            onClick={() => navigate("/reset-password")} 
+            style={{ 
+              display: "block", 
+              width: "100%", 
+              padding: "10px", 
+              margin: "10px 0", 
+              border: "1px solid #ddd", 
+              borderRadius: "5px", 
+              cursor: "pointer", 
+              textAlign: "left",
+              background: "white"
+            }}
+          >
+            🔑 Reset Password
+          </button>
+
+          <button 
+            onClick={() => setIsSidebarOpen(false)} 
+            style={{ 
+              marginTop: "20px", 
+              color: "red", 
+              border: "none", 
+              background: "none", 
+              cursor: "pointer" 
+            }}
+          >
+            Close
+          </button>
+        </div>
+      )}
+
       {/* Navbar */}
       <nav style={{ 
         height: "70px", 
@@ -103,35 +150,33 @@ const StudentProfile = () => {
 
       {/* Main Content */}
       <div style={{ padding: "30px 5%" }}>
-      <h1 style={{ color: colors.primary, marginBottom: "30px", fontSize: "32px", textAlign: "center" }}>
-        Student Dashboard
-      </h1>
-      {}
-      <div style={{ 
-        backgroundColor: "white", padding: "30px", borderRadius: "15px", 
-        boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)", marginBottom: "40px",
-        display: "flex", justifyContent: "space-between", alignItems: "center"
-      }}>
-        <div>
+        {/* Personal Info */}
+        <div style={{ 
+          backgroundColor: "white", 
+          padding: "30px", 
+          borderRadius: "15px", 
+          boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)", 
+          marginBottom: "40px"
+        }}>
           <h2 style={{ color: colors.primary, margin: "0 0 10px 0" }}>Personal Information</h2>
           <p style={{ margin: "5px 0", color: "#475569" }}><strong>Name:</strong> {studentData.name}</p>
           <p style={{ margin: "5px 0", color: "#475569" }}><strong>ID:</strong> {studentData.studentId}</p>
           <p style={{ margin: "5px 0", color: "#475569" }}><strong>Email:</strong> {studentData.email}</p>
         </div>
-      </div>
 
-      {}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "25px" }}>
-        {courses.map((course) => (
-          <div key={course.id} style={{ backgroundColor: "white", padding: "25px", borderRadius: "15px", border: "1px solid #E2E8F0" }}>
-            <h3 style={{ color: colors.primary, marginBottom: "15px" }}>{course.name}</h3>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-              <span style={{ fontSize: "12px", color: "#64748B" }}>Attendance Rate</span>
-              <span style={{ fontSize: "14px", fontWeight: "bold" }}>{course.attendance}%</span>
+        {/* Courses */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "25px" }}>
+          {courses.map((course) => (
+            <div key={course.id} style={{ backgroundColor: "white", padding: "25px", borderRadius: "15px", border: "1px solid #E2E8F0" }}>
+              <h3 style={{ color: colors.primary, marginBottom: "15px" }}>{course.name}</h3>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                <span style={{ fontSize: "12px", color: "#64748B" }}>Attendance Rate</span>
+                <span style={{ fontSize: "14px", fontWeight: "bold" }}>{course.attendance}%</span>
+              </div>
+              <AttendanceBar attendance={course.attendance} />
             </div>
-            <AttendanceBar attendance={course.attendance} />
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
