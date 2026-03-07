@@ -15,14 +15,12 @@ export default function RootNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         <Stack.Screen name="StudentHome" component={StudentHomeScreen} />
         <Stack.Screen name="ProfessorHome" component={ProfessorHomeScreen} />
         <Stack.Screen name="ScanQR" component={ScanQRScreen} />
-
       </Stack.Navigator>
     </NavigationContainer>
   );
