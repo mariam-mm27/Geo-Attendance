@@ -48,8 +48,13 @@ export const validateRegister = (data) => {
 
   // Professor rules
   if (role === "professor") {
+<<<<<<< HEAD
     if (!email.endsWith("@std.sci.cu.edu.eg")) {
       return "Professor email must end with @std.sci.cu.edu.eg";
+=======
+    if (!email.endsWith("@sci.cu.edu.eg")) {
+      return "Professor email must end with @sci.cu.edu.eg";
+>>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
     }
   }
 
