@@ -18,9 +18,18 @@ const ProfessorProfile = () => {
     { id: "CS101", name: "Introduction to CS", code: "CS101", count: "...", room: "Main Hall", time: "03:00 PM - 05:00 PM" },
   ]);
   useEffect(() => {
-    const stopBack = () => window.history.pushState(null, null, window.location.href);
+    // Aggressive back button prevention
+    const preventBack = () => {
+      window.history.forward();
+    };
+    
+    // Push multiple states
     window.history.pushState(null, null, window.location.href);
-    window.addEventListener("popstate", stopBack);
+    window.history.pushState(null, null, window.location.href);
+    window.history.pushState(null, null, window.location.href);
+    
+    window.addEventListener("popstate", preventBack);
+    setTimeout(preventBack, 0);
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -33,7 +42,7 @@ const ProfessorProfile = () => {
     });
 
     return () => {
-      window.removeEventListener("popstate", stopBack);
+      window.removeEventListener("popstate", preventBack);
       unsubscribeAuth();
     };
   }, [navigate]);

@@ -74,12 +74,31 @@ export default function LoginScreen({ navigation }: any) {
 
       // 6️⃣ Redirect حسب role
       if (userData.role === "student") {
+<<<<<<< HEAD
         navigation.replace("StudentHome");
       } else if (userData.role === "professor") {
         navigation.replace("ProfessorHome");
       } else {
         setError("Invalid user role.");
       }
+=======
+  navigation.replace("StudentHome", {
+    user: {
+      name: userData.name,
+      id: cred.user.uid,
+      email: cred.user.email,
+    }
+  });
+} else if (userData.role === "professor") {
+  navigation.replace("ProfessorHome", {
+    user: {
+      name: userData.name,
+      id: cred.user.uid,
+      email: cred.user.email,
+    }
+  });
+}
+>>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
 
       // 7️⃣ Clear fields
       setEmail("");

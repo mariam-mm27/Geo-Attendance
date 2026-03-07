@@ -21,10 +21,18 @@ const StudentProfile = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   useEffect(() => {
-    // Prevent back navigation
+    // Aggressive back button prevention
+    const preventBack = () => {
+      window.history.forward();
+    };
+    
+    // Push multiple states
     window.history.pushState(null, null, window.location.href);
-    const stopBack = () => window.history.pushState(null, null, window.location.href);
-    window.addEventListener("popstate", stopBack);
+    window.history.pushState(null, null, window.location.href);
+    window.history.pushState(null, null, window.location.href);
+    
+    window.addEventListener("popstate", preventBack);
+    setTimeout(preventBack, 0);
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -39,7 +47,7 @@ const StudentProfile = () => {
     });
     
     return () => {
-      window.removeEventListener("popstate", stopBack);
+      window.removeEventListener("popstate", preventBack);
       unsubscribe();
     };
   }, []);

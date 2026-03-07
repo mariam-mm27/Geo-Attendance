@@ -1,32 +1,15 @@
-import { useEffect, useState } from "react";
-import { auth, db } from "../firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { signOut } from "firebase/auth";
+import { auth } from "../firebase";
+import { useNavigate } from "react-router-dom";
 
 function Student() {
+  const navigate = useNavigate();
 
-  const [userData, setUserData] = useState(null);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      if (auth.currentUser) {
-        const ref = doc(db, "users", auth.currentUser.uid);
-        const snap = await getDoc(ref);
-
-        if (snap.exists()) {
-          setUserData(snap.data());
-        }
-      }
-    };
-
-    fetchUser();
-  }, []);
-
-  return (
-    <div>
-      <h1>Student Dashboard</h1>
-      {userData && <p>Welcome {userData.name}</p>}
-    </div>
-  );
+  const handleLogout = async () => {
+    await signOut(auth);
+    navigate("/"); 
+  };
+  return <h1>Student Dashboard</h1>;
 }
 
 export default Student;
