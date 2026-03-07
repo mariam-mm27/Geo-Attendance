@@ -26,7 +26,7 @@ export const createSession = async (courseId, duration) => {
     const userRef = doc(db, "users", professor.uid);
     const userSnap = await getDoc(userRef);
 
-    if (!userSnap.exists() || userSnap.data().role !== "Professor") {
+    if (!userSnap.exists() || userSnap.data().role.toLowerCase() !== "professor") {
       throw new Error("Only Professors can create sessions");
     }
 

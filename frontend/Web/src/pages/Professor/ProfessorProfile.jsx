@@ -134,10 +134,10 @@ const ProfessorProfile = () => {
 
 const styles = {
   pageWrapper: { backgroundColor: "#F8FAFC", minHeight: "100vh", fontFamily: "sans-serif" },
-  navbar: { height: "70px", backgroundColor: "#173B66", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 5%", color: "white" },
+  navbar: { height: "70px", backgroundColor: "#173B66", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 5%", color: "white", position: "sticky", top: 0, zIndex: 100 },
   menuBtn: { fontSize: "28px", cursor: "pointer", color: "white" },
   navTitle: { fontSize: "20px", fontWeight: "bold" },
-  logoutBtn: { backgroundColor: "transparent", border: "1px solid white", color: "white", padding: "8px 18px", borderRadius: "20px", cursor: "pointer" },
+  logoutBtn: { backgroundColor: "white", border: "none", color: "#173B66", padding: "10px 24px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "14px" },
   sidebarOverlay: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.4)", zIndex: 6000 },
   sidebar: { width: "260px", height: "100%", backgroundColor: "white", position: "absolute", left: 0, top: 0, boxShadow: "2px 0 10px rgba(0,0,0,0.1)" },
   sidebarItem: { padding: "15px 20px", color: "#173B66", cursor: "pointer", borderBottom: "1px solid #F1F5F9", fontSize: "16px" },

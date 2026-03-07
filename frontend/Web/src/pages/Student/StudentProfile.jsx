@@ -60,41 +60,49 @@ const StudentProfile = () => {
   };
 
   return (
-    <div style={{ backgroundColor: "#F1F5F9", minHeight: "100vh", padding: "60px 10% 40px", position: "relative" }}>
-      {}
-      <div 
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        style={{ position: "absolute", top: "25px", left: "30px", cursor: "pointer", zIndex: 1001 }}
-      >
-        <div style={{ width: "25px", height: "3px", backgroundColor: colors.primary, margin: "5px 0" }}></div>
-        <div style={{ width: "25px", height: "3px", backgroundColor: colors.primary, margin: "5px 0" }}></div>
-        <div style={{ width: "25px", height: "3px", backgroundColor: colors.primary, margin: "5px 0" }}></div>
-      </div>
-      {}
-      {isSidebarOpen && (
-        <div style={{
-          position: "absolute", top: 0, left: 0, width: "250px", height: "100%", 
-          backgroundColor: "white", boxShadow: "2px 0 5px rgba(0,0,0,0.1)", zIndex: 1000, padding: "80px 20px"
-        }}>
-          <h3 style={{ color: colors.primary }}>Settings</h3>
-          
-          <button 
-            onClick={() => navigate("/reset-password")} 
-            style={{ display: "block", width: "100%", padding: "10px", margin: "10px 0", border: "1px solid #ddd", borderRadius: "5px", cursor: "pointer", textAlign: "left" }}
+    <div style={{ backgroundColor: "#F1F5F9", minHeight: "100vh", position: "relative" }}>
+      {/* Navbar */}
+      <nav style={{ 
+        height: "70px", 
+        backgroundColor: "#173B66", 
+        display: "flex", 
+        alignItems: "center", 
+        justifyContent: "space-between", 
+        padding: "0 5%", 
+        color: "white",
+        position: "sticky",
+        top: 0,
+        zIndex: 100
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+          <div 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            style={{ cursor: "pointer", fontSize: "28px" }}
           >
-            🔑 Reset Password
-          </button>
-
-          <button onClick={() => setIsSidebarOpen(false)} style={{ marginTop: "20px", color: "red", border: "none", background: "none", cursor: "pointer" }}>Close</button>
+            ☰
+          </div>
+          <div style={{ fontSize: "20px", fontWeight: "bold" }}>Student Dashboard</div>
         </div>
-      )}
-      {}
-      <button 
-        onClick={handleLogout}
-        style={{ position: "absolute", top: "20px", right: "40px", backgroundColor: "#173B66", color: "white", border: "none", padding: "10px 20px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", zIndex: 100 }}
-      >
-        Log Out
-      </button>
+        
+        <button 
+          onClick={handleLogout}
+          style={{ 
+            backgroundColor: "white", 
+            color: "#173B66", 
+            border: "none", 
+            padding: "10px 24px", 
+            borderRadius: "8px", 
+            cursor: "pointer", 
+            fontWeight: "bold",
+            fontSize: "14px"
+          }}
+        >
+          Logout
+        </button>
+      </nav>
+
+      {/* Main Content */}
+      <div style={{ padding: "30px 5%" }}>
       <h1 style={{ color: colors.primary, marginBottom: "30px", fontSize: "32px", textAlign: "center" }}>
         Student Dashboard
       </h1>
