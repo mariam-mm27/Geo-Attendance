@@ -10,12 +10,8 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
+
 export const db = admin.firestore();
-export default admin;
 
+export{admin};
 
-
-const db = admin.firestore();
-
-module.exports = db;
-8
