@@ -242,7 +242,7 @@ function Login() {
       </div>
 
       {showForgotPassword && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 }} onClick={() => setShowForgotPassword(false)}>
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "white", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 }} onClick={() => setShowForgotPassword(false)}>
           <div style={{ background: "white", padding: "30px", borderRadius: "12px", width: "400px", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ color: "#173B66", marginTop: 0, marginBottom: "10px" }}>Reset Password</h2>
             <p style={{ color: "#64748B", fontSize: "14px", marginBottom: "20px" }}>Enter your email address and we'll send you a link to reset your password.</p>
