@@ -13,7 +13,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
-import { useAuth } from "../context/AuthContext"; // 
+import { useAuth } from "../context/AuthContext";
 
 export default function LoginScreen({ navigation }: any) {
   const [role, setRole] = useState("");
@@ -24,7 +24,6 @@ export default function LoginScreen({ navigation }: any) {
   const { setUser, setRole: setUserRole } = useAuth();
 
   React.useEffect(() => {
-    // Clear all fields when component mounts
     const clearFields = () => {
       setRole("");
       setEmail("");
