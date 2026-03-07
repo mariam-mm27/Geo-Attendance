@@ -67,27 +67,21 @@ export default function StudentHomeScreen({ navigation }: any) {
   const { setUser, setRole } = authContext;
 
   const handleLogout = async () => {
-    // Alert.alert("Log Out", "Are you sure you want to log out?", [
-    //   { text: "Cancel", style: "cancel" },
-    //   {
-    //     text: "Log Out",
-    //     style: "destructive",
-    //     onPress: logoutUser,
-    //   },
-    // ]);
-    await signOut(auth);
-    setUser(null);
-    setRole(null);
-    navigation.replace("Login");
+    try {
+      await signOut(auth);
+      setUser(null);
+      setRole(null);
+      
+      // Clear navigation stack and go to login
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
+    } catch (error) {
+      console.log("Logout error:", error);
+      Alert.alert("Error", "Failed to logout");
+    }
   };
-
-  // const logoutUser = async () => {
-  //   try {
-  //     await signOut(auth);
-  //   } catch (error) {
-  //     console.log("Logout error:", error);
-  //   }
-  // };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -143,18 +137,20 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
+    paddingHorizontal: 0,
   },
 
   title: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "700",
-    color: "#3F5BD9",
+    color: "#173B66",
+    flex: 1,
   },
 
   logoutButton: {
-    backgroundColor: "#3F5BD9",
-    paddingVertical: 6,
-    paddingHorizontal: 14,
+    backgroundColor: "#173B66",
+    paddingVertical: 10,
+    paddingHorizontal: 18,
     borderRadius: 8,
   },
 
@@ -179,7 +175,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 15,
-    color: "#3F5BD9",
+    color: "#173B66",
   },
 
   row: {
@@ -200,9 +196,9 @@ const styles = StyleSheet.create({
   scanButton: {
     marginTop: 20,
     alignSelf: "flex-start",
-    backgroundColor: "#3F5BD9",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    backgroundColor: "#173B66",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 8,
   },
 

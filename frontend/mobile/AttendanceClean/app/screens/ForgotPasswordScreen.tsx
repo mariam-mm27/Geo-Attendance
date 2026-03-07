@@ -31,9 +31,13 @@ export default function ForgotPasswordScreen({ navigation }: any) {
     setLoading(true);
     try {
       await sendPasswordResetEmail(auth, email.trim());
+      setLoading(false);
+      setEmail("");
+      
+      // Show success alert
       Alert.alert(
-        "Success",
-        "Password reset email sent! Please check your inbox and spam folder.",
+        "✅ Success!",
+        "Password reset email sent successfully!\n\nPlease check your inbox and spam folder.",
         [
           {
             text: "OK",
@@ -41,7 +45,6 @@ export default function ForgotPasswordScreen({ navigation }: any) {
           },
         ]
       );
-      setEmail("");
     } catch (error: any) {
       console.error("Password reset error:", error);
       
@@ -108,7 +111,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.primary,
+    backgroundColor: "white",
     justifyContent: "center",
     alignItems: "center",
     padding: 20,

@@ -21,6 +21,27 @@ export default function RegisterScreen({ navigation }: any) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
+  React.useEffect(() => {
+    // Clear all fields when component mounts
+    const clearFields = () => {
+      setRole("");
+      setName("");
+      setId("");
+      setEmail("");
+      setPassword("");
+      setError("");
+    };
+    
+    clearFields();
+    
+    // Also clear when screen comes into focus
+    const unsubscribe = navigation.addListener('focus', () => {
+      clearFields();
+    });
+    
+    return unsubscribe;
+  }, [navigation]);
+
   const handleRegister = async () => {
   setError("");
 
@@ -83,6 +104,10 @@ export default function RegisterScreen({ navigation }: any) {
         style={styles.input}
         value={name}
         onChangeText={setName}
+        autoCapitalize="words"
+        autoCorrect={false}
+        autoComplete="off"
+        textContentType="none"
       />
 
       {role === "student" && (
@@ -91,6 +116,10 @@ export default function RegisterScreen({ navigation }: any) {
           style={styles.input}
           value={id}
           onChangeText={setId}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="off"
+          textContentType="none"
         />
       )}
 
@@ -99,6 +128,10 @@ export default function RegisterScreen({ navigation }: any) {
         style={styles.input}
         value={email}
         onChangeText={setEmail}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="off"
+        textContentType="none"
       />
 
       <TextInput
@@ -107,6 +140,10 @@ export default function RegisterScreen({ navigation }: any) {
         style={styles.input}
         value={password}
         onChangeText={setPassword}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="off"
+        textContentType="none"
       />
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
