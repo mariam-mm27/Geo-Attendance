@@ -42,6 +42,7 @@ function Register() {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
 
+      // Save to users collection
       await setDoc(doc(db, "users", cred.user.uid), {
         name,
         email,
@@ -49,6 +50,25 @@ function Register() {
         studentId: role === "student" ? id : null,
         createdAt: new Date()
       });
+
+      // Also save to role-specific collection
+      if (role === "student") {
+        await setDoc(doc(db, "students", cred.user.uid), {
+          name,
+          email,
+          code: id,
+          attendance: "0%",
+          createdAt: new Date().toISOString()
+        });
+      } else if (role === "professor") {
+        await setDoc(doc(db, "professors", cred.user.uid), {
+          name,
+          email,
+          courses: 0,
+          attendance: "0%",
+          createdAt: new Date().toISOString()
+        });
+      }
 
       alert("Registration successful!");
 

@@ -1,24 +1,27 @@
 import { useState, useEffect } from "react";
 import { auth, db } from "../../firebase";
 import { signOut } from "firebase/auth";
-import { collection, getDocs, addDoc, deleteDoc, doc, getDoc } from "firebase/firestore";
+import { collection, getDocs, addDoc, deleteDoc, doc, getDoc, onSnapshot } from "firebase/firestore";
 import { FaUserGraduate, FaChalkboardTeacher, FaSignOutAlt, FaPlus, FaUserShield } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import UsersTable from "./UsersTable";
 import SubjectsTable from "./SubjectsTable";
 import AddModal from "./AddModal";
 
 const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState("professors");
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab') || 'professors';
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [showModal, setShowModal] = useState(false);
   const [profs, setProfs] = useState([]);
   const [students, setStudents] = useState([]);
+  const [courses, setCourses] = useState([]);
   const [adminInfo, setAdminInfo] = useState({ 
     name: "Loading...", 
     email: auth.currentUser?.email || "" 
   });
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
     // Aggressive back button prevention
@@ -147,20 +150,35 @@ const AdminDashboard = () => {
   }, []);
 
   useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "students"));
-        const studentsData = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setStudents(studentsData);
-      } catch (error) {
-        console.error("Error fetching students:", error);
-        setStudents([]);
-      }
-    };
-    fetchStudents();
+    // Real-time listener for students
+    const unsubscribe = onSnapshot(collection(db, "students"), (snapshot) => {
+      const studentsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setStudents(studentsData);
+    }, (error) => {
+      console.error("Error fetching students:", error);
+      setStudents([]);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    // Real-time listener for courses
+    const unsubscribe = onSnapshot(collection(db, "courses"), (snapshot) => {
+      const coursesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setCourses(coursesData);
+    }, (error) => {
+      console.error("Error fetching courses:", error);
+      setCourses([]);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleLogout = async () => {
@@ -221,6 +239,28 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleAddCourse = async (newCourse) => {
+    try {
+      const docRef = await addDoc(collection(db, "courses"), newCourse);
+      setCourses([...courses, { id: docRef.id, ...newCourse }]);
+      alert("Course added successfully!");
+    } catch (error) {
+      console.error("Error adding course:", error);
+      alert("Failed to add course");
+    }
+  };
+
+  const handleDeleteCourse = async (id) => {
+    try {
+      await deleteDoc(doc(db, "courses", id));
+      setCourses(courses.filter(course => course.id !== id));
+      alert("Course deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting course:", error);
+      alert("Failed to delete course");
+    }
+  };
+
   if (loading) {
     return <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>Loading...</div>;
   }
@@ -248,6 +288,9 @@ const AdminDashboard = () => {
         <div onClick={() => setActiveTab("students")} style={styles.navItem(activeTab === "students")}>
           <FaUserGraduate style={{ marginRight: "8px" }} /> Students
         </div>
+        <div onClick={() => setActiveTab("courses")} style={styles.navItem(activeTab === "courses")}>
+          <FaChalkboardTeacher style={{ marginRight: "8px" }} /> Courses
+        </div>
         <button onClick={handleLogout} style={styles.logoutBtn}>
           <FaSignOutAlt style={{ marginRight: "8px" }} /> Log Out
         </button>
@@ -256,16 +299,18 @@ const AdminDashboard = () => {
       <main style={{ flex: 1, padding: "40px", overflow: "auto" }}>
         <div style={styles.header}>
           <h1 style={{ color: "#173B66", margin: 0, fontSize: "28px" }}>
-            Manage {activeTab === "professors" ? "Professors" : "Students"}
+            Manage {activeTab === "professors" ? "Professors" : activeTab === "students" ? "Students" : "Courses"}
           </h1>
           <button onClick={() => setShowModal(true)} style={styles.addBtn}>
-            <FaPlus style={{ marginRight: "8px" }} /> Add {activeTab === "professors" ? "Professor" : "Student"}
+            <FaPlus style={{ marginRight: "8px" }} /> Add {activeTab === "professors" ? "Professor" : activeTab === "students" ? "Student" : "Course"}
           </button>
         </div>
         <div style={styles.card}>
           {activeTab === "professors" ? 
-            <SubjectsTable data={profs} onDelete={handleDeleteProfessor} /> : 
-            <UsersTable data={students} onDelete={handleDeleteStudent} />
+            <SubjectsTable data={profs} onDelete={handleDeleteProfessor} allCourses={courses} /> : 
+            activeTab === "students" ?
+            <UsersTable data={students} onDelete={handleDeleteStudent} allCourses={courses} /> :
+            <UsersTable data={courses} onDelete={handleDeleteCourse} type="courses" />
           }
         </div>
       </main>
@@ -276,11 +321,14 @@ const AdminDashboard = () => {
           onAdd={(newItem) => {
             if (activeTab === "professors") {
               handleAddProfessor(newItem);
-            } else {
+            } else if (activeTab === "students") {
               handleAddStudent(newItem);
+            } else {
+              handleAddCourse(newItem);
             }
             setShowModal(false);
           }}
+          professors={profs}
         />
       )}
     </div>

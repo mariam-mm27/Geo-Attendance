@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../../firebase";
-import { doc, getDoc, collection, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, collection, onSnapshot, getDocs } from "firebase/firestore";
 import { signOut, onAuthStateChanged } from "firebase/auth";
 
 const ProfessorProfile = () => {
@@ -10,13 +10,7 @@ const ProfessorProfile = () => {
   const [loading, setLoading] = useState(true);
   const [showToast, setShowToast] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
-  const [courses, setCourses] = useState([
-    { id: "CS301", name: "Data Structures & Algorithms", code: "CS301", count: "...", room: "Lab 5", time: "09:00 AM - 11:00 AM" },
-    { id: "CS402", name: "Artificial Intelligence", code: "CS402", count: "...", room: "Hall B", time: "11:00 AM - 01:00 PM" },
-    { id: "CS205", name: "Database Management", code: "CS205", count: "...", room: "Hall C", time: "01:00 PM - 03:00 PM" },
-    { id: "CS101", name: "Introduction to CS", code: "CS101", count: "...", room: "Main Hall", time: "03:00 PM - 05:00 PM" },
-  ]);
+  const [courses, setCourses] = useState([]);
   useEffect(() => {
     // Aggressive back button prevention
     const preventBack = () => {
@@ -36,7 +30,25 @@ const ProfessorProfile = () => {
         navigate("/login", { replace: true });
       } else {
         const snap = await getDoc(doc(db, "users", user.uid));
-        if (snap.exists()) setProfData(snap.data());
+        if (snap.exists()) {
+          const userData = snap.data();
+          setProfData(userData);
+          
+          // Fetch courses assigned to this professor
+          const coursesSnapshot = await getDocs(collection(db, "courses"));
+          const professorCourses = [];
+          coursesSnapshot.forEach((docSnap) => {
+            const courseData = docSnap.data();
+            if (courseData.professorId === user.uid || courseData.professorEmail === user.email) {
+              professorCourses.push({
+                id: docSnap.id,
+                ...courseData,
+                count: (courseData.enrolledStudents || []).length
+              });
+            }
+          });
+          setCourses(professorCourses);
+        }
         setLoading(false);
       }
     });
@@ -48,18 +60,26 @@ const ProfessorProfile = () => {
   }, [navigate]);
 
   useEffect(() => {
-    const listeners = courses.map(course => {
-      return onSnapshot(collection(db, "courses", course.id, "students"), (snapshot) => {
-        setCourses(prev => prev.map(c => 
-          c.id === course.id ? { ...c, count: snapshot.size } : c
-        ));
+    if (courses.length === 0) return;
+
+    // Set up real-time listeners for course enrollment changes
+    const unsubscribers = courses.map(course => {
+      const courseRef = doc(db, "courses", course.id);
+      return onSnapshot(courseRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const courseData = docSnap.data();
+          const enrolledCount = (courseData.enrolledStudents || []).length;
+          setCourses(prev => prev.map(c => 
+            c.id === course.id ? { ...c, count: enrolledCount } : c
+          ));
+        }
       });
     });
 
     return () => {
-      listeners.forEach(unsub => unsub());
+      unsubscribers.forEach(unsub => unsub());
     };
-  }, []);
+  }, [courses.length]);
 
   if (loading) return <div style={styles.loader}>Loading...</div>;
   return (
@@ -106,7 +126,12 @@ const ProfessorProfile = () => {
 
         <div style={styles.statsBar}>
           <div style={styles.statItem}><div style={styles.statNumber}>{courses.length}</div><div style={styles.statLabel}>Active Courses</div></div>
-          <div style={styles.statItem}><div style={styles.statNumber}>475</div><div style={styles.statLabel}>Total Students</div></div>
+          <div style={styles.statItem}>
+            <div style={styles.statNumber}>
+              {courses.reduce((total, course) => total + (course.count || 0), 0)}
+            </div>
+            <div style={styles.statLabel}>Total Students</div>
+          </div>
           <div style={styles.statItem}><div style={styles.statNumber}>92%</div><div style={styles.statLabel}>Attendance Rate</div></div>
         </div>
 
