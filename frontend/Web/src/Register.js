@@ -10,11 +10,40 @@ function Register() {
   const [id, setId] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("");
   const [adminCode, setAdminCode] = useState("");
   const navigate = useNavigate(); 
 
+  const allowedAdminEmails = [
+    "alaatantawy352@gmail.com",
+    "mariam22khalid22@gmail.com",
+    "mariamhany31017@gmail.com",
+    "mariemkhaled2009@gmail.com",
+    "shimaaabdelfatah13579@gmail.com",
+    "mariam10182005@gmail.com"
+  ];
+
+  const detectRoleFromEmail = (email) => {
+    const cleanEmail = email.trim().toLowerCase();
+    
+    if (allowedAdminEmails.includes(cleanEmail)) {
+      return "admin";
+    } else if (cleanEmail.endsWith("@std.sci.cu.edu.eg")) {
+      return "student";
+    } else if (cleanEmail.endsWith("@sci.cu.edu.eg")) {
+      return "professor";
+    }
+    
+    return null;
+  };
+
   const handleRegister = async () => {
+    const role = detectRoleFromEmail(email);
+    
+    if (!role) {
+      alert("Invalid email domain. Please use:\n- @std.sci.cu.edu.eg for students\n- @sci.cu.edu.eg for professors\n- Authorized admin emails");
+      return;
+    }
+
     const error = validateRegister({
       role,
       name,
@@ -27,16 +56,6 @@ function Register() {
     if (error) {
       alert(error);
       return;
-    }
-
-    if (role === "professor") {
-      const cleanEmail = email.trim().toLowerCase();
-      const isUniEmail = cleanEmail.endsWith("@sci.cu.edu.eg");
-      
-      if (!isUniEmail) {
-        alert("Professors must use their university email (@sci.cu.edu.eg)");
-        return;
-      }
     }
 
     try {
@@ -76,6 +95,8 @@ function Register() {
         window.location.replace("/professor");
       } else if (role === "student") { 
         window.location.replace("/student");
+      } else if (role === "admin") {
+        window.location.replace("/admin");
       }
 
     } catch (err) {
@@ -121,28 +142,11 @@ function Register() {
           Create Account
         </h2>
 
-        <select
-          style={{
-            width: "100%", padding: "12px", marginTop: "10px",
-            borderRadius: "8px", border: "1px solid #CBD5E1", outline: "none",
-            color: role ? "#000" : "#64748B",
-            background: "white",
-            fontSize: "15px",
-            fontWeight: role ? "600" : "normal"
-          }}
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-        >
-          <option value="" disabled style={{ color: "#94A3B8", backgroundColor: "#F8FAFC" }}>-- Select Your Role --</option>
-          <option value="student" style={{ color: "#000", fontWeight: "600", backgroundColor: "white" }}> Student</option>
-          <option value="professor" style={{ color: "#000", fontWeight: "600", backgroundColor: "white" }}> Professor</option>
-        </select>
-
         <input
           placeholder="Full Name"
           autoComplete="off"
           style={{
-            width: "100%", padding: "12px", marginTop: "15px",
+            width: "100%", padding: "12px", marginTop: "10px",
             borderRadius: "8px", border: "1px solid #CBD5E1", boxSizing: "border-box"
           }}
           value={name}
@@ -160,7 +164,7 @@ function Register() {
           onChange={(e) => setEmail(e.target.value)}
         />
 
-        {role === "student" && (
+        {detectRoleFromEmail(email) === "student" && (
           <input
             placeholder="Student ID"
             autoComplete="off"

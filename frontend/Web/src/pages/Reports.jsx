@@ -13,13 +13,11 @@ const Reports = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch course details
         const courseDoc = await getDoc(doc(db, "courses", courseId));
         if (courseDoc.exists()) {
           const courseData = courseDoc.data();
           setCourse({ id: courseDoc.id, ...courseData });
 
-          // Fetch enrolled students
           const enrolledIds = courseData.enrolledStudents || [];
           if (enrolledIds.length > 0) {
             const studentsSnapshot = await getDocs(collection(db, "students"));

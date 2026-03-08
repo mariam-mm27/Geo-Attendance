@@ -12,12 +12,10 @@ const StudentProfile = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   useEffect(() => {
-    // Aggressive back button prevention
     const preventBack = () => {
       window.history.forward();
     };
     
-    // Push multiple states
     window.history.pushState(null, null, window.location.href);
     window.history.pushState(null, null, window.location.href);
     window.history.pushState(null, null, window.location.href);
@@ -32,7 +30,6 @@ const StudentProfile = () => {
         if (docSnap.exists()) {
           setStudentData(docSnap.data());
           
-          // Fetch all courses and filter enrolled ones
           const coursesSnapshot = await getDocs(collection(db, "courses"));
           const enrolledCourses = [];
           coursesSnapshot.forEach((courseDoc) => {
@@ -46,7 +43,7 @@ const StudentProfile = () => {
                 time: courseData.time,
                 duration: courseData.duration,
                 professorName: courseData.professorName,
-                attendance: 0 // You can calculate this based on attendance records
+                attendance: 0 
               });
             }
           });

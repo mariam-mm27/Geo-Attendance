@@ -36,7 +36,6 @@ const AdminDashboard = () => {
     
     window.addEventListener('popstate', preventBack);
     
-    // Also prevent on page load
     setTimeout(preventBack, 0);
     
     return () => {
@@ -150,7 +149,6 @@ const AdminDashboard = () => {
   }, []);
 
   useEffect(() => {
-    // Real-time listener for students
     const unsubscribe = onSnapshot(collection(db, "students"), (snapshot) => {
       const studentsData = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -166,7 +164,6 @@ const AdminDashboard = () => {
   }, []);
 
   useEffect(() => {
-    // Real-time listener for courses
     const unsubscribe = onSnapshot(collection(db, "courses"), (snapshot) => {
       const coursesData = snapshot.docs.map(doc => ({
         id: doc.id,

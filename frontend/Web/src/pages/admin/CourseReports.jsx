@@ -13,7 +13,6 @@ const CourseReports = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch course details
         const courseDoc = await getDoc(doc(db, "courses", courseId));
         if (courseDoc.exists()) {
           const courseData = { id: courseDoc.id, ...courseDoc.data() };

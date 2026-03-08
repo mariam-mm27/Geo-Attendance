@@ -21,7 +21,6 @@ const StudentEnroll = () => {
 
         setStudentId(user.uid);
 
-        // Fetch all courses
         const coursesSnapshot = await getDocs(collection(db, "courses"));
         const coursesData = coursesSnapshot.docs.map(doc => ({
           id: doc.id,
@@ -29,7 +28,6 @@ const StudentEnroll = () => {
         }));
         setAllCourses(coursesData);
 
-        // Get enrolled course IDs
         const enrolledIds = coursesData
           .filter(course => (course.enrolledStudents || []).includes(user.uid))
           .map(course => course.id);
