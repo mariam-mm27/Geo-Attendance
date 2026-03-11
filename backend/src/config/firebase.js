@@ -1,4 +1,3 @@
-
 import admin from "firebase-admin";
 import { readFileSync } from "fs";
 
@@ -12,10 +11,3 @@ admin.initializeApp({
 
 export const db = admin.firestore();
 export default admin;
-
-
-
-const db = admin.firestore();
-
-module.exports = db;
-8
