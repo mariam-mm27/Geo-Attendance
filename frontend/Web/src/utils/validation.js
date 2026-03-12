@@ -1,4 +1,4 @@
-// ========= REGISTER VALIDATION =========
+
 
 export const validateRegister = (data) => {
   const {
@@ -10,28 +10,40 @@ export const validateRegister = (data) => {
     adminCode,
   } = data;
 
-  // Common validations
+ 
   if (!role || !name || !email || !password) {
     return "All fields are required.";
   }
 
-  // Email format
+  
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return "Invalid email format.";
   }
 
-  // Password length
+
   if (password.length < 6) {
     return "Password must be at least 6 characters.";
   }
 
-  // Role validation
+  if (!/[A-Z]/.test(password)) {
+    return "Password must contain at least one uppercase letter.";
+  }
+
+  if (!/[a-z]/.test(password)) {
+    return "Password must contain at least one lowercase letter.";
+  }
+
+  if (!/[0-9]/.test(password)) {
+    return "Password must contain at least one number.";
+  }
+
+  
   if (!["student", "professor", "admin"].includes(role)) {
     return "Invalid role selected.";
   }
 
-  // Student rules
+  
   if (role === "student") {
     if (!studentId) {
       return "Student ID is required.";
@@ -46,14 +58,14 @@ export const validateRegister = (data) => {
     }
   }
 
-  // Professor rules
+ 
   if (role === "professor") {
     if (!email.endsWith("@sci.cu.edu.eg")) {
       return "Professor email must end with @sci.cu.edu.eg";
     }
   }
 
-  // Admin rules
+ 
   if (role === "admin") {
     if (!adminCode) {
       return "Admin code is required.";
@@ -67,7 +79,7 @@ export const validateRegister = (data) => {
   return null;
 };
 
-// ========= LOGIN VALIDATION =========
+
 
 export const validateLogin = (data) => {
   const { email, password } = data;
