@@ -1,30 +1,26 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   TextInput,
-  View,
   StyleSheet,
   Text,
   TouchableOpacity,
 } from "react-native";
 import AuthLayout from "../components/AuthInput";
-import RolePicker from "../components/RoleSelector";
 import { COLORS } from "../theme/color";
-import { validateRegister } from "../utils/validation";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+
 export default function RegisterScreen({ navigation }: any) {
-  const [role, setRole] = useState("");
   const [name, setName] = useState("");
   const [id, setId] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  React.useEffect(() => {
-    // Clear all fields when component mounts
+  useEffect(() => {
     const clearFields = () => {
-      setRole("");
       setName("");
       setId("");
       setEmail("");
@@ -34,94 +30,92 @@ export default function RegisterScreen({ navigation }: any) {
     
     clearFields();
     
-    // Also clear when screen comes into focus
-    const unsubscribe = navigation.addListener('focus', () => {
-      clearFields();
-    });
-    
+    const unsubscribe = navigation.addListener("focus", clearFields);
     return unsubscribe;
   }, [navigation]);
 
+  const detectRoleFromEmail = (email: string): "student" | "professor" | null => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (cleanEmail.endsWith("@std.sci.cu.edu.eg")) return "student";
+    if (cleanEmail.endsWith("@sci.cu.edu.eg")) return "professor";
+    return null;
+  };
+
   const handleRegister = async () => {
-  setError("");
-
-  // 1️⃣ Validation
-  const errorMessage = validateRegister({
-    role,
-    name,
-    id,
-    email,
-    password,
-  });
-
-  if (errorMessage) {
-    setError(errorMessage);
-    return;
-  }
-
-  try {
-    // 2️⃣ Create user in Firebase Auth
-    const cred = await createUserWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
-
-    // 3️⃣ Save user in Firestore
-    await setDoc(doc(db, "users", cred.user.uid), {
-      name,
-      email,
-      role,
-      studentId: role === "student" ? id : null,
-      createdAt: serverTimestamp(),
-    });
-
-    // 4️⃣ Clear fields
-    setName("");
-    setId("");
-    setEmail("");
-    setPassword("");
-
-    // 5️⃣ Navigation AFTER success only
-    if (role === "student") {
-      navigation.replace("StudentHome");
-    } else {
-      navigation.replace("ProfessorHome");
+    setError("");
+    const role = detectRoleFromEmail(email);
+    if (!role) {
+      setError("Invalid email domain.");
+      return;
+    }
+    if (!name || !email || !password || (role === "student" && !id)) {
+      setError("All fields are required.");
+      return;
     }
 
-  } catch (err: any) {
-  console.log("REGISTER ERROR:", err);
-  setError(err.message || "Registration failed");
-}
-};
+    try {
+      setLoading(true);
+
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password
+      );
+
+      const user = userCredential.user;
+
+      // 1️⃣ Save in "users" collection
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        name: name.trim(),
+        email: email.trim(),
+        role,
+        studentId: role === "student" ? id : null,
+        createdAt: serverTimestamp(),
+      });
+
+      // 2️⃣ Save in role-specific collection
+      if (role === "student") {
+        await setDoc(doc(db, "students", user.uid), {
+          name,
+          email,
+          code: id,
+          attendance: "0%",
+          createdAt: serverTimestamp(),
+        });
+      } else if (role === "professor") {
+        await setDoc(doc(db, "professors", user.uid), {
+          name,
+          email,
+          courses: 0,
+          attendance: "0%",
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      console.log("User registered successfully");
+
+      // Logout after registration
+      await signOut(auth);
+
+      navigation.replace("Login");
+    } catch (err: any) {
+      console.log("Register Error:", err);
+      setError(err.message || "Registration failed");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <AuthLayout>
-      <RolePicker role={role} setRole={setRole} />
-
       <TextInput
         placeholder="Name"
         style={styles.input}
         value={name}
         onChangeText={setName}
         autoCapitalize="words"
-        autoCorrect={false}
-        autoComplete="off"
-        textContentType="none"
       />
-
-      {role === "student" && (
-        <TextInput
-          placeholder="ID"
-          style={styles.input}
-          value={id}
-          onChangeText={setId}
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="off"
-          textContentType="none"
-        />
-      )}
 
       <TextInput
         placeholder="Email"
@@ -129,33 +123,37 @@ export default function RegisterScreen({ navigation }: any) {
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="off"
-        textContentType="none"
       />
+
+      {detectRoleFromEmail(email) === "student" && (
+        <TextInput
+          placeholder="Student ID"
+          style={styles.input}
+          value={id}
+          onChangeText={setId}
+          autoCapitalize="none"
+        />
+      )}
 
       <TextInput
         placeholder="Password"
-        secureTextEntry
         style={styles.input}
+        secureTextEntry
         value={password}
         onChangeText={setPassword}
         autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="off"
-        textContentType="none"
       />
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <TouchableOpacity style={styles.button} onPress={handleRegister}>
-        <Text style={styles.buttonText}>Register</Text>
-      </TouchableOpacity>
-
       <TouchableOpacity
-            style={[styles.button, { backgroundColor: COLORS.secondary }]}
->
-          <Text style={styles.buttonText}>Sign up with Google</Text>
+        style={styles.button}
+        onPress={handleRegister}
+        disabled={loading}
+      >
+        <Text style={styles.buttonText}>
+          {loading ? "Registering..." : "Register"}
+        </Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.navigate("Login")}>

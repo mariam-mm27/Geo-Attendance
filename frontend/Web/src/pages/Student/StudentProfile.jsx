@@ -61,10 +61,20 @@ const StudentProfile = () => {
   }, []);
 
   const handleLogout = async () => {
-    await signOut(auth);
-    localStorage.clear();
-    sessionStorage.clear();
-    window.location.href = "/login";
+    try {
+      setStudentData({ name: "...", studentId: "", email: "" });
+      setCourses([]);
+      
+      await signOut(auth);
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      window.history.pushState(null, null, "/login");
+      window.location.replace("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+      window.location.replace("/login");
+    }
   };
 
   return (

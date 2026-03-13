@@ -12,12 +12,10 @@ const ProfessorProfile = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [courses, setCourses] = useState([]);
   useEffect(() => {
-    // Aggressive back button prevention
     const preventBack = () => {
       window.history.forward();
     };
     
-    // Push multiple states
     window.history.pushState(null, null, window.location.href);
     window.history.pushState(null, null, window.location.href);
     window.history.pushState(null, null, window.location.href);
@@ -34,12 +32,17 @@ const ProfessorProfile = () => {
           const userData = snap.data();
           setProfData(userData);
           
-          // Fetch courses assigned to this professor
           const coursesSnapshot = await getDocs(collection(db, "courses"));
           const professorCourses = [];
+          const userEmail = user.email?.toLowerCase();
+          
           coursesSnapshot.forEach((docSnap) => {
             const courseData = docSnap.data();
-            if (courseData.professorId === user.uid || courseData.professorEmail === user.email) {
+            const courseProfEmail = courseData.professorEmail?.toLowerCase();
+            
+            if (courseData.professorId === user.uid || 
+                courseProfEmail === userEmail ||
+                courseData.professorEmail === user.email) {
               professorCourses.push({
                 id: docSnap.id,
                 ...courseData,
@@ -62,7 +65,6 @@ const ProfessorProfile = () => {
   useEffect(() => {
     if (courses.length === 0) return;
 
-    // Set up real-time listeners for course enrollment changes
     const unsubscribers = courses.map(course => {
       const courseRef = doc(db, "courses", course.id);
       return onSnapshot(courseRef, (docSnap) => {

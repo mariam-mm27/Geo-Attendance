@@ -34,7 +34,6 @@ export default function ForgotPasswordScreen({ navigation }: any) {
       setLoading(false);
       setEmail("");
       
-      // Show success alert
       Alert.alert(
         "✅ Success!",
         "Password reset email sent successfully!\n\nPlease check your inbox and spam folder.",
