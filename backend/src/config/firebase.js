@@ -1,4 +1,3 @@
-
 import admin from "firebase-admin";
 import { readFileSync } from "fs";
 
@@ -10,8 +9,5 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
-
 export const db = admin.firestore();
-
-export{admin};
-
+export { admin };

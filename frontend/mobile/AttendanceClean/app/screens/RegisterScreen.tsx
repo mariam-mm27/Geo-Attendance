@@ -7,10 +7,9 @@ import {
 } from "react-native";
 import AuthLayout from "../components/AuthInput";
 import { COLORS } from "../theme/color";
-import { validateRegister } from "../utils/validation";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
 export default function RegisterScreen({ navigation }: any) {
   const [name, setName] = useState("");
@@ -18,6 +17,7 @@ export default function RegisterScreen({ navigation }: any) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const clearFields = () => {
@@ -30,65 +30,53 @@ export default function RegisterScreen({ navigation }: any) {
     
     clearFields();
     
-    const unsubscribe = navigation.addListener('focus', () => {
-      clearFields();
-    });
-    
+    const unsubscribe = navigation.addListener("focus", clearFields);
     return unsubscribe;
   }, [navigation]);
 
-  const detectRoleFromEmail = (email: string): string | null => {
+  const detectRoleFromEmail = (email: string): "student" | "professor" | null => {
     const cleanEmail = email.trim().toLowerCase();
-    
-    if (cleanEmail.endsWith("@std.sci.cu.edu.eg")) {
-      return "student";
-    } else if (cleanEmail.endsWith("@sci.cu.edu.eg")) {
-      return "professor";
-    }
-    
+    if (cleanEmail.endsWith("@std.sci.cu.edu.eg")) return "student";
+    if (cleanEmail.endsWith("@sci.cu.edu.eg")) return "professor";
     return null;
   };
 
   const handleRegister = async () => {
     setError("");
-
     const role = detectRoleFromEmail(email);
-
     if (!role) {
-      setError("Invalid email domain. Use @std.sci.cu.edu.eg for students or @sci.cu.edu.eg for professors.");
+      setError("Invalid email domain.");
       return;
     }
-
-    const errorMessage = validateRegister({
-      role,
-      name,
-      id,
-      email,
-      password,
-    });
-
-    if (errorMessage) {
-      setError(errorMessage);
+    if (!name || !email || !password || (role === "student" && !id)) {
+      setError("All fields are required.");
       return;
     }
 
     try {
-      const cred = await createUserWithEmailAndPassword(
+      setLoading(true);
+
+      const userCredential = await createUserWithEmailAndPassword(
         auth,
-        email,
+        email.trim(),
         password
       );
 
-      await setDoc(doc(db, "users", cred.user.uid), {
-        name,
-        email,
-        role: role.toLowerCase(),
+      const user = userCredential.user;
+
+      // 1️⃣ Save in "users" collection
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        name: name.trim(),
+        email: email.trim(),
+        role,
         studentId: role === "student" ? id : null,
         createdAt: serverTimestamp(),
       });
 
+      // 2️⃣ Save in role-specific collection
       if (role === "student") {
-        await setDoc(doc(db, "students", cred.user.uid), {
+        await setDoc(doc(db, "students", user.uid), {
           name,
           email,
           code: id,
@@ -96,7 +84,7 @@ export default function RegisterScreen({ navigation }: any) {
           createdAt: serverTimestamp(),
         });
       } else if (role === "professor") {
-        await setDoc(doc(db, "professors", cred.user.uid), {
+        await setDoc(doc(db, "professors", user.uid), {
           name,
           email,
           courses: 0,
@@ -105,15 +93,17 @@ export default function RegisterScreen({ navigation }: any) {
         });
       }
 
-      setName("");
-      setId("");
-      setEmail("");
-      setPassword("");
+      console.log("User registered successfully");
 
+      // Logout after registration
+      await signOut(auth);
 
+      navigation.replace("Login");
     } catch (err: any) {
-      console.log("REGISTER ERROR:", err);
+      console.log("Register Error:", err);
       setError(err.message || "Registration failed");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -125,9 +115,6 @@ export default function RegisterScreen({ navigation }: any) {
         value={name}
         onChangeText={setName}
         autoCapitalize="words"
-        autoCorrect={false}
-        autoComplete="off"
-        textContentType="none"
       />
 
       <TextInput
@@ -136,9 +123,6 @@ export default function RegisterScreen({ navigation }: any) {
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="off"
-        textContentType="none"
       />
 
       {detectRoleFromEmail(email) === "student" && (
@@ -148,32 +132,29 @@ export default function RegisterScreen({ navigation }: any) {
           value={id}
           onChangeText={setId}
           autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="off"
-          textContentType="none"
         />
       )}
 
       <TextInput
         placeholder="Password"
-        secureTextEntry
         style={styles.input}
+        secureTextEntry
         value={password}
         onChangeText={setPassword}
         autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="off"
-        textContentType="none"
       />
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <TouchableOpacity style={styles.button} onPress={handleRegister}>
-        <Text style={styles.buttonText}>Register</Text>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={handleRegister}
+        disabled={loading}
+      >
+        <Text style={styles.buttonText}>
+          {loading ? "Registering..." : "Register"}
+        </Text>
       </TouchableOpacity>
-
-      {}
-      {}
 
       <TouchableOpacity onPress={() => navigation.navigate("Login")}>
         <Text style={styles.link}>Already have an account? Login</Text>
