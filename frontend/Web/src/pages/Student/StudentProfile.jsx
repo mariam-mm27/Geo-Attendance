@@ -71,8 +71,7 @@ const StudentProfile = () => {
       
       const updatedCourses = await Promise.all(
         courses.map(async (course) => {
-          const result = await calculateStudentAttendance(course.id, studentData.studentId);
-          return {
+const result = await calculateStudentAttendance(course.id, auth.currentUser.uid);          return {
             ...course,
             attendance: result.success ? result.data.percentage : "0",
             attendanceDetails: result.success ? result.data : null
@@ -105,8 +104,7 @@ const StudentProfile = () => {
   };
 
   const handleViewHistory = async (courseId, courseName) => {
-    const result = await getStudentAttendanceHistory(courseId, studentData.studentId);
-    if (result.success) {
+const result = await getStudentAttendanceHistory(courseId, auth.currentUser.uid);    if (result.success) {
       const historyText = result.data.map(s => 
         `${new Date(s.date).toLocaleDateString()}: ${s.attended ? '✅ حاضر' : '❌ غائب'}`
       ).join('\n');

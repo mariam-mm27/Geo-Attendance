@@ -100,8 +100,7 @@ export const calculateCourseAttendanceStats = async (courseId) => {
       };
     }
     
-    const studentIds = courseData.students || [];
-    
+const studentIds = courseData.enrolledStudents || [];    
     if (studentIds.length === 0) {
       return {
         success: true,
@@ -150,16 +149,21 @@ export const calculateCourseAttendanceStats = async (courseId) => {
 ========================= */
 export const getStudentAttendanceHistory = async (courseId, studentId) => {
   try {
+    console.log('🔍 Fetching history for:', { courseId, studentId });
+    
     const sessionsQuery = query(
       collection(db, "sessions"),
       where("courseId", "==", courseId)
     );
     const sessionsSnap = await getDocs(sessionsQuery);
     
+    console.log('📚 Total sessions found:', sessionsSnap.size);
+    
     const sessions = [];
     
     for (const sessionDoc of sessionsSnap.docs) {
       const sessionData = sessionDoc.data();
+      console.log(`📅 Session ${sessionDoc.id}:`, sessionData);
       
       const attendanceQuery = query(
         collection(db, "attendance"),
@@ -170,6 +174,8 @@ export const getStudentAttendanceHistory = async (courseId, studentId) => {
       const attendanceSnap = await getDocs(attendanceQuery);
       const attended = attendanceSnap.size > 0;
       
+      console.log(`   👤 Attended: ${attended}, Records:`, attendanceSnap.docs.map(d => d.data()));
+      
       sessions.push({
         sessionId: sessionDoc.id,
         date: sessionData.createdAt?.toDate?.() || sessionData.createdAt,
@@ -177,12 +183,16 @@ export const getStudentAttendanceHistory = async (courseId, studentId) => {
       });
     }
     
+    const sorted = sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
+    console.log('✅ Final history:', sorted);
+    
     return {
       success: true,
-      data: sessions.sort((a, b) => new Date(b.date) - new Date(a.date))
+      data: sorted
     };
     
   } catch (error) {
+    console.error('❌ Error in getStudentAttendanceHistory:', error);
     return {
       success: false,
       error: error.message
