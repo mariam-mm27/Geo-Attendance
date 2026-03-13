@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { auth, db } from "../../firebase";
 import { doc, getDoc, collection, onSnapshot, getDocs } from "firebase/firestore";
 import { signOut, onAuthStateChanged } from "firebase/auth";
-import { calculateCourseAttendanceStats } from '../../backend-services/attendanceService';
-const ProfessorProfile = () => {
+import { calculateCourseAttendanceStats } from '../../services/attendanceService';const ProfessorProfile = () => {
   const navigate = useNavigate();
   const [profData, setProfData] = useState({ name: "", email: "" });
   const [loading, setLoading] = useState(true);

@@ -4,8 +4,7 @@ import { auth, db } from "../../firebase";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { signOut, onAuthStateChanged } from "firebase/auth";
 import AttendanceBar from "../../components/AttendanceBar";
-import { calculateStudentAttendance, getStudentAttendanceHistory } from '../../backend-services/attendanceService';
-
+import { calculateStudentAttendance, getStudentAttendanceHistory } from '../../services/attendanceService';
 const StudentProfile = () => {
   const navigate = useNavigate(); 
   const [studentData, setStudentData] = useState({ name: "...", studentId: "", email: "" });
