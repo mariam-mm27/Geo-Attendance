@@ -10,4 +10,4 @@ admin.initializeApp({
 });
 
 export const db = admin.firestore();
-export default admin;
+export { admin };

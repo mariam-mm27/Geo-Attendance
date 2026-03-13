@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../../firebase";
-import { doc, getDoc, collection, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, collection, onSnapshot, getDocs } from "firebase/firestore";
 import { signOut, onAuthStateChanged } from "firebase/auth";
 
 const ProfessorProfile = () => {
@@ -10,20 +10,12 @@ const ProfessorProfile = () => {
   const [loading, setLoading] = useState(true);
   const [showToast, setShowToast] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
-  const [courses, setCourses] = useState([
-    { id: "CS301", name: "Data Structures & Algorithms", code: "CS301", count: "...", room: "Lab 5", time: "09:00 AM - 11:00 AM" },
-    { id: "CS402", name: "Artificial Intelligence", code: "CS402", count: "...", room: "Hall B", time: "11:00 AM - 01:00 PM" },
-    { id: "CS205", name: "Database Management", code: "CS205", count: "...", room: "Hall C", time: "01:00 PM - 03:00 PM" },
-    { id: "CS101", name: "Introduction to CS", code: "CS101", count: "...", room: "Main Hall", time: "03:00 PM - 05:00 PM" },
-  ]);
+  const [courses, setCourses] = useState([]);
   useEffect(() => {
-    // Aggressive back button prevention
     const preventBack = () => {
       window.history.forward();
     };
     
-    // Push multiple states
     window.history.pushState(null, null, window.location.href);
     window.history.pushState(null, null, window.location.href);
     window.history.pushState(null, null, window.location.href);
@@ -36,7 +28,30 @@ const ProfessorProfile = () => {
         navigate("/login", { replace: true });
       } else {
         const snap = await getDoc(doc(db, "users", user.uid));
-        if (snap.exists()) setProfData(snap.data());
+        if (snap.exists()) {
+          const userData = snap.data();
+          setProfData(userData);
+          
+          const coursesSnapshot = await getDocs(collection(db, "courses"));
+          const professorCourses = [];
+          const userEmail = user.email?.toLowerCase();
+          
+          coursesSnapshot.forEach((docSnap) => {
+            const courseData = docSnap.data();
+            const courseProfEmail = courseData.professorEmail?.toLowerCase();
+            
+            if (courseData.professorId === user.uid || 
+                courseProfEmail === userEmail ||
+                courseData.professorEmail === user.email) {
+              professorCourses.push({
+                id: docSnap.id,
+                ...courseData,
+                count: (courseData.enrolledStudents || []).length
+              });
+            }
+          });
+          setCourses(professorCourses);
+        }
         setLoading(false);
       }
     });
@@ -48,18 +63,25 @@ const ProfessorProfile = () => {
   }, [navigate]);
 
   useEffect(() => {
-    const listeners = courses.map(course => {
-      return onSnapshot(collection(db, "courses", course.id, "students"), (snapshot) => {
-        setCourses(prev => prev.map(c => 
-          c.id === course.id ? { ...c, count: snapshot.size } : c
-        ));
+    if (courses.length === 0) return;
+
+    const unsubscribers = courses.map(course => {
+      const courseRef = doc(db, "courses", course.id);
+      return onSnapshot(courseRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const courseData = docSnap.data();
+          const enrolledCount = (courseData.enrolledStudents || []).length;
+          setCourses(prev => prev.map(c => 
+            c.id === course.id ? { ...c, count: enrolledCount } : c
+          ));
+        }
       });
     });
 
     return () => {
-      listeners.forEach(unsub => unsub());
+      unsubscribers.forEach(unsub => unsub());
     };
-  }, []);
+  }, [courses.length]);
 
   if (loading) return <div style={styles.loader}>Loading...</div>;
   return (
@@ -106,7 +128,12 @@ const ProfessorProfile = () => {
 
         <div style={styles.statsBar}>
           <div style={styles.statItem}><div style={styles.statNumber}>{courses.length}</div><div style={styles.statLabel}>Active Courses</div></div>
-          <div style={styles.statItem}><div style={styles.statNumber}>475</div><div style={styles.statLabel}>Total Students</div></div>
+          <div style={styles.statItem}>
+            <div style={styles.statNumber}>
+              {courses.reduce((total, course) => total + (course.count || 0), 0)}
+            </div>
+            <div style={styles.statLabel}>Total Students</div>
+          </div>
           <div style={styles.statItem}><div style={styles.statNumber}>92%</div><div style={styles.statLabel}>Attendance Rate</div></div>
         </div>
 
@@ -134,10 +161,10 @@ const ProfessorProfile = () => {
 
 const styles = {
   pageWrapper: { backgroundColor: "#F8FAFC", minHeight: "100vh", fontFamily: "sans-serif" },
-  navbar: { height: "70px", backgroundColor: "#173B66", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 5%", color: "white" },
+  navbar: { height: "70px", backgroundColor: "#173B66", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 5%", color: "white", position: "sticky", top: 0, zIndex: 100 },
   menuBtn: { fontSize: "28px", cursor: "pointer", color: "white" },
   navTitle: { fontSize: "20px", fontWeight: "bold" },
-  logoutBtn: { backgroundColor: "transparent", border: "1px solid white", color: "white", padding: "8px 18px", borderRadius: "20px", cursor: "pointer" },
+  logoutBtn: { backgroundColor: "white", border: "none", color: "#173B66", padding: "10px 24px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "14px" },
   sidebarOverlay: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.4)", zIndex: 6000 },
   sidebar: { width: "260px", height: "100%", backgroundColor: "white", position: "absolute", left: 0, top: 0, boxShadow: "2px 0 10px rgba(0,0,0,0.1)" },
   sidebarItem: { padding: "15px 20px", color: "#173B66", cursor: "pointer", borderBottom: "1px solid #F1F5F9", fontSize: "16px" },

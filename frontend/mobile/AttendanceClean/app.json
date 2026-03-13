@@ -25,13 +25,9 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-<<<<<<< HEAD
-    }
-=======
     },
     "plugins": [
       "expo-barcode-scanner"
     ]
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
   }
 }
