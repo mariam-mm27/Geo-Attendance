@@ -14,7 +14,7 @@ import { auth, db } from "../firebase";
 
 import { useAuth } from "../context/AuthContext";
 
-export default function LoginScreen({ navigation }: any) {
+export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -29,7 +29,7 @@ export default function LoginScreen({ navigation }: any) {
     };
     
     clearFields();
-    
+
     const unsubscribe = navigation.addListener('focus', () => {
       clearFields();
     });
@@ -37,7 +37,7 @@ export default function LoginScreen({ navigation }: any) {
     return unsubscribe;
   }, [navigation]);
 
-  const detectRoleFromEmail = (email: string): string | null => {
+  const detectRoleFromEmail = (email) => {
     const cleanEmail = email.trim().toLowerCase();
     
     if (cleanEmail.endsWith("@std.sci.cu.edu.eg")) {
@@ -86,12 +86,12 @@ export default function LoginScreen({ navigation }: any) {
       }
 
       setUser(cred.user);
-      setUserRole(userData.role?.toLowerCase() as "professor" | "student");
+      setUserRole(userData.role?.toLowerCase());
 
       setEmail("");
       setPassword("");
 
-    } catch (err: any) {
+    } catch (err) {
       console.log("LOGIN ERROR:", err);
       setError(err.message || "Login failed");
     }
@@ -134,16 +134,6 @@ export default function LoginScreen({ navigation }: any) {
       <TouchableOpacity style={styles.button} onPress={handleLogin}>
         <Text style={styles.buttonText}>Login</Text>
       </TouchableOpacity>
-
-      {/* Google Sign-In - Requires OAuth Configuration */}
-      {/* 
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: COLORS.secondary, opacity: 0.5 }]}
-        disabled={true}
-      >
-        <Text style={styles.buttonText}>Login with Google (Coming Soon)</Text>
-      </TouchableOpacity>
-      */}
 
       <TouchableOpacity onPress={() => navigation.navigate("Register")}>
         <Text style={styles.link}>Don't have an account? Register</Text>
