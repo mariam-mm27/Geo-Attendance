@@ -11,7 +11,7 @@ import { auth, db } from "../firebase";
 import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
-export default function RegisterScreen({ navigation }) {
+export default function RegisterScreen({ navigation }: any) {
   const [name, setName] = useState("");
   const [id, setId] = useState("");
   const [email, setEmail] = useState("");
