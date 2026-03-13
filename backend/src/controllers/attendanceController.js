@@ -1,9 +1,9 @@
 import { markAttendance } from "../models/attendance.js";
 import { collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "../firebase.js"; // عدلي المسار لو مختلف
+import { db } from "../firebase.js";
 
 /**
- * يسجل حضور الطالب مع التحقق من عدم وجود تعارض بين محاضراته
+ * يسجل حضور الطالب مع منع أي تداخل في المحاضرات حتى لو كورسين مختلفين
  * @param {string} studentId
  * @param {string} sessionId
  * @param {Date} newStartTime وقت بداية المحاضرة الجديدة
@@ -19,20 +19,20 @@ export const attendanceController = async (studentId, sessionId, newStartTime, n
 
     const snapshot = await getDocs(q);
 
+    // 2️⃣ التحقق من أي تعارض في المواعيد
     let conflict = false;
-
     snapshot.forEach((doc) => {
       const data = doc.data();
       const oldStart = data.startTime.toDate ? data.startTime.toDate() : new Date(data.startTime);
       const oldEnd = data.endTime.toDate ? data.endTime.toDate() : new Date(data.endTime);
 
-      // 2️⃣ شرط التداخل بين المحاضرات
+      // منع أي تداخل في الوقت، سواء نفس الكورس أو كورسين مختلفين
       if (newStartTime < oldEnd && newEndTime > oldStart) {
         conflict = true;
       }
     });
 
-    // 3️⃣ لو في تعارض
+    // 3️⃣ لو في تعارض، ارجع رسالة واضحة
     if (conflict) {
       throw new Error("You cannot attend two courses at the same time.");
     }
