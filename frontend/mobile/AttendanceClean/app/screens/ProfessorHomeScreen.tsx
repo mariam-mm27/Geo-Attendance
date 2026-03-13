@@ -15,14 +15,27 @@ import { auth, db } from "../firebase";
 import { collection, getDocs, doc, getDoc, addDoc } from "firebase/firestore";
 import { AuthContext } from "../context/AuthContext";
 
-export default function ProfessorSessionScreen({ navigation }) {
+interface Course {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface ActiveSession {
+  sessionId: string;
+  courseName: string;
+  lectureNumber: number;
+  expiresAt: Date;
+}
+
+export default function ProfessorSessionScreen({ navigation }: any) {
   const [userData, setUserData] = useState({ name: "", id: "", email: "" });
-  const [courses, setCourses] = useState([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCourseId, setSelectedCourseId] = useState(null);
-  const [activeSession, setActiveSession] = useState(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [lectureCounters, setLectureCounters] = useState({});
+  const [lectureCounters, setLectureCounters] = useState<Record<string, number>>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const authContext = useContext(AuthContext);
@@ -41,7 +54,7 @@ export default function ProfessorSessionScreen({ navigation }) {
           setUserData({ name: data.name, id: user.uid, email: data.email });
 
           const coursesSnapshot = await getDocs(collection(db, "courses"));
-          const professorCourses = [];
+          const professorCourses: Course[] = [];
           const userEmail = user.email?.toLowerCase();
 
           coursesSnapshot.forEach((docSnap) => {
@@ -73,7 +86,7 @@ export default function ProfessorSessionScreen({ navigation }) {
   }, [navigation]);
 
   useEffect(() => {
-    let timer;
+    let timer: NodeJS.Timeout;
     if (timeLeft > 0) {
       timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
     }
@@ -82,9 +95,9 @@ export default function ProfessorSessionScreen({ navigation }) {
       setActiveSession(null);
     }
     return () => clearInterval(timer);
-  }, [timeLeft]);
+  }, [timeLeft, activeSession]);
 
-  const formatTime = (seconds) => {
+  const formatTime = (seconds: number) => {
     const min = Math.floor(seconds / 60);
     const sec = seconds % 60;
     return `${min}:${sec < 10 ? "0" : ""}${sec}`;
@@ -95,6 +108,8 @@ export default function ProfessorSessionScreen({ navigation }) {
 
     try {
       const selectedCourse = courses.find((c) => c.id === selectedCourseId);
+      if (!selectedCourse) return Alert.alert("Error", "Course not found");
+      
       const lectureNumber = lectureCounters[selectedCourseId] || 1;
 
       const newSessionId =
@@ -132,7 +147,7 @@ export default function ProfessorSessionScreen({ navigation }) {
       }));
 
       Alert.alert("✅ Success", "Session created successfully!");
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
       Alert.alert("❌ Error", error.message || "Failed to create session");
     }
@@ -193,13 +208,14 @@ export default function ProfessorSessionScreen({ navigation }) {
             <>
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Personal Information</Text>
-                <Text>Name: {userData.name}</Text>
-                <Text>Email: {userData.email}</Text>
+                <Text style={styles.infoText}>Name: {userData.name}</Text>
+                <Text style={styles.infoText}>Email: {userData.email}</Text>
               </View>
 
-              {courses.length > 0 && (
+              {courses.length > 0 ? (
                 <View style={styles.card}>
-                  <Picker selectedValue={selectedCourseId} onValueChange={(v) => setSelectedCourseId(v)}>
+                  <Text style={styles.cardTitle}>Create Attendance Session</Text>
+                  <Picker selectedValue={selectedCourseId} onValueChange={(v) => setSelectedCourseId(v)} style={styles.picker}>
                     <Picker.Item label="Select a Course..." value={null} />
                     {courses.map((c) => (
                       <Picker.Item key={c.id} label={`${c.code} - ${c.name}`} value={c.id} />
@@ -209,15 +225,22 @@ export default function ProfessorSessionScreen({ navigation }) {
                     <Text style={styles.buttonText}>Create Session</Text>
                   </TouchableOpacity>
                 </View>
+              ) : (
+                <View style={styles.card}>
+                  <Text style={styles.noCoursesText}>No courses assigned yet.</Text>
+                </View>
               )}
 
               {activeSession && (
                 <View style={styles.card}>
-                  <Text>Active Session</Text>
-                  <Text>Course: {activeSession.courseName}</Text>
-                  <Text>Lecture: {activeSession.lectureNumber}</Text>
-                  <Text>Time Left: {formatTime(timeLeft)}</Text>
-                  <QRCode value={activeSession.sessionId} size={200} />
+                  <Text style={styles.cardTitle}>Active Session</Text>
+                  <Text style={styles.infoText}>Course: {activeSession.courseName}</Text>
+                  <Text style={styles.infoText}>Lecture: #{activeSession.lectureNumber}</Text>
+                  <Text style={styles.infoText}>Time Left: {formatTime(timeLeft)}</Text>
+                  <View style={styles.qrContainer}>
+                    <QRCode value={activeSession.sessionId} size={200} />
+                  </View>
+                  <Text style={styles.sessionIdText}>Session ID: {activeSession.sessionId}</Text>
                 </View>
               )}
             </>
@@ -228,7 +251,6 @@ export default function ProfessorSessionScreen({ navigation }) {
   );
 }
 
-// Styles remain mostly the same
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
   overlay: { position: "absolute", top:0,left:0,right:0,bottom:0,backgroundColor:"rgba(0,0,0,0.5)", zIndex:999 },
@@ -248,6 +270,11 @@ const styles = StyleSheet.create({
   pageTitle:{fontSize:28,fontWeight:"700",color:"#173B66",textAlign:"center",marginBottom:30,marginTop:10},
   card:{backgroundColor:"#fff",padding:25,borderRadius:20,marginBottom:20,shadowColor:"#000",shadowOpacity:0.1,shadowRadius:15,shadowOffset:{width:0,height:5},elevation:6,borderWidth:1,borderColor:"#E2E8F0"},
   cardTitle:{fontSize:20,fontWeight:"700",color:"#173B66",marginBottom:18,borderBottomWidth:2,borderBottomColor:"#E2E8F0",paddingBottom:10},
-  createButton:{backgroundColor:"#173B66",paddingVertical:14,paddingHorizontal:28,borderRadius:12,alignSelf:"flex-start",shadowColor:"#173B66",shadowOpacity:0.4,shadowRadius:10,shadowOffset:{width:0,height:6},elevation:8},
+  infoText:{fontSize:15,color:"#1E293B",marginBottom:8,lineHeight:22},
+  picker:{height:50,marginBottom:15},
+  createButton:{backgroundColor:"#173B66",paddingVertical:14,paddingHorizontal:28,borderRadius:12,alignSelf:"flex-start",shadowColor:"#173B66",shadowOpacity:0.4,shadowRadius:10,shadowOffset:{width:0,height:6},elevation:8,marginTop:10},
   buttonText:{color:"#fff",fontWeight:"700",fontSize:15},
+  noCoursesText:{fontSize:15,color:"#64748B",textAlign:"center",paddingVertical:10},
+  qrContainer:{alignItems:"center",marginTop:20,marginBottom:15},
+  sessionIdText:{fontSize:12,color:"#64748B",textAlign:"center",marginTop:10},
 });
