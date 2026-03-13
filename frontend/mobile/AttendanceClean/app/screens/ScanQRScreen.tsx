@@ -1,19 +1,14 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
-import { BarCodeScanner } from "expo-barcode-scanner";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import { recordAttendance } from "../services/attendanceService";
 import { useAuth } from "../context/AuthContext";
-
-type ScanResult = {
-  type: string;
-  data: string;
-};
 
 type AttendanceStatus = "success" | "already_recorded" | "expired" | "error" | null;
 
 export default function ScanQRScreen({ navigation }: any) {
   const { user } = useAuth();
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<AttendanceStatus>(null);
@@ -21,34 +16,30 @@ export default function ScanQRScreen({ navigation }: any) {
   const [isCameraActive, setIsCameraActive] = useState(true);
 
   useEffect(() => {
-    const getPermission = async () => {
-      const { status } = await BarCodeScanner.requestPermissionsAsync();
-      setHasPermission(status === "granted");
-      setIsCameraActive(status === "granted");
-    };
-
-    getPermission();
+    if (!permission) {
+      requestPermission();
+    }
+    
+    setIsCameraActive(permission?.granted || false);
 
     return () => {
       setIsCameraActive(false);
-      setHasPermission(null);
       setScanned(false);
       setStatus(null);
       setMessage("");
     };
-  }, []);
+  }, [permission]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', () => {
       setIsCameraActive(false);
-      setHasPermission(null);
       setScanned(false);
     });
 
     return unsubscribe;
   }, [navigation]);
 
-  const handleScan = async ({ data }: ScanResult) => {
+  const handleBarCodeScanned = async ({ data }: { data: string }) => {
     if (scanned) return;
     
     setScanned(true);
@@ -93,7 +84,6 @@ export default function ScanQRScreen({ navigation }: any) {
 
   const handleGoBack = () => {
     setIsCameraActive(false);
-    setHasPermission(null);
     setScanned(false);
     setStatus(null);
     setMessage("");
@@ -103,7 +93,7 @@ export default function ScanQRScreen({ navigation }: any) {
     }, 100);
   };
 
-  if (hasPermission === null) {
+  if (!permission) {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.permissionText}>Requesting camera permission...</Text>
@@ -111,18 +101,20 @@ export default function ScanQRScreen({ navigation }: any) {
     );
   }
 
-  if (hasPermission === false) {
+  if (!permission.granted) {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.errorText}>No access to camera</Text>
         <Text style={styles.subText}>Please enable camera permissions in settings</Text>
+        <TouchableOpacity style={styles.button} onPress={requestPermission}>
+          <Text style={styles.buttonText}>Grant Permission</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Back Button */}
       <TouchableOpacity 
         style={styles.backButton}
         onPress={handleGoBack}
@@ -132,9 +124,13 @@ export default function ScanQRScreen({ navigation }: any) {
 
       {!scanned && isCameraActive ? (
         <>
-          <BarCodeScanner
-            onBarCodeScanned={handleScan}
+          <CameraView
             style={StyleSheet.absoluteFillObject}
+            facing="back"
+            barcodeScannerSettings={{
+              barcodeTypes: ["qr"],
+            }}
+            onBarcodeScanned={handleBarCodeScanned}
           />
           <View style={styles.overlay}>
             <View style={styles.scanArea} />
@@ -302,6 +298,18 @@ const styles = StyleSheet.create({
   permissionText: {
     fontSize: 18,
     color: "#64748B",
+  },
+  button: {
+    backgroundColor: "#173B66",
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
   scanAgainButton: {
     backgroundColor: "#173B66",
