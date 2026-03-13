@@ -1,14 +1,13 @@
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import admin from "firebase-admin";
+import { readFileSync } from "fs";
 
-const firebaseConfig = {
-  apiKey: "AIzaSy...", // هاتي ده من Firebase Console
-  authDomain: "geo-attendance.firebaseapp.com",
-  projectId: "geo-attendance-f0d04",
-  storageBucket: "geo-attendance.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abc123"
-};
+const serviceAccount = JSON.parse(
+  readFileSync("./serviceAccount.json", "utf8")
+);
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+export const db = admin.firestore();
+export { admin };
