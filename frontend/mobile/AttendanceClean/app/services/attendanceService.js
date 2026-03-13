@@ -11,7 +11,7 @@ import {
 } from "firebase/firestore";
 
 
-export const recordAttendance = async (sessionId) => {
+export const recordAttendance = async (scannedQRValue) => {
   try {
     const student = auth.currentUser;
 
@@ -26,30 +26,39 @@ export const recordAttendance = async (sessionId) => {
       throw new Error("Only students can record attendance");
     }
 
-    const sessionRef = doc(db, "sessions", sessionId);
-    const sessionSnap = await getDoc(sessionRef);
+    // Extract base session ID from dynamic QR code (format: SESSION-XXXXX-N)
+    const baseSessionId = scannedQRValue.split('-').slice(0, 2).join('-');
 
-    if (!sessionSnap.exists()) {
+    // Query sessions collection to find the session by sessionId field
+    const sessionsQuery = query(
+      collection(db, "sessions"),
+      where("sessionId", "==", baseSessionId)
+    );
+
+    const sessionsSnap = await getDocs(sessionsQuery);
+
+    if (sessionsSnap.empty) {
       return { success: false, message: "Session not found" };
     }
 
-    const sessionData = sessionSnap.data();
+    const sessionDoc = sessionsSnap.docs[0];
+    const sessionData = sessionDoc.data();
 
-    if (!sessionData.isActive) {
+    // Check if session is active
+    if (sessionData.active === false) {
       return { success: false, message: "Session Expired" };
     }
 
-    const createdAt = sessionData.createdAt?.toDate();
-    const duration = sessionData.duration || 15; 
-    const expiryTime = new Date(createdAt.getTime() + duration * 60000);
-    
-    if (new Date() > expiryTime) {
+    // Check if session has expired (15 minutes)
+    const expiresAt = sessionData.expiresAt?.toDate();
+    if (new Date() > expiresAt) {
       return { success: false, message: "Session Expired" };
     }
 
+    // Check for duplicate attendance
     const attendanceQuery = query(
       collection(db, "attendance"),
-      where("sessionId", "==", sessionId),
+      where("sessionId", "==", baseSessionId),
       where("studentId", "==", student.uid)
     );
 
@@ -59,8 +68,9 @@ export const recordAttendance = async (sessionId) => {
       return { success: false, message: "Already Recorded" };
     }
 
+    // Record attendance
     await addDoc(collection(db, "attendance"), {
-      sessionId,
+      sessionId: baseSessionId,
       studentId: student.uid,
       studentEmail: student.email,
       courseId: sessionData.courseId,

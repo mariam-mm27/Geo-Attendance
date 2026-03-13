@@ -26,6 +26,7 @@ interface ActiveSession {
   courseName: string;
   lectureNumber: number;
   expiresAt: Date;
+  baseSessionId: string;
 }
 
 export default function ProfessorSessionScreen({ navigation }: any) {
@@ -35,6 +36,7 @@ export default function ProfessorSessionScreen({ navigation }: any) {
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [qrRefreshCounter, setQrRefreshCounter] = useState(0);
   const [lectureCounters, setLectureCounters] = useState<Record<string, number>>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -88,11 +90,16 @@ export default function ProfessorSessionScreen({ navigation }: any) {
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (timeLeft > 0) {
-      timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
+      timer = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+        // Refresh QR code every 10 seconds
+        setQrRefreshCounter((prev) => prev + 1);
+      }, 1000);
     }
     if (timeLeft === 0 && activeSession) {
       Alert.alert("Session Expired", "The current attendance session has ended.");
       setActiveSession(null);
+      setQrRefreshCounter(0);
     }
     return () => clearInterval(timer);
   }, [timeLeft, activeSession]);
@@ -101,6 +108,13 @@ export default function ProfessorSessionScreen({ navigation }: any) {
     const min = Math.floor(seconds / 60);
     const sec = seconds % 60;
     return `${min}:${sec < 10 ? "0" : ""}${sec}`;
+  };
+
+  // Generate dynamic QR code that changes every 10 seconds
+  const getDynamicQRValue = () => {
+    if (!activeSession) return "";
+    const qrCycle = Math.floor(qrRefreshCounter / 10);
+    return `${activeSession.baseSessionId}-${qrCycle}`;
   };
 
   const handleCreateSession = async () => {
@@ -112,16 +126,16 @@ export default function ProfessorSessionScreen({ navigation }: any) {
       
       const lectureNumber = lectureCounters[selectedCourseId] || 1;
 
-      const newSessionId =
+      const baseSessionId =
         "SESSION-" + Math.random().toString(36).substring(2, 10).toUpperCase();
       const expireTime = new Date();
-      expireTime.setMinutes(expireTime.getMinutes() + 10);
+      expireTime.setMinutes(expireTime.getMinutes() + 15); // 15 minutes duration
 
       const user = auth.currentUser;
       if (!user) return Alert.alert("Error", "No user logged in");
 
       await addDoc(collection(db, "sessions"), {
-        sessionId: newSessionId,
+        sessionId: baseSessionId,
         courseId: selectedCourseId,
         courseName: selectedCourse.name,
         courseCode: selectedCourse.code,
@@ -134,19 +148,21 @@ export default function ProfessorSessionScreen({ navigation }: any) {
       });
 
       setActiveSession({
-        sessionId: newSessionId,
+        sessionId: baseSessionId + "-0",
         courseName: selectedCourse.name,
         lectureNumber,
         expiresAt: expireTime,
+        baseSessionId: baseSessionId,
       });
 
-      setTimeLeft(600);
+      setTimeLeft(900); 
+      setQrRefreshCounter(0);
       setLectureCounters((prev) => ({
         ...prev,
         [selectedCourseId]: (prev[selectedCourseId] || 1) + 1,
       }));
 
-      Alert.alert("✅ Success", "Session created successfully!");
+      Alert.alert("✅ Success", "Session created successfully! QR code will refresh every 10 seconds.");
     } catch (error: any) {
       console.error(error);
       Alert.alert("❌ Error", error.message || "Failed to create session");
@@ -237,10 +253,12 @@ export default function ProfessorSessionScreen({ navigation }: any) {
                   <Text style={styles.infoText}>Course: {activeSession.courseName}</Text>
                   <Text style={styles.infoText}>Lecture: #{activeSession.lectureNumber}</Text>
                   <Text style={styles.infoText}>Time Left: {formatTime(timeLeft)}</Text>
+                  <Text style={styles.qrRefreshText}>QR refreshes every 10 seconds</Text>
                   <View style={styles.qrContainer}>
-                    <QRCode value={activeSession.sessionId} size={200} />
+                    <QRCode value={getDynamicQRValue()} size={200} />
                   </View>
-                  <Text style={styles.sessionIdText}>Session ID: {activeSession.sessionId}</Text>
+                  <Text style={styles.sessionIdText}>Base Session ID: {activeSession.baseSessionId}</Text>
+                  <Text style={styles.sessionIdText}>Current QR: {getDynamicQRValue()}</Text>
                 </View>
               )}
             </>
@@ -276,5 +294,6 @@ const styles = StyleSheet.create({
   buttonText:{color:"#fff",fontWeight:"700",fontSize:15},
   noCoursesText:{fontSize:15,color:"#64748B",textAlign:"center",paddingVertical:10},
   qrContainer:{alignItems:"center",marginTop:20,marginBottom:15},
+  qrRefreshText:{fontSize:13,color:"#F59E0B",textAlign:"center",marginTop:10,fontWeight:"600"},
   sessionIdText:{fontSize:12,color:"#64748B",textAlign:"center",marginTop:10},
 });
