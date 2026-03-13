@@ -13,8 +13,12 @@ const SubjectsTable = ({ data, onDelete, allCourses = [] }) => {
     navigate(`/details/prof/${id}`);
   };
 
-  const getProfessorCourseCount = (professorId) => {
-    return allCourses.filter(course => course.professorId === professorId).length;
+  const getProfessorCourseCount = (professorId, professorEmail) => {
+    return allCourses.filter(course => {
+      const courseProfEmail = course.professorEmail?.toLowerCase();
+      const profEmail = professorEmail?.toLowerCase();
+      return course.professorId === professorId || courseProfEmail === profEmail;
+    }).length;
   };
 
   return (
@@ -39,7 +43,7 @@ const SubjectsTable = ({ data, onDelete, allCourses = [] }) => {
             </tr>
           ) : (
             data.map(item => {
-              const courseCount = getProfessorCourseCount(item.id);
+              const courseCount = getProfessorCourseCount(item.id, item.email);
               return (
                 <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
                   <td style={styles.td}>{item.name}</td>
