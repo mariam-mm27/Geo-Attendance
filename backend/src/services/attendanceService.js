@@ -1,191 +1,131 @@
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
 import {
   collection,
+  addDoc,
+  serverTimestamp,
+  doc,
+  getDoc,
   query,
   where,
   getDocs,
-  doc,
-  getDoc
 } from "firebase/firestore";
 
-/* =========================
-   calculateStudentAttendance
-========================= */
-export const calculateStudentAttendance = async (courseId, studentId) => {
+export const recordAttendance = async (scannedQRValue) => {
   try {
-    const courseRef = doc(db, "courses", courseId);
-    const courseSnap = await getDoc(courseRef);
-    
-    if (!courseSnap.exists()) {
-      throw new Error("Course not found");
-    }
-    
-    let totalSessions = courseSnap.data().totalSessions;
-    
-    if (!totalSessions) {
-      const sessionsQuery = query(
-        collection(db, "sessions"),
-        where("courseId", "==", courseId)
-      );
-      const sessionsSnap = await getDocs(sessionsQuery);
-      totalSessions = sessionsSnap.size;
-    }
-    
-    const attendanceQuery = query(
-      collection(db, "attendance"),
-      where("courseId", "==", courseId),
-      where("studentId", "==", studentId)
-    );
-    
-    const attendanceSnap = await getDocs(attendanceQuery);
-    const attendedSessions = attendanceSnap.size;
-    
-    const percentage = totalSessions > 0 
-      ? (attendedSessions / totalSessions) * 100 
-      : 0;
-    
-    const studentRef = doc(db, "users", studentId);
-    const studentSnap = await getDoc(studentRef);
-    const studentData = studentSnap.exists() ? studentSnap.data() : {};
-    
-    return {
-      success: true,
-      data: {
-        studentId,
-        studentName: studentData.name || "Unknown",
-        attendedSessions,
-        totalSessions,
-        percentage: percentage.toFixed(2),
-        status: percentage >= 75 ? "Good" : percentage >= 50 ? "Warning" : "Low"
-      }
-    };
-    
-  } catch (error) {
-    console.error("Error calculating student attendance:", error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-};
+    const student = auth.currentUser;
+    if (!student) throw new Error("No authenticated user");
 
-/* =========================
-   calculateCourseAttendanceStats
-========================= */
-export const calculateCourseAttendanceStats = async (courseId) => {
-  try {
-    const courseRef = doc(db, "courses", courseId);
+    const userRef = doc(db, "users", student.uid);
+    const userSnap = await getDoc(userRef);
+
+    if (!userSnap.exists() || userSnap.data().role.toLowerCase() !== "student") {
+      throw new Error("Only students can record attendance");
+    }
+
+    const baseSessionId = scannedQRValue.split("-").slice(0, 2).join("-");
+
+    const sessionsQuery = query(
+      collection(db, "sessions"),
+      where("sessionId", "==", baseSessionId)
+    );
+
+    const sessionsSnap = await getDocs(sessionsQuery);
+
+    if (sessionsSnap.empty) {
+      return { success: false, message: "Session not found" };
+    }
+
+    const sessionDoc = sessionsSnap.docs[0];
+    const sessionData = sessionDoc.data();
+
+    // Check if student is enrolled in the course
+    const courseRef = doc(db, "courses", sessionData.courseId);
     const courseSnap = await getDoc(courseRef);
     
     if (!courseSnap.exists()) {
-      throw new Error("Course not found");
+      return { success: false, message: "Course not found" };
     }
     
     const courseData = courseSnap.data();
+    const enrolledStudents = courseData.enrolledStudents || [];
     
-    const sessionsQuery = query(
-      collection(db, "sessions"),
-      where("courseId", "==", courseId)
-    );
-    const sessionsSnap = await getDocs(sessionsQuery);
-    const totalSessions = sessionsSnap.size;
-    
-    if (totalSessions === 0) {
-      return {
-        success: true,
-        data: {
-          avgAttendance: 0,
-          message: "No sessions yet"
-        }
-      };
+    if (!enrolledStudents.includes(student.uid)) {
+      return { success: false, message: "Not Enrolled in Course" };
     }
-    
-    const studentIds = courseData.enrolledStudents || [];
-    
-    if (studentIds.length === 0) {
-      return {
-        success: true,
-        data: {
-          avgAttendance: 0,
-          message: "No students enrolled"
-        }
-      };
-    }
-    
-    let totalPercentage = 0;
-    
-    for (const studentId of studentIds) {
-      const attendanceQuery = query(
-        collection(db, "attendance"),
-        where("courseId", "==", courseId),
-        where("studentId", "==", studentId)
-      );
-      
-      const attendanceSnap = await getDocs(attendanceQuery);
-      const attended = attendanceSnap.size;
-      const percentage = (attended / totalSessions) * 100;
-      totalPercentage += percentage;
-    }
-    
-    const avgAttendance = totalPercentage / studentIds.length;
-    
-    return {
-      success: true,
-      data: {
-        avgAttendance: avgAttendance.toFixed(2)
-      }
-    };
-    
-  } catch (error) {
-    console.error("Error calculating course stats:", error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-};
 
-/* =========================
-   getStudentAttendanceHistory
-========================= */
-export const getStudentAttendanceHistory = async (courseId, studentId) => {
-  try {
-    const sessionsQuery = query(
+    // Check if student is already attending another active session
+    const now = new Date();
+    const allActiveSessionsQuery = query(
       collection(db, "sessions"),
-      where("courseId", "==", courseId)
+      where("active", "==", true)
     );
-    const sessionsSnap = await getDocs(sessionsQuery);
+    const allActiveSessionsSnap = await getDocs(allActiveSessionsQuery);
     
-    const sessions = [];
-    
-    for (const sessionDoc of sessionsSnap.docs) {
-      const sessionData = sessionDoc.data();
+    for (const activeSessionDoc of allActiveSessionsSnap.docs) {
+      const activeSessionData = activeSessionDoc.data();
+      const activeSessionId = activeSessionData.sessionId;
       
-      const attendanceQuery = query(
-        collection(db, "attendance"),
-        where("sessionId", "==", sessionDoc.id),
-        where("studentId", "==", studentId)
-      );
+      // Skip if it's the same session
+      if (activeSessionId === baseSessionId) continue;
       
-      const attendanceSnap = await getDocs(attendanceQuery);
-      const attended = attendanceSnap.size > 0;
+      // Check if session is still within its time window
+      const sessionCreatedAt = activeSessionData.createdAt?.toDate();
+      const sessionDuration = activeSessionData.duration || 10;
+      const sessionExpiresAt = new Date(sessionCreatedAt.getTime() + sessionDuration * 60 * 1000);
       
-      sessions.push({
-        sessionId: sessionDoc.id,
-        date: sessionData.createdAt?.toDate?.() || sessionData.createdAt,
-        attended
-      });
+      if (now <= sessionExpiresAt) {
+        // Check if student has already recorded attendance for this active session
+        const otherAttendanceQuery = query(
+          collection(db, "attendance"),
+          where("sessionId", "==", activeSessionId),
+          where("studentId", "==", student.uid)
+        );
+        const otherAttendanceSnap = await getDocs(otherAttendanceQuery);
+        
+        if (!otherAttendanceSnap.empty) {
+          // Get the course name for the conflicting session
+          const conflictCourseRef = doc(db, "courses", activeSessionData.courseId);
+          const conflictCourseSnap = await getDoc(conflictCourseRef);
+          const conflictCourseName = conflictCourseSnap.exists() 
+            ? conflictCourseSnap.data().name 
+            : "another course";
+          
+          return { 
+            success: false, 
+            message: `Already attending ${conflictCourseName}. Wait until that lecture ends.` 
+          };
+        }
+      }
     }
-    
-    return {
-      success: true,
-      data: sessions.sort((a, b) => new Date(b.date) - new Date(a.date))
-    };
-    
+
+    if (sessionData.active === false) return { success: false, message: "Session Expired" };
+
+    const createdAt = sessionData.createdAt?.toDate();
+    const duration = sessionData.duration || 10; 
+    const expiresAt = new Date(createdAt.getTime() + duration * 60 * 1000);
+    if (new Date() > expiresAt) return { success: false, message: "Session Expired" };
+
+    const attendanceQuery = query(
+      collection(db, "attendance"),
+      where("sessionId", "==", baseSessionId),
+      where("studentId", "==", student.uid)
+    );
+
+    const existingAttendance = await getDocs(attendanceQuery);
+    if (!existingAttendance.empty) return { success: false, message: "Already Recorded" };
+
+    await addDoc(collection(db, "attendance"), {
+      sessionId: baseSessionId,
+      studentId: student.uid,
+      studentEmail: student.email,
+      courseId: sessionData.courseId,
+      professorId: sessionData.professorId,
+      recordedAt: serverTimestamp(),
+    });
+
+    return { success: true, message: "Attendance Successful" };
   } catch (error) {
-    return {
-      success: false,
-      error: error.message
-    };
+    console.error("Error recording attendance:", error);
+    return { success: false, message: "Server Error" };
   }
 };
