@@ -1,30 +1,26 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   TextInput,
-  View,
   StyleSheet,
   Text,
   TouchableOpacity,
 } from "react-native";
 import AuthLayout from "../components/AuthInput";
-import RolePicker from "../components/RoleSelector";
 import { COLORS } from "../theme/color";
 import { validateRegister } from "../utils/validation";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../firebase";
+
 export default function RegisterScreen({ navigation }: any) {
-  const [role, setRole] = useState("");
   const [name, setName] = useState("");
   const [id, setId] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  React.useEffect(() => {
-    // Clear all fields when component mounts
+  useEffect(() => {
     const clearFields = () => {
-      setRole("");
       setName("");
       setId("");
       setEmail("");
@@ -34,7 +30,6 @@ export default function RegisterScreen({ navigation }: any) {
     
     clearFields();
     
-    // Also clear when screen comes into focus
     const unsubscribe = navigation.addListener('focus', () => {
       clearFields();
     });
@@ -42,63 +37,88 @@ export default function RegisterScreen({ navigation }: any) {
     return unsubscribe;
   }, [navigation]);
 
+  const detectRoleFromEmail = (email: string): string | null => {
+    const cleanEmail = email.trim().toLowerCase();
+    
+    if (cleanEmail.endsWith("@std.sci.cu.edu.eg")) {
+      return "student";
+    } else if (cleanEmail.endsWith("@sci.cu.edu.eg")) {
+      return "professor";
+    }
+    
+    return null;
+  };
+
   const handleRegister = async () => {
-  setError("");
+    setError("");
 
-  // 1️⃣ Validation
-  const errorMessage = validateRegister({
-    role,
-    name,
-    id,
-    email,
-    password,
-  });
+    const role = detectRoleFromEmail(email);
 
-  if (errorMessage) {
-    setError(errorMessage);
-    return;
-  }
-
-  try {
-    // 2️⃣ Create user in Firebase Auth
-    const cred = await createUserWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
-
-    // 3️⃣ Save user in Firestore
-    await setDoc(doc(db, "users", cred.user.uid), {
-      name,
-      email,
-      role,
-      studentId: role === "student" ? id : null,
-      createdAt: serverTimestamp(),
-    });
-
-    // 4️⃣ Clear fields
-    setName("");
-    setId("");
-    setEmail("");
-    setPassword("");
-
-    // 5️⃣ Navigation AFTER success only
-    if (role === "student") {
-      navigation.replace("StudentHome");
-    } else {
-      navigation.replace("ProfessorHome");
+    if (!role) {
+      setError("Invalid email domain. Use @std.sci.cu.edu.eg for students or @sci.cu.edu.eg for professors.");
+      return;
     }
 
-  } catch (err: any) {
-  console.log("REGISTER ERROR:", err);
-  setError(err.message || "Registration failed");
-}
-};
+    const errorMessage = validateRegister({
+      role,
+      name,
+      id,
+      email,
+      password,
+    });
+
+    if (errorMessage) {
+      setError(errorMessage);
+      return;
+    }
+
+    try {
+      const cred = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      await setDoc(doc(db, "users", cred.user.uid), {
+        name,
+        email,
+        role: role.toLowerCase(),
+        studentId: role === "student" ? id : null,
+        createdAt: serverTimestamp(),
+      });
+
+      if (role === "student") {
+        await setDoc(doc(db, "students", cred.user.uid), {
+          name,
+          email,
+          code: id,
+          attendance: "0%",
+          createdAt: serverTimestamp(),
+        });
+      } else if (role === "professor") {
+        await setDoc(doc(db, "professors", cred.user.uid), {
+          name,
+          email,
+          courses: 0,
+          attendance: "0%",
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      setName("");
+      setId("");
+      setEmail("");
+      setPassword("");
+
+
+    } catch (err: any) {
+      console.log("REGISTER ERROR:", err);
+      setError(err.message || "Registration failed");
+    }
+  };
 
   return (
     <AuthLayout>
-      <RolePicker role={role} setRole={setRole} />
-
       <TextInput
         placeholder="Name"
         style={styles.input}
@@ -110,19 +130,6 @@ export default function RegisterScreen({ navigation }: any) {
         textContentType="none"
       />
 
-      {role === "student" && (
-        <TextInput
-          placeholder="ID"
-          style={styles.input}
-          value={id}
-          onChangeText={setId}
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="off"
-          textContentType="none"
-        />
-      )}
-
       <TextInput
         placeholder="Email"
         style={styles.input}
@@ -133,6 +140,19 @@ export default function RegisterScreen({ navigation }: any) {
         autoComplete="off"
         textContentType="none"
       />
+
+      {detectRoleFromEmail(email) === "student" && (
+        <TextInput
+          placeholder="Student ID"
+          style={styles.input}
+          value={id}
+          onChangeText={setId}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="off"
+          textContentType="none"
+        />
+      )}
 
       <TextInput
         placeholder="Password"
@@ -152,11 +172,8 @@ export default function RegisterScreen({ navigation }: any) {
         <Text style={styles.buttonText}>Register</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-            style={[styles.button, { backgroundColor: COLORS.secondary }]}
->
-          <Text style={styles.buttonText}>Sign up with Google</Text>
-      </TouchableOpacity>
+      {}
+      {}
 
       <TouchableOpacity onPress={() => navigation.navigate("Login")}>
         <Text style={styles.link}>Already have an account? Login</Text>
