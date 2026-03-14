@@ -39,6 +39,7 @@ export const recordAttendance = async (scannedQRValue: string) => {
     const sessionDoc = sessionsSnap.docs[0];
     const sessionData = sessionDoc.data();
 
+    // Check if student is enrolled in the course
     const courseRef = doc(db, "courses", sessionData.courseId);
     const courseSnap = await getDoc(courseRef);
     
@@ -51,47 +52,6 @@ export const recordAttendance = async (scannedQRValue: string) => {
     
     if (!enrolledStudents.includes(student.uid)) {
       return { success: false, message: "Not Enrolled in Course" };
-    }
-
-    const now = new Date();
-    const allActiveSessionsQuery = query(
-      collection(db, "sessions"),
-      where("active", "==", true)
-    );
-    const allActiveSessionsSnap = await getDocs(allActiveSessionsQuery);
-    
-    for (const activeSessionDoc of allActiveSessionsSnap.docs) {
-      const activeSessionData = activeSessionDoc.data();
-      const activeSessionId = activeSessionData.sessionId;
-      
-      if (activeSessionId === baseSessionId) continue;
-      
-      const sessionCreatedAt = activeSessionData.createdAt?.toDate();
-      const sessionDuration = activeSessionData.duration || 10;
-      const sessionExpiresAt = new Date(sessionCreatedAt.getTime() + sessionDuration * 60 * 1000);
-      
-      if (now <= sessionExpiresAt) {
-        const otherAttendanceQuery = query(
-          collection(db, "attendance"),
-          where("sessionId", "==", activeSessionId),
-          where("studentId", "==", student.uid)
-        );
-        const otherAttendanceSnap = await getDocs(otherAttendanceQuery);
-        
-        if (!otherAttendanceSnap.empty) {
-          // Get the course name for the conflicting session
-          const conflictCourseRef = doc(db, "courses", activeSessionData.courseId);
-          const conflictCourseSnap = await getDoc(conflictCourseRef);
-          const conflictCourseName = conflictCourseSnap.exists() 
-            ? conflictCourseSnap.data().name 
-            : "another course";
-          
-          return { 
-            success: false, 
-            message: `Already attending ${conflictCourseName}. Wait until that lecture ends.` 
-          };
-        }
-      }
     }
 
     if (sessionData.active === false) return { success: false, message: "Session Expired" };
