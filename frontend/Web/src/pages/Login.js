@@ -13,10 +13,7 @@ function Login() {
   const navigate = useNavigate();
 
   const handleLogin = async () => {
-<<<<<<< HEAD
-    // 1️⃣ UI validation
-=======
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
+    // UI validation
     if (!role) {
       alert("Please select a role");
       return;
@@ -29,15 +26,10 @@ function Login() {
     }
 
     try {
-<<<<<<< HEAD
-      // 2️⃣ Firebase Auth
+      // Firebase Auth
       const cred = await signInWithEmailAndPassword(auth, email, password);
 
-      // 3️⃣ Get user profile from Firestore
-=======
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
+      // Get user profile from Firestore
       const userRef = doc(db, "users", cred.user.uid);
       const userSnap = await getDoc(userRef);
 
@@ -49,28 +41,18 @@ function Login() {
       const userData = userSnap.data();
       const realRole = userData.role;
 
-<<<<<<< HEAD
-      // 4️⃣ Security check (IMPORTANT 🔐)
-=======
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
+      // Security check
       if (realRole !== role.toLowerCase()) {
         alert("Selected role does not match your account.");
         return;
       }
 
-<<<<<<< HEAD
-      // 5️⃣ Redirect safely
-=======
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
+      // Redirect safely
       if (realRole === "admin") {
         navigate("/admin");
       } else if (realRole === "professor") {
         navigate("/professor");
-<<<<<<< HEAD
       } else {
-=======
-      } else if (role === "student") {
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
         navigate("/student");
       }
 

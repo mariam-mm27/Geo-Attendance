@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 
-const SubjectsTable = ({ data, onDelete }) => {
+const SubjectsTable = ({ data, onDelete, allCourses = [] }) => {
   const navigate = useNavigate();
 
   const handleDelete = (id, name) => {
@@ -11,6 +11,14 @@ const SubjectsTable = ({ data, onDelete }) => {
 
   const handleView = (id) => {
     navigate(`/details/prof/${id}`);
+  };
+
+  const getProfessorCourseCount = (professorId, professorEmail) => {
+    return allCourses.filter(course => {
+      const courseProfEmail = course.professorEmail?.toLowerCase();
+      const profEmail = professorEmail?.toLowerCase();
+      return course.professorId === professorId || courseProfEmail === profEmail;
+    }).length;
   };
 
   return (
@@ -34,30 +42,35 @@ const SubjectsTable = ({ data, onDelete }) => {
               </td>
             </tr>
           ) : (
-            data.map(item => (
-              <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                <td style={styles.td}>{item.name}</td>
-                <td style={styles.td}>{item.email}</td>
-                <td style={{ ...styles.td, textAlign: "center" }}>{item.courses || 0}</td>
-                <td style={{ ...styles.td, textAlign: "center" }}>
-                  <button 
-                    style={styles.viewBtn} 
-                    onClick={() => handleView(item.id)}
-                  >
-                    View
-                  </button>
-                </td>
-                <td style={{ ...styles.td, textAlign: "center" }}>{item.attendance || "0%"}</td>
-                <td style={{ ...styles.td, textAlign: "center" }}>
-                  <button 
-                    onClick={() => handleDelete(item.id, item.name)} 
-                    style={styles.deleteBtn}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))
+            data.map(item => {
+              const courseCount = getProfessorCourseCount(item.id, item.email);
+              return (
+                <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                  <td style={styles.td}>{item.name}</td>
+                  <td style={styles.td}>{item.email}</td>
+                  <td style={{ ...styles.td, textAlign: "center" }}>
+                    <span style={styles.courseBadge}>{courseCount}</span>
+                  </td>
+                  <td style={{ ...styles.td, textAlign: "center" }}>
+                    <button 
+                      style={styles.viewBtn} 
+                      onClick={() => handleView(item.id)}
+                    >
+                      View
+                    </button>
+                  </td>
+                  <td style={{ ...styles.td, textAlign: "center" }}>{item.attendance || "0%"}</td>
+                  <td style={{ ...styles.td, textAlign: "center" }}>
+                    <button 
+                      onClick={() => handleDelete(item.id, item.name)} 
+                      style={styles.deleteBtn}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>
@@ -102,6 +115,15 @@ const styles = {
     fontWeight: "500",
     transition: "background 0.2s",
     whiteSpace: "nowrap"
+  },
+  courseBadge: {
+    background: "#e0f2fe",
+    color: "#173B66",
+    padding: "4px 12px",
+    borderRadius: "12px",
+    fontSize: "13px",
+    fontWeight: "bold",
+    display: "inline-block"
   }
 };
 

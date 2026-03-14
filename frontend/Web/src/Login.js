@@ -14,7 +14,6 @@ import { useNavigate } from "react-router-dom";
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const navigate = useNavigate();
@@ -25,20 +24,17 @@ function Login() {
    
     setEmail("");
     setPassword("");
-    setRole("");
     
     if (formRef.current) {
       formRef.current.reset();
     }
     
     const clearAllInputs = () => {
-      const inputs = document.querySelectorAll('input, select');
+      const inputs = document.querySelectorAll('input');
       inputs.forEach(input => {
         if (input instanceof HTMLInputElement) {
           input.value = '';
           input.defaultValue = '';
-        } else if (input instanceof HTMLSelectElement) {
-          input.selectedIndex = 0;
         }
       });
     };
@@ -63,19 +59,16 @@ function Login() {
     const clearForm = () => {
       setEmail("");
       setPassword("");
-      setRole("");
       
       if (formRef.current) {
         formRef.current.reset();
       }
       
       setTimeout(() => {
-        const inputs = document.querySelectorAll('input, select');
+        const inputs = document.querySelectorAll('input');
         inputs.forEach(input => {
           if (input instanceof HTMLInputElement) {
             input.value = '';
-          } else if (input instanceof HTMLSelectElement) {
-            input.selectedIndex = 0;
           }
         });
       }, 0);
@@ -115,9 +108,29 @@ function Login() {
     "mariam10182005@gmail.com"
   ];
 
+  const detectRoleFromEmail = (email) => {
+    const cleanEmail = email.trim().toLowerCase();
+    
+    if (allowedAdminEmails.includes(cleanEmail)) {
+      return "admin";
+    } else if (cleanEmail.endsWith("@std.sci.cu.edu.eg")) {
+      return "student";
+    } else if (cleanEmail.endsWith("@sci.cu.edu.eg")) {
+      return "professor";
+    }
+    
+    return null;
+  };
+
   const handleGoogleLogin = async () => {
-    if (!role) {
-      alert("Please select a role first!");
+    if (!email) {
+      alert("Please enter your email first to verify your role!");
+      return;
+    }
+
+    const detectedRole = detectRoleFromEmail(email);
+    if (!detectedRole) {
+      alert("Invalid email domain. Please use:\n- @std.sci.cu.edu.eg for students\n- @sci.cu.edu.eg for professors\n- Authorized admin emails");
       return;
     }
 
@@ -146,20 +159,21 @@ function Login() {
 
   const redirectUser = (userData, userEmail) => {
     const userRoleInDB = userData.role ? userData.role.toLowerCase().trim() : "";
-    const selectedRole = role.toLowerCase().trim();
+    const detectedRole = detectRoleFromEmail(userEmail);
 
-    if (userRoleInDB !== selectedRole) {
-      alert(`Role Mismatch! DB says you are ${userRoleInDB}.`);
+    if (!detectedRole) {
+      alert("Invalid email domain.");
+      signOut(auth);
+      return;
+    }
+
+    if (userRoleInDB !== detectedRole) {
+      alert(`Role Mismatch! Your email indicates you are ${detectedRole}, but DB says ${userRoleInDB}.`);
       signOut(auth);
       return;
     }
 
     if (userRoleInDB === "admin") {
-      if (!allowedAdminEmails.includes(userEmail.toLowerCase().trim())) {
-        alert("Unauthorized Admin Email.");
-        signOut(auth);
-        return;
-      }
       window.location.replace("/admin");
     } else if (userRoleInDB === "professor") {
       window.location.replace("/professor");
@@ -171,7 +185,12 @@ function Login() {
   const handleLogin = async () => {
     const error = validateLogin({ email, password });
     if (error) { alert(error); return; }
-    if (!role) { alert("Please select a role!"); return; }
+
+    const detectedRole = detectRoleFromEmail(email);
+    if (!detectedRole) {
+      alert("Invalid email domain. Please use:\n- @std.sci.cu.edu.eg for students\n- @sci.cu.edu.eg for professors\n- Authorized admin emails");
+      return;
+    }
 
     try {
       const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
@@ -242,7 +261,7 @@ function Login() {
       </div>
 
       {showForgotPassword && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 }} onClick={() => setShowForgotPassword(false)}>
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "white", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 }} onClick={() => setShowForgotPassword(false)}>
           <div style={{ background: "white", padding: "30px", borderRadius: "12px", width: "400px", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ color: "#173B66", marginTop: 0, marginBottom: "10px" }}>Reset Password</h2>
             <p style={{ color: "#64748B", fontSize: "14px", marginBottom: "20px" }}>Enter your email address and we'll send you a link to reset your password.</p>
@@ -281,29 +300,6 @@ function Login() {
         </div>
 
         <form ref={formRef} onSubmit={(e) => e.preventDefault()}>
-          <select 
-            value={role} 
-            onChange={(e) => setRole(e.target.value)} 
-            style={{ 
-              width: "100%", 
-              padding: "10px 12px", 
-              borderRadius: "8px", 
-              border: "1px solid #CBD5E1", 
-              height: "42px", 
-              fontSize: "15px", 
-              color: role ? "#000" : "#64748B", 
-              background: "white", 
-              marginBottom: "15px",
-              fontWeight: role ? "600" : "normal"
-            }}
-            autoComplete="off"
-          >
-            <option value="" style={{ color: "#94A3B8", backgroundColor: "#F8FAFC" }}>-- Select Your Role --</option>
-            <option value="student" style={{ color: "#000", fontWeight: "600", backgroundColor: "white", padding: "10px" }}>Student</option>
-            <option value="professor" style={{ color: "#000", fontWeight: "600", backgroundColor: "white", padding: "10px" }}> Professor</option>
-            <option value="admin" style={{ color: "#000", fontWeight: "600", backgroundColor: "white", padding: "10px" }}>Admin</option>
-          </select>
-
           <input 
             type="email" 
             placeholder="Email" 
