@@ -39,6 +39,21 @@ export const recordAttendance = async (scannedQRValue: string) => {
     const sessionDoc = sessionsSnap.docs[0];
     const sessionData = sessionDoc.data();
 
+    // Check if student is enrolled in the course
+    const courseRef = doc(db, "courses", sessionData.courseId);
+    const courseSnap = await getDoc(courseRef);
+    
+    if (!courseSnap.exists()) {
+      return { success: false, message: "Course not found" };
+    }
+    
+    const courseData = courseSnap.data();
+    const enrolledStudents = courseData.enrolledStudents || [];
+    
+    if (!enrolledStudents.includes(student.uid)) {
+      return { success: false, message: "Not Enrolled in Course" };
+    }
+
     if (sessionData.active === false) return { success: false, message: "Session Expired" };
 
     const createdAt = sessionData.createdAt?.toDate();

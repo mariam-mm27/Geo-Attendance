@@ -39,10 +39,61 @@ export default function ProfessorSessionScreen({ navigation }: any) {
   const [qrRefreshCounter, setQrRefreshCounter] = useState(0);
   const [lectureCounters, setLectureCounters] = useState<Record<string, number>>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [errorModal, setErrorModal] = useState<{ visible: boolean; title: string; message: string }>({
+    visible: false,
+    title: "",
+    message: ""
+  });
 
   const authContext = useContext(AuthContext);
   if (!authContext) return null;
   const { setUser, setRole } = authContext;
+
+  const validateLectureTime = (lectureTime: string): { isValid: boolean; message: string } => {
+    try {
+      console.log("🕐 Validating lecture time:", lectureTime);
+      
+      const timePattern = /(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)\s*(?:to|-)\s*(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)/i;
+      const match = lectureTime.match(timePattern);
+      
+      if (!match) {
+        console.log("⚠️ Time format doesn't match pattern, allowing session");
+        return { isValid: true, message: "" }; // If format doesn't match, allow session creation
+      }
+      
+      const [, startHour, startMin, startPeriod, endHour, endMin, endPeriod] = match;
+      
+      let startHour24 = parseInt(startHour);
+      let endHour24 = parseInt(endHour);
+      
+      if (startPeriod.toLowerCase() === 'pm' && startHour24 !== 12) startHour24 += 12;
+      if (startPeriod.toLowerCase() === 'am' && startHour24 === 12) startHour24 = 0;
+      if (endPeriod.toLowerCase() === 'pm' && endHour24 !== 12) endHour24 += 12;
+      if (endPeriod.toLowerCase() === 'am' && endHour24 === 12) endHour24 = 0;
+      
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMin = now.getMinutes();
+      
+      const currentTimeInMin = currentHour * 60 + currentMin;
+      const startTimeInMin = startHour24 * 60 + parseInt(startMin);
+      const endTimeInMin = endHour24 * 60 + parseInt(endMin);
+      
+      console.log(`⏰ Current: ${currentHour}:${currentMin} (${currentTimeInMin} min)`);
+      console.log(`📅 Lecture: ${startHour24}:${startMin} - ${endHour24}:${endMin} (${startTimeInMin}-${endTimeInMin} min)`);
+      
+      const isValid = currentTimeInMin >= startTimeInMin && currentTimeInMin <= endTimeInMin;
+      console.log(`✅ Is within time: ${isValid}`);
+      
+      return {
+        isValid,
+        message: isValid ? "" : `You can only create sessions during the scheduled lecture time: ${lectureTime}`
+      };
+    } catch (error) {
+      console.error("❌ Error validating lecture time:", error);
+      return { isValid: true, message: "" }; 
+    }
+  };
 
   useEffect(() => {
     const fetchUserAndCourses = async () => {
@@ -92,7 +143,6 @@ export default function ProfessorSessionScreen({ navigation }: any) {
     if (timeLeft > 0) {
       timer = setInterval(() => {
         setTimeLeft((prev) => prev - 1);
-        // Refresh QR code every 10 seconds
         setQrRefreshCounter((prev) => prev + 1);
       }, 1000);
     }
@@ -110,7 +160,6 @@ export default function ProfessorSessionScreen({ navigation }: any) {
     return `${min}:${sec < 10 ? "0" : ""}${sec}`;
   };
 
-  // Generate dynamic QR code that changes every 10 seconds
   const getDynamicQRValue = () => {
     if (!activeSession) return "";
     const qrCycle = Math.floor(qrRefreshCounter / 10);
@@ -123,6 +172,28 @@ export default function ProfessorSessionScreen({ navigation }: any) {
     try {
       const selectedCourse = courses.find((c) => c.id === selectedCourseId);
       if (!selectedCourse) return Alert.alert("Error", "Course not found");
+      
+      // Get full course data to check lecture time
+      const courseDoc = await getDoc(doc(db, "courses", selectedCourseId));
+      if (!courseDoc.exists()) return Alert.alert("Error", "Course not found");
+      
+      const courseData = courseDoc.data();
+      console.log("📚 Course data:", courseData);
+      
+      if (courseData.time) {
+        const validation = validateLectureTime(courseData.time);
+        console.log("🔍 Validation result:", validation);
+        if (!validation.isValid) {
+          setErrorModal({
+            visible: true,
+            title: "⏰ Outside Lecture Time",
+            message: validation.message
+          });
+          return;
+        }
+      } else {
+        console.log("⚠️ No time field found in course data");
+      }
       
       const lectureNumber = lectureCounters[selectedCourseId] || 1;
 
@@ -189,6 +260,22 @@ export default function ProfessorSessionScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Error Modal */}
+      {errorModal.visible && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>{errorModal.title}</Text>
+            <Text style={styles.modalMessage}>{errorModal.message}</Text>
+            <TouchableOpacity 
+              style={styles.modalButton} 
+              onPress={() => setErrorModal({ visible: false, title: "", message: "" })}
+            >
+              <Text style={styles.modalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {isSidebarOpen && (
         <>
           <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setIsSidebarOpen(false)} />
@@ -271,6 +358,57 @@ export default function ProfessorSessionScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
+  modalOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 9999,
+  },
+  modalContainer: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 30,
+    width: "85%",
+    maxWidth: 400,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#173B66",
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: "#64748B",
+    marginBottom: 25,
+    textAlign: "center",
+    lineHeight: 24,
+  },
+  modalButton: {
+    backgroundColor: "#173B66",
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 12,
+    alignSelf: "center",
+    minWidth: 120,
+  },
+  modalButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 16,
+    textAlign: "center",
+  },
   overlay: { position: "absolute", top:0,left:0,right:0,bottom:0,backgroundColor:"rgba(0,0,0,0.5)", zIndex:999 },
   sidebar: { position:"absolute",top:0,left:0,bottom:0,width:280,backgroundColor:"white",padding:20, zIndex:1000 },
   closeButton:{alignSelf:"flex-end",padding:10,marginBottom:20},
