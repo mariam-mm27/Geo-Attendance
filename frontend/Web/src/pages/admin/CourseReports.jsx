@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { db } from "../../firebase";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { calculateStudentAttendance } from '../../services/attendanceService';
 
 const CourseReports = () => {
   const { courseId } = useParams();
@@ -20,11 +21,25 @@ const CourseReports = () => {
 
           const enrolledIds = courseData.enrolledStudents || [];
           if (enrolledIds.length > 0) {
-            const studentsSnapshot = await getDocs(collection(db, "students"));
-            const studentsData = studentsSnapshot.docs
+            const usersSnapshot = await getDocs(collection(db, "users"));
+            const studentsData = usersSnapshot.docs
               .map(doc => ({ id: doc.id, ...doc.data() }))
-              .filter(student => enrolledIds.includes(student.id));
-            setEnrolledStudentsData(studentsData);
+              .filter(user => enrolledIds.includes(user.uid || doc.id));
+            
+            // Calculate attendance for each student
+            const studentsWithAttendance = await Promise.all(
+              studentsData.map(async (student) => {
+                const studentUid = student.uid || student.id;
+                const result = await calculateStudentAttendance(courseId, studentUid);
+                return {
+                  ...student,
+                  attendance: result.success ? `${result.data.percentage}%` : "0%",
+                  attendanceData: result.success ? result.data : null
+                };
+              })
+            );
+            
+            setEnrolledStudentsData(studentsWithAttendance);
           }
         }
       } catch (error) {
@@ -80,18 +95,23 @@ const CourseReports = () => {
               </tr>
             </thead>
             <tbody>
-              {enrolledStudentsData.map(student => (
-                <tr key={student.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  <td style={styles.td}>{student.name}</td>
-                  <td style={styles.td}>{student.email}</td>
-                  <td style={styles.td}>{student.code}</td>
-                  <td style={{ ...styles.td, textAlign: "center" }}>
-                    <span style={styles.attendanceBadge}>
-                      {student.attendance || "0%"}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {enrolledStudentsData.map(student => {
+                const attendancePercent = parseFloat(student.attendance || "0");
+                const attendanceColor = attendancePercent >= 75 ? "#10B981" : 
+                                       attendancePercent >= 50 ? "#F59E0B" : "#EF4444";
+                return (
+                  <tr key={student.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                    <td style={styles.td}>{student.name}</td>
+                    <td style={styles.td}>{student.email}</td>
+                    <td style={styles.td}>{student.studentId || student.code || "N/A"}</td>
+                    <td style={{ ...styles.td, textAlign: "center" }}>
+                      <span style={{...styles.attendanceBadge, background: attendancePercent >= 75 ? "#dcfce7" : attendancePercent >= 50 ? "#fef3c7" : "#fee2e2", color: attendanceColor}}>
+                        {student.attendance}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

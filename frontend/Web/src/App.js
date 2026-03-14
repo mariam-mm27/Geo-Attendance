@@ -10,6 +10,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import ProfessorProfile from "./pages/Professor/ProfessorProfile";
 import StudentProfile from "./pages/Student/StudentProfile";
 import StudentEnroll from "./pages/Student/StudentEnroll";
+import AttendanceHistory from "./pages/Student/AttendanceHistory";
 import CourseDetails from "./pages/admin/CourseDetails";
 import EnrollStudents from "./pages/admin/EnrollStudents";
 import CourseReports from "./pages/admin/CourseReports";
@@ -28,6 +29,7 @@ function App() {
         <Route path="/professor" element={<ProfessorProfile />} />
         <Route path="/student" element={<StudentProfile />} />
         <Route path="/student-enroll" element={<StudentEnroll />} />
+        <Route path="/student/attendance-history/:courseId" element={<AttendanceHistory />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/reports/:courseId" element={<Reports />} />
         <Route path="/enroll-students/:courseId" element={<EnrollStudents />} />

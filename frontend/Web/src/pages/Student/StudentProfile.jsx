@@ -4,7 +4,7 @@ import { auth, db } from "../../firebase";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { signOut, onAuthStateChanged } from "firebase/auth";
 import AttendanceBar from "../../components/AttendanceBar";
-import { calculateStudentAttendance, getStudentAttendanceHistory } from '../../services/attendanceService';
+import { calculateStudentAttendance } from '../../services/attendanceService';
 const StudentProfile = () => {
   const navigate = useNavigate(); 
   const [studentData, setStudentData] = useState({ name: "...", studentId: "", email: "" });
@@ -86,6 +86,8 @@ const result = await calculateStudentAttendance(course.id, auth.currentUser.uid)
     fetchAttendanceForCourses();
   }, [courses, studentData.studentId]);
 
+
+
   const handleLogout = async () => {
     try {
       setStudentData({ name: "...", studentId: "", email: "" });
@@ -103,23 +105,14 @@ const result = await calculateStudentAttendance(course.id, auth.currentUser.uid)
     }
   };
 
-  const handleViewHistory = async (courseId, courseName) => {
-const result = await getStudentAttendanceHistory(courseId, auth.currentUser.uid);    if (result.success) {
-      const historyText = result.data.map(s => 
-        `${new Date(s.date).toLocaleDateString()}: ${s.attended ? '✅ حاضر' : '❌ غائب'}`
-      ).join('\n');
-      
-      alert(`📊 Attendance History for ${courseName}\n\n${historyText || 'No sessions yet'}`);
-    } else {
-      alert('Error loading attendance history');
-    }
+  const handleViewHistory = (courseId, courseName) => {
+    navigate(`/student/attendance-history/${courseId}`, { 
+      state: { courseName, courseId } 
+    });
   };
 
   const getAttendanceColor = (percentage) => {
-    const p = parseFloat(percentage);
-    if (p >= 75) return { bg: "#d4edda", text: "#155724", border: "#c3e6cb" };
-    if (p >= 50) return { bg: "#fff3cd", text: "#856404", border: "#ffeeba" };
-    return { bg: "#f8d7da", text: "#721c24", border: "#f5c6cb" };
+    return { bg: "#F0F9FF", text: "#173B66", border: "#E0F2FE", barColor: "#173B66" };
   };
 
   return (
@@ -265,7 +258,7 @@ const result = await getStudentAttendanceHistory(courseId, auth.currentUser.uid)
           <button
             onClick={() => navigate("/student-enroll")}
             style={{
-              backgroundColor: "#173B66",
+              backgroundColor: "#173B66 ",
               color: "white",
               border: "none",
               padding: "12px 24px",
@@ -429,9 +422,9 @@ const result = await getStudentAttendanceHistory(courseId, auth.currentUser.uid)
                   <button
                     onClick={() => handleViewHistory(course.id, course.name)}
                     style={{
-                      backgroundColor: "white",
-                      border: "1px solid #173B66",
-                      color: "#173B66",
+                      backgroundColor: "#173B66",
+                      border: "none",
+                      color: "white",
                       padding: "10px",
                       borderRadius: "6px",
                       cursor: "pointer",
@@ -441,12 +434,10 @@ const result = await getStudentAttendanceHistory(courseId, auth.currentUser.uid)
                       transition: "0.3s"
                     }}
                     onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = "#173B66";
-                      e.target.style.color = "white";
+                      e.target.style.backgroundColor = "#0F2744";
                     }}
                     onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = "white";
-                      e.target.style.color = "#173B66";
+                      e.target.style.backgroundColor = "#173B66";
                     }}
                   >
                     📋 View Attendance History

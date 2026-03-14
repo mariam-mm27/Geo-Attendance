@@ -10,10 +10,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 
-/**
- * Record attendance for a scanned dynamic QR
- * QR format: SESSION-XXXXX-N (dynamic part N)
- */
+
 export const recordAttendance = async (scannedQRValue: string) => {
   try {
     const student = auth.currentUser;
@@ -26,10 +23,8 @@ export const recordAttendance = async (scannedQRValue: string) => {
       throw new Error("Only students can record attendance");
     }
 
-    // Extract base session ID from dynamic QR code
     const baseSessionId = scannedQRValue.split("-").slice(0, 2).join("-");
 
-    // Find session in Firestore
     const sessionsQuery = query(
       collection(db, "sessions"),
       where("sessionId", "==", baseSessionId)
@@ -44,16 +39,13 @@ export const recordAttendance = async (scannedQRValue: string) => {
     const sessionDoc = sessionsSnap.docs[0];
     const sessionData = sessionDoc.data();
 
-    // Check if session is active
     if (sessionData.active === false) return { success: false, message: "Session Expired" };
 
-    // Check session expiry (duration in minutes)
     const createdAt = sessionData.createdAt?.toDate();
-    const duration = sessionData.duration || 10; // default 10 minutes
+    const duration = sessionData.duration || 10; 
     const expiresAt = new Date(createdAt.getTime() + duration * 60 * 1000);
     if (new Date() > expiresAt) return { success: false, message: "Session Expired" };
 
-    // Check for duplicate attendance
     const attendanceQuery = query(
       collection(db, "attendance"),
       where("sessionId", "==", baseSessionId),
@@ -63,7 +55,6 @@ export const recordAttendance = async (scannedQRValue: string) => {
     const existingAttendance = await getDocs(attendanceQuery);
     if (!existingAttendance.empty) return { success: false, message: "Already Recorded" };
 
-    // Record attendance
     await addDoc(collection(db, "attendance"), {
       sessionId: baseSessionId,
       studentId: student.uid,
@@ -80,9 +71,7 @@ export const recordAttendance = async (scannedQRValue: string) => {
   }
 };
 
-/**
- * Get all attendance records for the logged-in student
- */
+
 export const getStudentAttendance = async () => {
   try {
     const student = auth.currentUser;
@@ -101,9 +90,7 @@ export const getStudentAttendance = async () => {
   }
 };
 
-/**
- * Get all attendance records for a specific course (for professor)
- */
+
 export const getCourseAttendance = async (courseId: string) => {
   try {
     const q = query(collection(db, "attendance"), where("courseId", "==", courseId));
@@ -119,9 +106,7 @@ export const getCourseAttendance = async (courseId: string) => {
   }
 };
 
-/**
- * Validate if a session is active (frontend check before recording)
- */
+
 export const validateSession = async (sessionId: string) => {
   try {
     const sessionRef = doc(db, "sessions", sessionId);
@@ -145,9 +130,7 @@ export const validateSession = async (sessionId: string) => {
   }
 };
 
-/**
- * Validate student enrollment in a course
- */
+
 export const validateStudentInCourse = async (studentId: string, courseId: string) => {
   try {
     const enrollmentsRef = collection(db, "enrollments");

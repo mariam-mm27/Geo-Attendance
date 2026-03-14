@@ -100,7 +100,7 @@ export const calculateCourseAttendanceStats = async (courseId) => {
       };
     }
     
-    const studentIds = courseData.students || [];
+    const studentIds = courseData.enrolledStudents || [];
     
     if (studentIds.length === 0) {
       return {
