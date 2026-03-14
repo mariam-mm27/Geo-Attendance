@@ -1,84 +1,17 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";       
-import { doc, getDoc } from "firebase/firestore";
+import { useParams, useNavigate, useLocation } from "react-router-dom";       
+import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../../firebase";
 import { FaArrowLeft, FaBook, FaUsers, FaChartBar, FaClock } from "react-icons/fa";
+import { calculateStudentAttendance, calculateOverallStudentAttendance, calculateOverallProfessorAttendance } from '../../services/attendanceService';
 
 const CourseDetails = () => {
   const { type, id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [userData, setUserData] = useState(null);
+  const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  const dummyCourses = type === "prof" ? [
-    {
-      id: 1,
-      name: "Advanced React Development",
-      code: "CS401",
-      studentsCount: 45,
-      attendance: "92%",
-      schedule: "Mon & Wed, 10:00 AM - 12:00 PM",
-      students: [
-        { name: "Ahmed Mohamed", attendance: "95%" },
-        { name: "Sara Ali", attendance: "88%" },
-        { name: "Omar Hassan", attendance: "92%" },
-        { name: "Fatima Ibrahim", attendance: "90%" }
-      ]
-    },
-    {
-      id: 2,
-      name: "Database Systems",
-      code: "CS302",
-      studentsCount: 38,
-      attendance: "87%",
-      schedule: "Tue & Thu, 2:00 PM - 4:00 PM",
-      students: [
-        { name: "Youssef Khaled", attendance: "85%" },
-        { name: "Nour Ahmed", attendance: "90%" },
-        { name: "Karim Mostafa", attendance: "82%" },
-        { name: "Hana Samir", attendance: "91%" }
-      ]
-    },
-    {
-      id: 3,
-      name: "Web Security",
-      code: "CS405",
-      studentsCount: 32,
-      attendance: "78%",
-      schedule: "Sun & Tue, 12:00 PM - 2:00 PM",
-      students: [
-        { name: "Mona Tarek", attendance: "75%" },
-        { name: "Ali Mahmoud", attendance: "80%" },
-        { name: "Layla Fathy", attendance: "78%" },
-        { name: "Hassan Nabil", attendance: "76%" }
-      ]
-    }
-  ] : [
-    {
-      id: 1,
-      name: "Advanced React Development",
-      code: "CS401",
-      attendance: "95%",
-      schedule: "Mon & Wed, 10:00 AM - 12:00 PM",
-      professor: "Dr. Ahmed Hassan"
-    },
-    {
-      id: 2,
-      name: "Database Systems",
-      code: "CS302",
-      attendance: "88%",
-      schedule: "Tue & Thu, 2:00 PM - 4:00 PM",
-      professor: "Dr. Sara Mohamed"
-    },
-    {
-      id: 3,
-      name: "Web Security",
-      code: "CS405",
-      attendance: "92%",
-      schedule: "Sun & Tue, 12:00 PM - 2:00 PM",
-      professor: "Dr. Omar Ali"
-    }
-  ];
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -87,14 +20,85 @@ const CourseDetails = () => {
         const userDoc = await getDoc(doc(db, collectionName, id));
         
         if (userDoc.exists()) {
-          setUserData({ id: userDoc.id, ...userDoc.data() });
+          const userDataFromDoc = { id: userDoc.id, ...userDoc.data() };
+          
+          // Calculate overall attendance
+          let overallAttendance = "0%";
+          if (type === "prof") {
+            const result = await calculateOverallProfessorAttendance(id, userDataFromDoc.email);
+            if (result.success) {
+              overallAttendance = `${result.data.overallPercentage}%`;
+            }
+          } else {
+            const result = await calculateOverallStudentAttendance(id);
+            if (result.success) {
+              overallAttendance = `${result.data.overallPercentage}%`;
+            }
+          }
+          
+          setUserData({
+            ...userDataFromDoc,
+            attendance: overallAttendance
+          });
+          
+          // Fetch courses
+          const coursesSnapshot = await getDocs(collection(db, "courses"));
+          const allCourses = coursesSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          
+          if (type === "prof") {
+            // Get courses assigned to this professor
+            const profCourses = allCourses.filter(course => 
+              course.professorId === id || course.professorEmail === userDataFromDoc.email
+            );
+            
+            // Fetch enrolled students for each course
+            const coursesWithStudents = await Promise.all(
+              profCourses.map(async (course) => {
+                const enrolledStudentIds = course.enrolledStudents || [];
+                const studentsData = [];
+                
+                if (enrolledStudentIds.length > 0) {
+                  const usersSnapshot = await getDocs(collection(db, "users"));
+                  const enrolledUsers = usersSnapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(user => enrolledStudentIds.includes(user.uid || doc.id));
+                  
+                  // Calculate attendance for each student
+                  for (const user of enrolledUsers) {
+                    const studentUid = user.uid || user.id;
+                    const result = await calculateStudentAttendance(course.id, studentUid);
+                    studentsData.push({
+                      name: user.name,
+                      attendance: result.success ? `${result.data.percentage}%` : "0%"
+                    });
+                  }
+                }
+                
+                return {
+                  ...course,
+                  studentsCount: enrolledStudentIds.length,
+                  students: studentsData
+                };
+              })
+            );
+            
+            setCourses(coursesWithStudents);
+          } else {
+            // Get courses student is enrolled in
+            const studentCourses = allCourses.filter(course => 
+              (course.enrolledStudents || []).includes(id)
+            );
+            setCourses(studentCourses);
+          }
         } else {
-          toast.error("User not found");
+          console.error("User not found");
           navigate("/admin");
         }
       } catch (error) {
         console.error("Error fetching details:", error);
-        toast.error("Failed to load details");
       } finally {
         setLoading(false);
       }
@@ -104,7 +108,8 @@ const CourseDetails = () => {
   }, [type, id, navigate]);
 
   const handleBackClick = () => {
-    navigate("/admin");
+    const tab = type === "prof" ? "professors" : "students";
+    navigate(`/admin?tab=${tab}`);
   };
 
   if (loading) {
@@ -168,53 +173,63 @@ const CourseDetails = () => {
           {type === "prof" ? "Assigned Courses" : "Enrolled Courses"}
         </h3>
         
-        <div style={styles.coursesList}>
-          {dummyCourses.map(course => (
-            <div key={course.id} style={styles.courseItem}>
-              <div style={styles.courseHeader}>
-                <h4 style={styles.courseName}>{course.name}</h4>
-                <span style={styles.courseCode}>{course.code}</span>
-              </div>
-              
-              <div style={styles.courseStats}>
-                <div style={styles.statItem}>
-                  <FaClock style={{ marginRight: "5px", color: "#173B66" }} />
-                  <span>{course.schedule}</span>
+        {courses.length === 0 ? (
+          <p style={{ color: "#64748b", textAlign: "center", padding: "20px" }}>
+            No courses {type === "prof" ? "assigned" : "enrolled"} yet.
+          </p>
+        ) : (
+          <div style={styles.coursesList}>
+            {courses.map(course => (
+              <div key={course.id} style={styles.courseItem}>
+                <div style={styles.courseHeader}>
+                  <h4 style={styles.courseName}>{course.name}</h4>
+                  <span style={styles.courseCode}>{course.code}</span>
                 </div>
-                <div style={styles.statItem}>
-                  <FaChartBar style={{ marginRight: "5px", color: "#173B66" }} />
-                  <span>Attendance: {course.attendance}</span>
+                
+                <div style={styles.courseStats}>
+                  <div style={styles.statItem}>
+                    <FaClock style={{ marginRight: "5px", color: "#173B66" }} />
+                    <span>Time: {course.time}</span>
+                  </div>
+                  <div style={styles.statItem}>
+                    <FaChartBar style={{ marginRight: "5px", color: "#173B66" }} />
+                    <span>Duration: {course.duration || "Not specified"}</span>
+                  </div>
+                  <div style={styles.statItem}>
+                    <FaChartBar style={{ marginRight: "5px", color: "#173B66" }} />
+                    <span>Room: {course.room}</span>
+                  </div>
+                  {type === "prof" && (
+                    <div style={styles.statItem}>
+                      <FaUsers style={{ marginRight: "5px", color: "#173B66" }} />
+                      <span>{course.studentsCount} Students</span>
+                    </div>
+                  )}
+                  {type === "std" && (
+                    <div style={styles.statItem}>
+                      <FaUsers style={{ marginRight: "5px", color: "#173B66" }} />
+                      <span>Professor: {course.professorName}</span>
+                    </div>
+                  )}
                 </div>
-                {type === "prof" && (
-                  <div style={styles.statItem}>
-                    <FaUsers style={{ marginRight: "5px", color: "#173B66" }} />
-                    <span>{course.studentsCount} Students</span>
-                  </div>
-                )}
-                {type === "std" && (
-                  <div style={styles.statItem}>
-                    <FaUsers style={{ marginRight: "5px", color: "#173B66" }} />
-                    <span>Professor: {course.professor}</span>
-                  </div>
-                )}
-              </div>
 
-              {type === "prof" && course.students && (
-                <div style={styles.studentsSection}>
-                  <h5 style={styles.studentsSectionTitle}>Enrolled Students:</h5>
-                  <div style={styles.studentsList}>
-                    {course.students.map((student, idx) => (
-                      <div key={idx} style={styles.studentItem}>
-                        <span style={styles.studentName}>{student.name}</span>
-                        <span style={styles.studentAttendance}>{student.attendance}</span>
-                      </div>
-                    ))}
+                {type === "prof" && course.students && course.students.length > 0 && (
+                  <div style={styles.studentsSection}>
+                    <h5 style={styles.studentsSectionTitle}>Enrolled Students:</h5>
+                    <div style={styles.studentsList}>
+                      {course.students.map((student, idx) => (
+                        <div key={idx} style={styles.studentItem}>
+                          <span style={styles.studentName}>{student.name}</span>
+                          <span style={styles.studentAttendance}>{student.attendance}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
