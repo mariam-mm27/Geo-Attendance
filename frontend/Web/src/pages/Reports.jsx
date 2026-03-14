@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { db } from "../firebase";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { calculateStudentAttendance } from '../services/attendanceService';
 
 const Reports = () => {
   const { courseId } = useParams();
@@ -20,11 +21,25 @@ const Reports = () => {
 
           const enrolledIds = courseData.enrolledStudents || [];
           if (enrolledIds.length > 0) {
-            const studentsSnapshot = await getDocs(collection(db, "students"));
-            const enrolledStudents = studentsSnapshot.docs
+            const usersSnapshot = await getDocs(collection(db, "users"));
+            const enrolledStudents = usersSnapshot.docs
               .map(doc => ({ id: doc.id, ...doc.data() }))
-              .filter(student => enrolledIds.includes(student.id));
-            setStudents(enrolledStudents);
+              .filter(user => enrolledIds.includes(user.uid || doc.id));
+            
+            // Calculate attendance for each student
+            const studentsWithAttendance = await Promise.all(
+              enrolledStudents.map(async (student) => {
+                const studentUid = student.uid || student.id;
+                const result = await calculateStudentAttendance(courseId, studentUid);
+                return {
+                  ...student,
+                  attendance: result.success ? `${result.data.percentage}%` : "0%",
+                  attendanceData: result.success ? result.data : null
+                };
+              })
+            );
+            
+            setStudents(studentsWithAttendance);
           }
         }
       } catch (error) {
@@ -77,14 +92,19 @@ const Reports = () => {
               </tr>
             </thead>
             <tbody>
-              {students.map((s) => (
-                <tr key={s.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                  <td style={{ padding: "15px", color: "#1E293B" }}>{s.name}</td>
-                  <td style={{ color: "#1E293B" }}>{s.code}</td>
-                  <td style={{ color: "#1E293B" }}>{s.email}</td>
-                  <td style={{ fontWeight: "bold", color: "#10B981" }}>{s.attendance || "0%"}</td>
-                </tr>
-              ))}
+              {students.map((s) => {
+                const attendancePercent = parseFloat(s.attendance || "0");
+                const attendanceColor = attendancePercent >= 75 ? "#10B981" : 
+                                       attendancePercent >= 50 ? "#F59E0B" : "#EF4444";
+                return (
+                  <tr key={s.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                    <td style={{ padding: "15px", color: "#1E293B" }}>{s.name}</td>
+                    <td style={{ color: "#1E293B" }}>{s.studentId || s.code || "N/A"}</td>
+                    <td style={{ color: "#1E293B" }}>{s.email}</td>
+                    <td style={{ fontWeight: "bold", color: attendanceColor }}>{s.attendance}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

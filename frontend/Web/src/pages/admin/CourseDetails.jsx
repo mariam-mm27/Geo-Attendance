@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../../firebase";
 import { FaArrowLeft, FaBook, FaUsers, FaChartBar, FaClock } from "react-icons/fa";
+import { calculateStudentAttendance, calculateOverallStudentAttendance, calculateOverallProfessorAttendance } from '../../services/attendanceService';
 
 const CourseDetails = () => {
   const { type, id } = useParams();
@@ -19,7 +20,26 @@ const CourseDetails = () => {
         const userDoc = await getDoc(doc(db, collectionName, id));
         
         if (userDoc.exists()) {
-          setUserData({ id: userDoc.id, ...userDoc.data() });
+          const userDataFromDoc = { id: userDoc.id, ...userDoc.data() };
+          
+          // Calculate overall attendance
+          let overallAttendance = "0%";
+          if (type === "prof") {
+            const result = await calculateOverallProfessorAttendance(id, userDataFromDoc.email);
+            if (result.success) {
+              overallAttendance = `${result.data.overallPercentage}%`;
+            }
+          } else {
+            const result = await calculateOverallStudentAttendance(id);
+            if (result.success) {
+              overallAttendance = `${result.data.overallPercentage}%`;
+            }
+          }
+          
+          setUserData({
+            ...userDataFromDoc,
+            attendance: overallAttendance
+          });
           
           // Fetch courses
           const coursesSnapshot = await getDocs(collection(db, "courses"));
@@ -31,7 +51,7 @@ const CourseDetails = () => {
           if (type === "prof") {
             // Get courses assigned to this professor
             const profCourses = allCourses.filter(course => 
-              course.professorId === id || course.professorEmail === userDoc.data().email
+              course.professorId === id || course.professorEmail === userDataFromDoc.email
             );
             
             // Fetch enrolled students for each course
@@ -41,15 +61,20 @@ const CourseDetails = () => {
                 const studentsData = [];
                 
                 if (enrolledStudentIds.length > 0) {
-                  const studentsSnapshot = await getDocs(collection(db, "students"));
-                  studentsSnapshot.forEach(studentDoc => {
-                    if (enrolledStudentIds.includes(studentDoc.id)) {
-                      studentsData.push({
-                        name: studentDoc.data().name,
-                        attendance: studentDoc.data().attendance || "0%"
-                      });
-                    }
-                  });
+                  const usersSnapshot = await getDocs(collection(db, "users"));
+                  const enrolledUsers = usersSnapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(user => enrolledStudentIds.includes(user.uid || doc.id));
+                  
+                  // Calculate attendance for each student
+                  for (const user of enrolledUsers) {
+                    const studentUid = user.uid || user.id;
+                    const result = await calculateStudentAttendance(course.id, studentUid);
+                    studentsData.push({
+                      name: user.name,
+                      attendance: result.success ? `${result.data.percentage}%` : "0%"
+                    });
+                  }
                 }
                 
                 return {

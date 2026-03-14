@@ -19,7 +19,6 @@ export default function ScanQRScreen({ navigation }: any) {
     if (!permission) {
       requestPermission();
     }
-    
     setIsCameraActive(permission?.granted || false);
 
     return () => {
@@ -31,27 +30,23 @@ export default function ScanQRScreen({ navigation }: any) {
   }, [permission]);
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('beforeRemove', () => {
+    const unsubscribe = navigation.addListener("beforeRemove", () => {
       setIsCameraActive(false);
       setScanned(false);
     });
-
     return unsubscribe;
   }, [navigation]);
 
   const handleBarCodeScanned = async ({ data }: { data: string }) => {
     if (scanned) return;
-    
+
     setScanned(true);
     setLoading(true);
 
     try {
-      let sessionId = data;
-      if (data.includes(":")) {
-        sessionId = data.split(":")[1];
-      }
-
-      const result = await recordAttendance(sessionId);
+      // Extract base session ID from dynamic QR (format: SESSION-XXXXX-N)
+      const baseSessionId = data.split("-").slice(0, 2).join("-");
+      const result = await recordAttendance(baseSessionId);
 
       if (result.success) {
         setStatus("success");
@@ -87,10 +82,7 @@ export default function ScanQRScreen({ navigation }: any) {
     setScanned(false);
     setStatus(null);
     setMessage("");
-    
-    setTimeout(() => {
-      navigation.goBack();
-    }, 100);
+    setTimeout(() => navigation.goBack(), 100);
   };
 
   if (!permission) {
@@ -115,10 +107,7 @@ export default function ScanQRScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity 
-        style={styles.backButton}
-        onPress={handleGoBack}
-      >
+      <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
         <Text style={styles.backButtonText}>← Back</Text>
       </TouchableOpacity>
 
@@ -127,9 +116,7 @@ export default function ScanQRScreen({ navigation }: any) {
           <CameraView
             style={StyleSheet.absoluteFillObject}
             facing="back"
-            barcodeScannerSettings={{
-              barcodeTypes: ["qr"],
-            }}
+            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
             onBarcodeScanned={handleBarCodeScanned}
           />
           <View style={styles.overlay}>
@@ -150,26 +137,23 @@ export default function ScanQRScreen({ navigation }: any) {
                 <>
                   <Text style={styles.successIcon}>✔</Text>
                   <Text style={styles.successText}>Attendance Successful</Text>
-                  <Text style={styles.subText}>Your attendance has been recorded</Text>
+                  <Text style={styles.subText}>{message}</Text>
                 </>
               )}
-
               {status === "already_recorded" && (
                 <>
-                  <Text style={styles.warningIcon}>✔</Text>
+                  <Text style={styles.warningIcon}>⚠</Text>
                   <Text style={styles.warningText}>Already Recorded</Text>
-                  <Text style={styles.subText}>You have already marked attendance for this session</Text>
+                  <Text style={styles.subText}>{message}</Text>
                 </>
               )}
-
               {status === "expired" && (
                 <>
                   <Text style={styles.errorIcon}>✖</Text>
                   <Text style={styles.errorText}>Session Expired</Text>
-                  <Text style={styles.subText}>This attendance session is no longer active</Text>
+                  <Text style={styles.subText}>{message}</Text>
                 </>
               )}
-
               {status === "error" && (
                 <>
                   <Text style={styles.errorIcon}>✖</Text>
@@ -190,10 +174,7 @@ export default function ScanQRScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1,
-    backgroundColor: "#000",
-  },
+  container: { flex: 1, backgroundColor: "#000" },
   backButton: {
     position: "absolute",
     top: 50,
@@ -204,123 +185,23 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 8,
   },
-  backButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    padding: 20,
-  },
-  overlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  scanArea: {
-    width: 250,
-    height: 250,
-    borderWidth: 2,
-    borderColor: "#fff",
-    borderRadius: 12,
-    backgroundColor: "transparent",
-  },
-  instructionText: {
-    marginTop: 30,
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#fff",
-    textAlign: "center",
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  resultContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    padding: 30,
-  },
-  loadingText: {
-    marginTop: 20,
-    fontSize: 16,
-    color: "#64748B",
-  },
-  successIcon: {
-    fontSize: 80,
-    color: "#10B981",
-    marginBottom: 20,
-  },
-  successText: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#10B981",
-    marginBottom: 10,
-  },
-  warningIcon: {
-    fontSize: 80,
-    color: "#F59E0B",
-    marginBottom: 20,
-  },
-  warningText: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#F59E0B",
-    marginBottom: 10,
-  },
-  errorIcon: {
-    fontSize: 80,
-    color: "#EF4444",
-    marginBottom: 20,
-  },
-  errorText: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#EF4444",
-    marginBottom: 10,
-  },
-  subText: {
-    fontSize: 16,
-    color: "#64748B",
-    textAlign: "center",
-    marginBottom: 30,
-  },
-  permissionText: {
-    fontSize: 18,
-    color: "#64748B",
-  },
-  button: {
-    backgroundColor: "#173B66",
-    paddingHorizontal: 30,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 20,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  scanAgainButton: {
-    backgroundColor: "#173B66",
-    paddingHorizontal: 40,
-    paddingVertical: 15,
-    borderRadius: 10,
-    marginTop: 20,
-  },
-  scanAgainText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
+  backButtonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  centerContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F8FAFC", padding: 20 },
+  overlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center" },
+  scanArea: { width: 250, height: 250, borderWidth: 2, borderColor: "#fff", borderRadius: 12, backgroundColor: "transparent" },
+  instructionText: { marginTop: 30, fontSize: 18, fontWeight: "600", color: "#fff", textAlign: "center", backgroundColor: "rgba(0,0,0,0.6)", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
+  resultContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F8FAFC", padding: 30 },
+  loadingText: { marginTop: 20, fontSize: 16, color: "#64748B" },
+  successIcon: { fontSize: 80, color: "#10B981", marginBottom: 20 },
+  successText: { fontSize: 28, fontWeight: "bold", color: "#10B981", marginBottom: 10 },
+  warningIcon: { fontSize: 80, color: "#F59E0B", marginBottom: 20 },
+  warningText: { fontSize: 28, fontWeight: "bold", color: "#F59E0B", marginBottom: 10 },
+  errorIcon: { fontSize: 80, color: "#EF4444", marginBottom: 20 },
+  errorText: { fontSize: 28, fontWeight: "bold", color: "#EF4444", marginBottom: 10 },
+  subText: { fontSize: 16, color: "#64748B", textAlign: "center", marginBottom: 30 },
+  permissionText: { fontSize: 18, color: "#64748B" },
+  button: { backgroundColor: "#173B66", paddingHorizontal: 30, paddingVertical: 12, borderRadius: 8, marginTop: 20 },
+  buttonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  scanAgainButton: { backgroundColor: "#173B66", paddingHorizontal: 40, paddingVertical: 15, borderRadius: 10, marginTop: 20 },
+  scanAgainText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
 });

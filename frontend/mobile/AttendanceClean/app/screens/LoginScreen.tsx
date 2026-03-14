@@ -13,8 +13,9 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
 import { useAuth } from "../context/AuthContext";
+type Props = { navigation: any; };
 
-export default function LoginScreen({ navigation }) {
+export default function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -37,7 +38,7 @@ export default function LoginScreen({ navigation }) {
     return unsubscribe;
   }, [navigation]);
 
-  const detectRoleFromEmail = (email) => {
+  const detectRoleFromEmail =(email: string): "student" | "professor" | null => {
     const cleanEmail = email.trim().toLowerCase();
     
     if (cleanEmail.endsWith("@std.sci.cu.edu.eg")) {
@@ -91,7 +92,7 @@ export default function LoginScreen({ navigation }) {
       setEmail("");
       setPassword("");
 
-    } catch (err) {
+    } catch (err: any) {
       console.log("LOGIN ERROR:", err);
       setError(err.message || "Login failed");
     }
