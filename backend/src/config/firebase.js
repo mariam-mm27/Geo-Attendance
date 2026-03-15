@@ -1,13 +1,17 @@
-import { db } from "../firebase";  // ✅ صح
-// import { readFileSync } from "fs";
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
-const serviceAccount = JSON.parse(
-  readFileSync("./serviceAccount.json", "utf8")
-);
+const firebaseConfig = {
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: ""
+};
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+const app = initializeApp(firebaseConfig);
 
-export const db = admin.firestore();
-export { admin };
+export const auth = getAuth(app);
+export const db = getFirestore(app);
