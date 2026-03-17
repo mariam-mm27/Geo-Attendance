@@ -11,9 +11,7 @@ import {
   getDocs
 } from "firebase/firestore";
 
-/* =========================
-   1️⃣ Create Session
-========================= */
+
 export const createSession = async (courseId, duration) => {
   try {
     const professor = auth.currentUser;
@@ -22,11 +20,10 @@ export const createSession = async (courseId, duration) => {
       throw new Error("No authenticated user");
     }
 
-    // تحقق من الرول
     const userRef = doc(db, "users", professor.uid);
     const userSnap = await getDoc(userRef);
 
-    if (!userSnap.exists() || userSnap.data().role !== "Professor") {
+    if (!userSnap.exists() || userSnap.data().role.toLowerCase() !== "professor") {
       throw new Error("Only Professors can create sessions");
     }
 
@@ -46,9 +43,7 @@ export const createSession = async (courseId, duration) => {
   }
 };
 
-/* =========================
-   2️⃣ Close Session (Owner Only)
-========================= */
+
 export const closeSession = async (sessionId) => {
   try {
     const professor = auth.currentUser;
@@ -78,9 +73,7 @@ export const closeSession = async (sessionId) => {
   }
 };
 
-/* =========================
-   3️⃣ Get Sessions For Professor
-========================= */
+
 export const getProfessorSessions = async () => {
   try {
     const professor = auth.currentUser;
@@ -107,9 +100,7 @@ export const getProfessorSessions = async () => {
   }
 };
 
-/* =========================
-   4️⃣ Get All Sessions (Admin)
-========================= */
+
 export const getAllSessions = async () => {
   try {
     const querySnapshot = await getDocs(collection(db, "sessions"));
@@ -125,9 +116,7 @@ export const getAllSessions = async () => {
   }
 };
 
-/* =========================
-   5️⃣ Get Session By ID
-========================= */
+
 export const getSessionById = async (sessionId) => {
   try {
     const sessionRef = doc(db, "sessions", sessionId);

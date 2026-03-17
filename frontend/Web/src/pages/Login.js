@@ -4,79 +4,60 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { useNavigate } from "react-router-dom";
+import Modal from "../components/Modal";
+import { useModal } from "../hooks/useModal";
 
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
+  const { modalState, closeModal, showError, showWarning } = useModal();
 
   const navigate = useNavigate();
 
   const handleLogin = async () => {
-<<<<<<< HEAD
-    // 1️⃣ UI validation
-=======
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
+    // UI validation
     if (!role) {
-      alert("Please select a role");
+      showWarning("Please select a role");
       return;
     }
 
     const error = validateLogin({ email, password });
     if (error) {
-      alert(error);
+      showWarning(error);
       return;
     }
 
     try {
-<<<<<<< HEAD
-      // 2️⃣ Firebase Auth
       const cred = await signInWithEmailAndPassword(auth, email, password);
 
-      // 3️⃣ Get user profile from Firestore
-=======
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
       const userRef = doc(db, "users", cred.user.uid);
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
-        alert("Account not registered properly.");
+        showError("Account not registered properly.");
         return;
       }
 
       const userData = userSnap.data();
       const realRole = userData.role;
 
-<<<<<<< HEAD
-      // 4️⃣ Security check (IMPORTANT 🔐)
-=======
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
       if (realRole !== role.toLowerCase()) {
-        alert("Selected role does not match your account.");
+        showError("Selected role does not match your account.");
         return;
       }
 
-<<<<<<< HEAD
-      // 5️⃣ Redirect safely
-=======
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
       if (realRole === "admin") {
         navigate("/admin");
       } else if (realRole === "professor") {
         navigate("/professor");
-<<<<<<< HEAD
       } else {
-=======
-      } else if (role === "student") {
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
         navigate("/student");
       }
 
     } catch (err) {
       console.log(err);
-      alert("Invalid email or password.");
+      showError("Invalid email or password.");
     }
   };
 
@@ -202,6 +183,15 @@ function Login() {
         </p>
 
       </div>
+      <Modal 
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        title={modalState.title}
+        message={modalState.message}
+        type={modalState.type}
+        confirmText={modalState.confirmText}
+        onConfirm={modalState.onConfirm}
+      />
     </div>
   );
 }
