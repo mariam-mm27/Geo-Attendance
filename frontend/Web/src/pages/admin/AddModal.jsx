@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-const AddModal = ({ type, onClose, onAdd, professors = [] }) => {
+const AddModal = ({ type, onClose, onAdd, professors = [], onShowWarning }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -20,29 +20,29 @@ const AddModal = ({ type, onClose, onAdd, professors = [] }) => {
   const handleSubmit = () => {
    
     if (!name.trim()) {
-      alert("Please enter a name");
+      if (onShowWarning) onShowWarning("Please enter a name");
       return;
     }
 
     if (type === "courses") {
       if (!code.trim()) {
-        alert("Please enter a course code");
+        if (onShowWarning) onShowWarning("Please enter a course code");
         return;
       }
       if (!room.trim()) {
-        alert("Please enter a room");
+        if (onShowWarning) onShowWarning("Please enter a room");
         return;
       }
       if (!time.trim()) {
-        alert("Please enter a time");
+        if (onShowWarning) onShowWarning("Please enter a time");
         return;
       }
       if (!duration.trim()) {
-        alert("Please enter a duration");
+        if (onShowWarning) onShowWarning("Please enter a duration");
         return;
       }
       if (!professorId) {
-        alert("Please select a professor");
+        if (onShowWarning) onShowWarning("Please select a professor");
         return;
       }
 
@@ -64,21 +64,21 @@ const AddModal = ({ type, onClose, onAdd, professors = [] }) => {
     }
 
     if (!email.trim()) {
-      alert("Please enter an email");
+      if (onShowWarning) onShowWarning("Please enter an email");
       return;
     }
 
     if (!validateEmail(email)) {
       if (type === "professors") {
-        alert("Professor email must end with @sci.cu.edu.eg");
+        if (onShowWarning) onShowWarning("Professor email must end with @sci.cu.edu.eg");
       } else {
-        alert("Student email must end with @std.sci.cu.edu.eg");
+        if (onShowWarning) onShowWarning("Student email must end with @std.sci.cu.edu.eg");
       }
       return;
     }
 
     if (type === "students" && !code.trim()) {
-      alert("Please enter a student ID");
+      if (onShowWarning) onShowWarning("Please enter a student ID");
       return;
     }
 

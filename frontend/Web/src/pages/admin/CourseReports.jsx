@@ -26,7 +26,6 @@ const CourseReports = () => {
               .map(doc => ({ id: doc.id, ...doc.data() }))
               .filter(user => enrolledIds.includes(user.uid || doc.id));
             
-            // Calculate attendance for each student
             const studentsWithAttendance = await Promise.all(
               studentsData.map(async (student) => {
                 const studentUid = student.uid || student.id;

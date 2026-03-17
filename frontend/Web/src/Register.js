@@ -3,7 +3,9 @@ import { validateRegister } from "./utils/validation";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
-import { useNavigate } from "react-router-dom"; 
+import { useNavigate } from "react-router-dom";
+import Modal from "./components/Modal";
+import { useModal } from "./hooks/useModal";
 
 function Register() {
   const [name, setName] = useState("");
@@ -11,7 +13,8 @@ function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [adminCode, setAdminCode] = useState("");
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
+  const { modalState, closeModal, showSuccess, showError, showWarning } = useModal(); 
 
   const allowedAdminEmails = [
     "alaatantawy352@gmail.com",
@@ -40,7 +43,7 @@ function Register() {
     const role = detectRoleFromEmail(email);
     
     if (!role) {
-      alert("Invalid email domain. Please use:\n- @std.sci.cu.edu.eg for students\n- @sci.cu.edu.eg for professors\n- Authorized admin emails");
+      showWarning("Invalid email domain. Please use:\n- @std.sci.cu.edu.eg for students\n- @sci.cu.edu.eg for professors\n- Authorized admin emails", "Invalid Email");
       return;
     }
 
@@ -54,7 +57,7 @@ function Register() {
     });
 
     if (error) {
-      alert(error);
+      showWarning(error);
       return;
     }
 
@@ -89,18 +92,18 @@ function Register() {
         });
       }
 
-      alert("Registration successful!");
-
-      if (role === "professor") {
-        window.location.replace("/professor");
-      } else if (role === "student") { 
-        window.location.replace("/student");
-      } else if (role === "admin") {
-        window.location.replace("/admin");
-      }
+      showSuccess("Registration successful!", "Success", () => {
+        if (role === "professor") {
+          window.location.replace("/professor");
+        } else if (role === "student") { 
+          window.location.replace("/student");
+        } else if (role === "admin") {
+          window.location.replace("/admin");
+        }
+      });
 
     } catch (err) {
-      alert("Error: " + err.message);
+      showError("Error: " + err.message);
     }
   };
 
@@ -206,6 +209,15 @@ function Register() {
         </p>
         
       </div>
+      <Modal 
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        title={modalState.title}
+        message={modalState.message}
+        type={modalState.type}
+        confirmText={modalState.confirmText}
+        onConfirm={modalState.onConfirm}
+      />
     </div>
   );
 }

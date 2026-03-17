@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { db } from "../../firebase";
 import { doc, getDoc, collection, getDocs, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import Modal from "../../components/Modal";
+import { useModal } from "../../hooks/useModal";
 
 const EnrollStudents = () => {
   const { courseId } = useParams();
@@ -10,6 +12,7 @@ const EnrollStudents = () => {
   const [allStudents, setAllStudents] = useState([]);
   const [enrolledStudents, setEnrolledStudents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { modalState, closeModal, showSuccess, showError } = useModal();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -44,10 +47,10 @@ const EnrollStudents = () => {
         enrolledStudents: arrayUnion(studentId)
       });
       setEnrolledStudents([...enrolledStudents, studentId]);
-      alert("Student enrolled successfully!");
+      showSuccess("Student enrolled successfully!");
     } catch (error) {
       console.error("Error enrolling student:", error);
-      alert("Failed to enroll student");
+      showError("Failed to enroll student");
     }
   };
 
@@ -58,10 +61,10 @@ const EnrollStudents = () => {
         enrolledStudents: arrayRemove(studentId)
       });
       setEnrolledStudents(enrolledStudents.filter(id => id !== studentId));
-      alert("Student unenrolled successfully!");
+      showSuccess("Student unenrolled successfully!");
     } catch (error) {
       console.error("Error unenrolling student:", error);
-      alert("Failed to unenroll student");
+      showError("Failed to unenroll student");
     }
   };
 
@@ -137,6 +140,15 @@ const EnrollStudents = () => {
           </tbody>
         </table>
       </div>
+      <Modal 
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        title={modalState.title}
+        message={modalState.message}
+        type={modalState.type}
+        confirmText={modalState.confirmText}
+        onConfirm={modalState.onConfirm}
+      />
     </div>
   );
 };
