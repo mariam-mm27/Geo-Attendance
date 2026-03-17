@@ -4,50 +4,49 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { useNavigate } from "react-router-dom";
+import Modal from "../components/Modal";
+import { useModal } from "../hooks/useModal";
 
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
+  const { modalState, closeModal, showError, showWarning } = useModal();
 
   const navigate = useNavigate();
 
   const handleLogin = async () => {
     // UI validation
     if (!role) {
-      alert("Please select a role");
+      showWarning("Please select a role");
       return;
     }
 
     const error = validateLogin({ email, password });
     if (error) {
-      alert(error);
+      showWarning(error);
       return;
     }
 
     try {
-      // Firebase Auth
       const cred = await signInWithEmailAndPassword(auth, email, password);
 
-      // Get user profile from Firestore
       const userRef = doc(db, "users", cred.user.uid);
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
-        alert("Account not registered properly.");
+        showError("Account not registered properly.");
         return;
       }
 
       const userData = userSnap.data();
       const realRole = userData.role;
 
-      // Security check
       if (realRole !== role.toLowerCase()) {
-        alert("Selected role does not match your account.");
+        showError("Selected role does not match your account.");
         return;
       }
 
-      // Redirect safely
       if (realRole === "admin") {
         navigate("/admin");
       } else if (realRole === "professor") {
@@ -58,7 +57,7 @@ function Login() {
 
     } catch (err) {
       console.log(err);
-      alert("Invalid email or password.");
+      showError("Invalid email or password.");
     }
   };
 
@@ -184,6 +183,15 @@ function Login() {
         </p>
 
       </div>
+      <Modal 
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        title={modalState.title}
+        message={modalState.message}
+        type={modalState.type}
+        confirmText={modalState.confirmText}
+        onConfirm={modalState.onConfirm}
+      />
     </div>
   );
 }
