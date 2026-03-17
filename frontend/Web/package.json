@@ -7,12 +7,6 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^13.5.0",
-<<<<<<< HEAD
-    "firebase": "^12.10.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "react-router-dom": "^7.13.1",
-=======
     "ajv": "6.12.6",
     "ajv-keywords": "3.5.2",
     "firebase": "^12.10.0",
@@ -20,7 +14,6 @@
     "react-dom": "18.2.0",
     "react-icons": "^5.6.0",
     "react-router-dom": "6.22.0",
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
     "react-scripts": "5.0.1",
     "web-vitals": "^2.1.4"
   },
@@ -41,12 +34,9 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-<<<<<<< HEAD
-=======
   },
   "overrides": {
     "react": "18.2.0",
     "react-dom": "18.2.0"
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
   }
 }

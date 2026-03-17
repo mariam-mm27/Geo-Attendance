@@ -1,6 +1,5 @@
-
-import admin from "firebase-admin";
-import { readFileSync } from "fs";
+import { db } from "../firebase";  // ✅ صح
+// import { readFileSync } from "fs";
 
 const serviceAccount = JSON.parse(
   readFileSync("./serviceAccount.json", "utf8")
@@ -11,11 +10,4 @@ admin.initializeApp({
 });
 
 export const db = admin.firestore();
-export default admin;
-
-
-
-const db = admin.firestore();
-
-module.exports = db;
-8
+export { admin };

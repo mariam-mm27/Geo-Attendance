@@ -1,9 +1,13 @@
 import { useState } from "react";
 
-const AddModal = ({ type, onClose, onAdd }) => {
+const AddModal = ({ type, onClose, onAdd, professors = [], onShowWarning }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
+  const [room, setRoom] = useState("");
+  const [time, setTime] = useState("");
+  const [duration, setDuration] = useState("");
+  const [professorId, setProfessorId] = useState("");
 
   const validateEmail = (email) => {
     if (type === "professors") {
@@ -16,26 +20,65 @@ const AddModal = ({ type, onClose, onAdd }) => {
   const handleSubmit = () => {
    
     if (!name.trim()) {
-      alert("Please enter a name");
+      if (onShowWarning) onShowWarning("Please enter a name");
+      return;
+    }
+
+    if (type === "courses") {
+      if (!code.trim()) {
+        if (onShowWarning) onShowWarning("Please enter a course code");
+        return;
+      }
+      if (!room.trim()) {
+        if (onShowWarning) onShowWarning("Please enter a room");
+        return;
+      }
+      if (!time.trim()) {
+        if (onShowWarning) onShowWarning("Please enter a time");
+        return;
+      }
+      if (!duration.trim()) {
+        if (onShowWarning) onShowWarning("Please enter a duration");
+        return;
+      }
+      if (!professorId) {
+        if (onShowWarning) onShowWarning("Please select a professor");
+        return;
+      }
+
+      const selectedProf = professors.find(p => p.id === professorId);
+      const newCourse = {
+        name: name.trim(),
+        code: code.trim(),
+        room: room.trim(),
+        time: time.trim(),
+        duration: duration.trim(),
+        professorId: professorId,
+        professorEmail: selectedProf?.email || "",
+        professorName: selectedProf?.name || "",
+        enrolledStudents: [],
+        createdAt: new Date().toISOString()
+      };
+      onAdd(newCourse);
       return;
     }
 
     if (!email.trim()) {
-      alert("Please enter an email");
+      if (onShowWarning) onShowWarning("Please enter an email");
       return;
     }
 
     if (!validateEmail(email)) {
       if (type === "professors") {
-        alert("Professor email must end with @sci.cu.edu.eg");
+        if (onShowWarning) onShowWarning("Professor email must end with @sci.cu.edu.eg");
       } else {
-        alert("Student email must end with @std.sci.cu.edu.eg");
+        if (onShowWarning) onShowWarning("Student email must end with @std.sci.cu.edu.eg");
       }
       return;
     }
 
     if (type === "students" && !code.trim()) {
-      alert("Please enter a student ID");
+      if (onShowWarning) onShowWarning("Please enter a student ID");
       return;
     }
 
@@ -58,31 +101,80 @@ const AddModal = ({ type, onClose, onAdd }) => {
     <div style={styles.overlay} onClick={onClose}>
       <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
         <h3 style={{ color: "#173B66", marginTop: 0 }}>
-          Add {type === "professors" ? "Professor" : "Student"}
+          Add {type === "professors" ? "Professor" : type === "students" ? "Student" : "Course"}
         </h3>
         
-        <input 
-          placeholder="Full Name" 
-          value={name}
-          onChange={e => setName(e.target.value)} 
-          style={styles.input} 
-        />
-        
-        <input 
-          placeholder={type === "professors" ? "Email (@sci.cu.edu.eg)" : "Email (@std.sci.cu.edu.eg)"} 
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          style={styles.input} 
-          type="email"
-        />
-        
-        {type === "students" && (
-          <input 
-            placeholder="Student ID (Code)" 
-            value={code}
-            onChange={e => setCode(e.target.value)}
-            style={styles.input} 
-          />
+        {type === "courses" ? (
+          <>
+            <input 
+              placeholder="Course Name" 
+              value={name}
+              onChange={e => setName(e.target.value)} 
+              style={styles.input} 
+            />
+            <input 
+              placeholder="Course Code (e.g., CS301)" 
+              value={code}
+              onChange={e => setCode(e.target.value)}
+              style={styles.input} 
+            />
+            <input 
+              placeholder="Room (e.g., Lab 5)" 
+              value={room}
+              onChange={e => setRoom(e.target.value)}
+              style={styles.input} 
+            />
+            <input 
+              placeholder="Time (e.g., 09:00 AM - 11:00 AM)" 
+              value={time}
+              onChange={e => setTime(e.target.value)}
+              style={styles.input} 
+            />
+            <input 
+              placeholder="Duration (e.g., 2 hours)" 
+              value={duration}
+              onChange={e => setDuration(e.target.value)}
+              style={styles.input} 
+            />
+            <select 
+              value={professorId}
+              onChange={e => setProfessorId(e.target.value)}
+              style={styles.input}
+            >
+              <option value="">Select Professor</option>
+              {professors.map(prof => (
+                <option key={prof.id} value={prof.id}>
+                  {prof.name} ({prof.email})
+                </option>
+              ))}
+            </select>
+          </>
+        ) : (
+          <>
+            <input 
+              placeholder="Full Name" 
+              value={name}
+              onChange={e => setName(e.target.value)} 
+              style={styles.input} 
+            />
+            
+            <input 
+              placeholder={type === "professors" ? "Email (@sci.cu.edu.eg)" : "Email (@std.sci.cu.edu.eg)"} 
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              style={styles.input} 
+              type="email"
+            />
+            
+            {type === "students" && (
+              <input 
+                placeholder="Student ID (Code)" 
+                value={code}
+                onChange={e => setCode(e.target.value)}
+                style={styles.input} 
+              />
+            )}
+          </>
         )}
         
         <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   TextInput,
   TouchableOpacity,
@@ -6,7 +6,6 @@ import {
   StyleSheet,
 } from "react-native";
 import AuthLayout from "../components/AuthInput";
-import RolePicker from "../components/RoleSelector";
 import { COLORS } from "../theme/color";
 
 import { signInWithEmailAndPassword } from "firebase/auth";
@@ -14,26 +13,24 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
 import { useAuth } from "../context/AuthContext";
+type Props = { navigation: any; };
 
-export default function LoginScreen({ navigation }: any) {
-  const [role, setRole] = useState("");
+export default function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   const { setUser, setRole: setUserRole } = useAuth();
 
-  React.useEffect(() => {
+  useEffect(() => {
     const clearFields = () => {
-      setRole("");
       setEmail("");
       setPassword("");
       setError("");
     };
     
     clearFields();
-    
-    // Also clear when screen comes into focus
+
     const unsubscribe = navigation.addListener('focus', () => {
       clearFields();
     });
@@ -41,23 +38,31 @@ export default function LoginScreen({ navigation }: any) {
     return unsubscribe;
   }, [navigation]);
 
+  const detectRoleFromEmail =(email: string): "student" | "professor" | null => {
+    const cleanEmail = email.trim().toLowerCase();
+    
+    if (cleanEmail.endsWith("@std.sci.cu.edu.eg")) {
+      return "student";
+    } else if (cleanEmail.endsWith("@sci.cu.edu.eg")) {
+      return "professor";
+    }
+    
+    return null;
+  };
+
   const handleLogin = async () => {
     setError("");
 
-    if (!role || !email || !password) {
-      setError("All fields are required.");
+    if (!email || !password) {
+      setError("Email and password are required.");
       return;
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    const detectedRole = detectRoleFromEmail(cleanEmail);
 
-    if (role === "student" && !cleanEmail.endsWith("@std.sci.cu.edu.eg")) {
-      setError("Invalid student email domain.");
-      return;
-    }
-
-    if (role === "professor" && !cleanEmail.endsWith("@sci.cu.edu.eg")) {
-      setError("Invalid professor email domain.");
+    if (!detectedRole) {
+      setError("Invalid email domain. Use @std.sci.cu.edu.eg for students or @sci.cu.edu.eg for professors.");
       return;
     }
 
@@ -75,37 +80,17 @@ export default function LoginScreen({ navigation }: any) {
 
       const userData = userSnap.data();
 
-      if (userData.role !== role.toLowerCase()) {
+      if (userData.role?.toLowerCase() !== detectedRole) {
         await auth.signOut();
-        setError("Selected role does not match your account.");
+        setError(`Email indicates you are ${detectedRole}, but account is ${userData.role}.`);
         return;
       }
 
       setUser(cred.user);
-      setUserRole(userData.role);
+      setUserRole(userData.role?.toLowerCase());
 
-      if (userData.role === "student") {
-        navigation.replace("StudentHome", {
-          user: {
-            name: userData.name,
-            id: cred.user.uid,
-            email: cred.user.email,
-          }
-        });
-      } else if (userData.role === "professor") {
-        navigation.replace("ProfessorHome", {
-          user: {
-            name: userData.name,
-            id: cred.user.uid,
-            email: cred.user.email,
-          }
-        });
-      }
-
-      // Clear fields after successful login
       setEmail("");
       setPassword("");
-      setRole("");
 
     } catch (err: any) {
       console.log("LOGIN ERROR:", err);
@@ -115,8 +100,6 @@ export default function LoginScreen({ navigation }: any) {
 
   return (
     <AuthLayout>
-      <RolePicker role={role} setRole={setRole} />
-
       <TextInput
         placeholder="Email"
         style={styles.input}
@@ -151,12 +134,6 @@ export default function LoginScreen({ navigation }: any) {
 
       <TouchableOpacity style={styles.button} onPress={handleLogin}>
         <Text style={styles.buttonText}>Login</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: COLORS.secondary }]}
-      >
-        <Text style={styles.buttonText}>Login with Google</Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.navigate("Register")}>
