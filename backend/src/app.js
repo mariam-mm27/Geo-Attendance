@@ -1,8 +1,11 @@
 import express from "express";
 import userRoutes from "./routes/user.routes.js";
 import enrollmentRouter from "./routes/enrollment.routes.js";
+
+import { attendanceController } from "./controllers/attendanceController.js";
+
 import courseRoutes from "./routes/course.routes.js";
-import { attendanceControllerTest } from "./controllers/attendanceController.js";
+
 
 const app = express();
 app.use(express.json());
