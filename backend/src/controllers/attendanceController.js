@@ -1,6 +1,5 @@
 
-
-import { db, auth } from "../firebase";
+import { db, auth } from "../config/firebase.js";
 import {
   collection,
   addDoc,
@@ -11,7 +10,7 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
-import { markAttendance } from "../models/attendance.js";
+import { markAttendance } from "../models/Attendance.js";
 
 
 

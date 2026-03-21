@@ -1,23 +1,16 @@
+import admin from "firebase-admin";
+import fs from "fs";
 
-import admin from "firebase-admin";  
- import { readFileSync } from "fs";
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+const serviceAccount = JSON.parse(
+  fs.readFileSync("serviceAccount.json", "utf8")
+);
 
-const firebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
-};
+// initialize firebase
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
 
-const app = initializeApp(firebaseConfig);
+const db = admin.firestore();
+const auth = admin.auth();
 
-
- const db = admin.firestore();
-export const auth = getAuth(app);
-export{db,auth,admin};
-
+export { db, auth, admin };

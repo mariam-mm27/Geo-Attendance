@@ -1,4 +1,4 @@
-import { db, auth } from "./firebase";
+import { db, auth } from "../config/firebase.js";
 import {
   collection,
   addDoc,
@@ -147,3 +147,15 @@ export const getSessionById = async (sessionId) => {
     throw error;
   }
 };
+
+export const isSessionActive = (session) => {
+  const now = new Date();
+
+  if (session.isActive) return false;
+
+  return now >= new Date(session.startTime) &&
+         now <= new Date(session.endTime);
+};
+
+
+
