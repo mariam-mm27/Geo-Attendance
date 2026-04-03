@@ -240,29 +240,18 @@ const ProfessorProfile = () => {
                 )}
               </div>
               
-              {/* Existing Reports Button */}
+              {/* Reports Button */}
               <button onClick={() => navigate(`/reports/${course.id}`)} style={styles.reportBtn}>
                 Reports
               </button>
               
-              {/* NEW BUTTONS - Add these two buttons */}
-              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+              {/* Manage Sessions Button Only */}
+              <div style={{ marginTop: "10px" }}>
                 <button 
                   onClick={() => navigate(`/professor/courses/${course.id}/sessions`)} 
                   style={{ ...styles.reportBtn, backgroundColor: "#2563EB" }}
                 >
                   📋 Manage Sessions
-                </button>
-                <button 
-                  onClick={() => navigate(`/professor/create-session/${course.id}`, { 
-                    state: { 
-                      courseName: course.name, 
-                      courseCode: course.code 
-                    } 
-                  })} 
-                  style={{ ...styles.reportBtn, backgroundColor: "#10B981" }}
-                >
-                  + New Session
                 </button>
               </div>
             </div>

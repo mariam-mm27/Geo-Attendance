@@ -9,13 +9,13 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ProfessorProfile from "./pages/Professor/ProfessorProfile";
 import StudentProfile from "./pages/Student/StudentProfile";
-import StudentEnroll from "./pages/Student/StudentEnroll";  // ← تأكد إنها موجودة
+import StudentEnroll from "./pages/Student/StudentEnroll";
 import AttendanceHistory from "./pages/Student/AttendanceHistory";
+import SessionsList from "./pages/Student/SessionsList";
 import CourseDetails from "./pages/admin/CourseDetails";
 import EnrollStudents from "./pages/admin/EnrollStudents";
 import CourseReports from "./pages/admin/CourseReports";
 import EditCourse from "./pages/admin/EditCourse";
-import SessionsList from "./pages/Student/SessionsList";
 import CourseSessions from "./pages/Professor/CourseSessions";
 import SessionAttendance from "./pages/Professor/SessionAttendance";
 
@@ -32,8 +32,8 @@ function App() {
         <Route path="/professor" element={<ProfessorProfile />} />
         <Route path="/student" element={<StudentProfile />} />
         
-        {/* Routes الـ Student */}
-        <Route path="/student/enroll" element={<StudentEnroll />} />  {/* ← أضف ده */}
+        {/* Student Routes */}
+        <Route path="/student-enroll" element={<StudentEnroll />} />
         <Route path="/student/sessions" element={<SessionsList />} />
         <Route path="/student/attendance-history/:courseId" element={<AttendanceHistory />} />
         
@@ -45,7 +45,7 @@ function App() {
         
         <Route path="/details/:type/:id" element={<CourseDetails />} />
 
-        {/* Routes الـ Professor */}
+        {/* Professor Routes */}
         <Route path="/professor/courses/:courseId/sessions" element={<CourseSessions />} />
         <Route path="/professor/sessions/:sessionId/attendance" element={<SessionAttendance />} />
       </Routes>
