@@ -14,6 +14,7 @@ import { signOut } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { collection, getDocs, doc, getDoc, addDoc } from "firebase/firestore";
 import { AuthContext } from "../context/AuthContext";
+import { getCourseReport } from "../services/attendanceService";
 
 interface Course {
   id: string;
@@ -39,6 +40,7 @@ export default function ProfessorSessionScreen({ navigation }: any) {
   const [qrRefreshCounter, setQrRefreshCounter] = useState(0);
   const [lectureCounters, setLectureCounters] = useState<Record<string, number>>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [courseReport, setCourseReport] = useState<any>(null);
 
   const authContext = useContext(AuthContext);
   if (!authContext) return null;
@@ -86,6 +88,17 @@ export default function ProfessorSessionScreen({ navigation }: any) {
 
     fetchUserAndCourses();
   }, [navigation]);
+
+  useEffect(() => {
+  const fetchReport = async () => {
+    if (!selectedCourseId) return;
+
+    const data = await getCourseReport(selectedCourseId);
+    setCourseReport(data);
+  };
+
+  fetchReport();
+}, [selectedCourseId]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -228,24 +241,65 @@ export default function ProfessorSessionScreen({ navigation }: any) {
                 <Text style={styles.infoText}>Email: {userData.email}</Text>
               </View>
 
-              {courses.length > 0 ? (
-                <View style={styles.card}>
-                  <Text style={styles.cardTitle}>Create Attendance Session</Text>
-                  <Picker selectedValue={selectedCourseId} onValueChange={(v) => setSelectedCourseId(v)} style={styles.picker}>
-                    <Picker.Item label="Select a Course..." value={null} />
-                    {courses.map((c) => (
-                      <Picker.Item key={c.id} label={`${c.code} - ${c.name}`} value={c.id} />
-                    ))}
-                  </Picker>
-                  <TouchableOpacity style={styles.createButton} onPress={handleCreateSession}>
-                    <Text style={styles.buttonText}>Create Session</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={styles.card}>
-                  <Text style={styles.noCoursesText}>No courses assigned yet.</Text>
-                </View>
-              )}
+             {courses.length > 0 ? (
+  <>
+    {/* Create Session Card */}
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Create Attendance Session</Text>
+
+      <Picker
+        selectedValue={selectedCourseId}
+        onValueChange={(v) => setSelectedCourseId(v)}
+        style={styles.picker}
+      >
+        <Picker.Item label="Select a Course..." value={null} />
+        {courses.map((c) => (
+          <Picker.Item
+            key={c.id}
+            label={`${c.code} - ${c.name}`}
+            value={c.id}
+          />
+        ))}
+      </Picker>
+
+      <TouchableOpacity
+        style={styles.createButton}
+        onPress={handleCreateSession}
+      >
+        <Text style={styles.buttonText}>Create Session</Text>
+      </TouchableOpacity>
+    </View>
+
+    {/* Course Report */}
+    {selectedCourseId && courseReport && (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Course Report</Text>
+
+        <Text style={styles.infoText}>
+          Total Students: {courseReport.totalStudents}
+        </Text>
+
+        <Text style={styles.infoText}>
+          Total Sessions: {courseReport.totalSessions}
+        </Text>
+
+        <Text style={styles.infoText}>
+          Average Attendance: {courseReport.averageAttendance}%
+        </Text>
+
+        <Text style={styles.infoText}>
+          Absent Students (&lt;75%): {courseReport.absentStudents}
+        </Text>
+      </View>
+    )}
+  </>
+) : (
+  <View style={styles.card}>
+    <Text style={styles.noCoursesText}>
+      No courses assigned yet.
+    </Text>
+  </View>
+)}
 
               {activeSession && (
                 <View style={styles.card}>
@@ -261,7 +315,7 @@ export default function ProfessorSessionScreen({ navigation }: any) {
                   <Text style={styles.sessionIdText}>Current QR: {getDynamicQRValue()}</Text>
                 </View>
               )}
-            </>
+            </> 
           )}
         </View>
       </ScrollView>
