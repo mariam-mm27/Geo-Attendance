@@ -7,6 +7,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import UsersTable from "./UsersTable";
 import SubjectsTable from "./SubjectsTable";
 import AddModal from "./AddModal";
+import Modal from "../../components/Modal";
+import { useModal } from "../../hooks/useModal";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -22,6 +24,8 @@ const AdminDashboard = () => {
     email: auth.currentUser?.email || "" 
   });
   const [loading, setLoading] = useState(true);
+  const { modalState, closeModal, showSuccess, showError, showWarning } = useModal();
+  const [confirmAction, setConfirmAction] = useState(null);
 
   useEffect(() => {
     // Aggressive back button prevention
@@ -207,10 +211,10 @@ const AdminDashboard = () => {
     try {
       const docRef = await addDoc(collection(db, "students"), newStudent);
       setStudents([...students, { id: docRef.id, ...newStudent }]);
-      alert("Student added successfully!");
+      showSuccess("Student added successfully!");
     } catch (error) {
       console.error("Error adding student:", error);
-      alert("Failed to add student");
+      showError("Failed to add student");
     }
   };
 
@@ -218,10 +222,10 @@ const AdminDashboard = () => {
     try {
       await deleteDoc(doc(db, "professors", id));
       setProfs(profs.filter(prof => prof.id !== id));
-      alert("Professor deleted successfully!");
+      showSuccess("Professor deleted successfully!");
     } catch (error) {
       console.error("Error deleting professor:", error);
-      alert("Failed to delete professor");
+      showError("Failed to delete professor");
     }
   };
 
@@ -229,10 +233,10 @@ const AdminDashboard = () => {
     try {
       await deleteDoc(doc(db, "students", id));
       setStudents(students.filter(student => student.id !== id));
-      alert("Student deleted successfully!");
+      showSuccess("Student deleted successfully!");
     } catch (error) {
       console.error("Error deleting student:", error);
-      alert("Failed to delete student");
+      showError("Failed to delete student");
     }
   };
 
@@ -240,10 +244,10 @@ const AdminDashboard = () => {
     try {
       const docRef = await addDoc(collection(db, "courses"), newCourse);
       setCourses([...courses, { id: docRef.id, ...newCourse }]);
-      alert("Course added successfully!");
+      showSuccess("Course added successfully!");
     } catch (error) {
       console.error("Error adding course:", error);
-      alert("Failed to add course");
+      showError("Failed to add course");
     }
   };
 
@@ -251,11 +255,31 @@ const AdminDashboard = () => {
     try {
       await deleteDoc(doc(db, "courses", id));
       setCourses(courses.filter(course => course.id !== id));
-      alert("Course deleted successfully!");
+      showSuccess("Course deleted successfully!");
     } catch (error) {
       console.error("Error deleting course:", error);
-      alert("Failed to delete course");
+      showError("Failed to delete course");
     }
+  };
+
+  const handleConfirmDelete = (id, name, type = 'professor') => {
+    const itemType = type === 'course' ? 'course' : type === 'student' ? 'student' : 'professor';
+    setConfirmAction({ id, name, type: itemType });
+    
+    showWarning(
+      `Are you sure you want to delete ${name}?`,
+      `Delete ${itemType.charAt(0).toUpperCase() + itemType.slice(1)}`,
+      () => {
+        if (itemType === 'professor') {
+          handleDeleteProfessor(id);
+        } else if (itemType === 'student') {
+          handleDeleteStudent(id);
+        } else if (itemType === 'course') {
+          handleDeleteCourse(id);
+        }
+        setConfirmAction(null);
+      }
+    );
   };
 
   if (loading) {
@@ -304,10 +328,25 @@ const AdminDashboard = () => {
         </div>
         <div style={styles.card}>
           {activeTab === "professors" ? 
-            <SubjectsTable data={profs} onDelete={handleDeleteProfessor} allCourses={courses} /> : 
+            <SubjectsTable 
+              data={profs} 
+              onDelete={handleDeleteProfessor} 
+              allCourses={courses} 
+              onConfirmDelete={(id, name) => handleConfirmDelete(id, name, 'professor')}
+            /> : 
             activeTab === "students" ?
-            <UsersTable data={students} onDelete={handleDeleteStudent} allCourses={courses} /> :
-            <UsersTable data={courses} onDelete={handleDeleteCourse} type="courses" />
+            <UsersTable 
+              data={students} 
+              onDelete={handleDeleteStudent} 
+              allCourses={courses} 
+              onConfirmDelete={(id, name) => handleConfirmDelete(id, name, 'student')}
+            /> :
+            <UsersTable 
+              data={courses} 
+              onDelete={handleDeleteCourse} 
+              type="courses" 
+              onConfirmDelete={(id, name) => handleConfirmDelete(id, name, 'course')}
+            />
           }
         </div>
       </main>
@@ -326,8 +365,18 @@ const AdminDashboard = () => {
             setShowModal(false);
           }}
           professors={profs}
+          onShowWarning={(message) => showWarning(message)}
         />
       )}
+      <Modal 
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        title={modalState.title}
+        message={modalState.message}
+        type={modalState.type}
+        confirmText={modalState.confirmText}
+        onConfirm={modalState.onConfirm}
+      />
     </div>
   );
 };

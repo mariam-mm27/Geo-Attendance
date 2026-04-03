@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { db } from "../../firebase";
 import { doc, getDoc, updateDoc, collection, getDocs } from "firebase/firestore";
+import Modal from "../../components/Modal";
+import { useModal } from "../../hooks/useModal";
 
 const EditCourse = () => {
   const { courseId } = useParams();
@@ -14,6 +16,7 @@ const EditCourse = () => {
   const [professorId, setProfessorId] = useState("");
   const [professors, setProfessors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { modalState, closeModal, showSuccess, showError, showWarning } = useModal();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -50,27 +53,27 @@ const EditCourse = () => {
     e.preventDefault();
 
     if (!name.trim()) {
-      alert("Please enter a course name");
+      showWarning("Please enter a course name");
       return;
     }
     if (!code.trim()) {
-      alert("Please enter a course code");
+      showWarning("Please enter a course code");
       return;
     }
     if (!room.trim()) {
-      alert("Please enter a room");
+      showWarning("Please enter a room");
       return;
     }
     if (!time.trim()) {
-      alert("Please enter a time");
+      showWarning("Please enter a time");
       return;
     }
     if (!duration.trim()) {
-      alert("Please enter a duration");
+      showWarning("Please enter a duration");
       return;
     }
     if (!professorId) {
-      alert("Please select a professor");
+      showWarning("Please select a professor");
       return;
     }
 
@@ -90,11 +93,12 @@ const EditCourse = () => {
         updatedAt: new Date().toISOString()
       });
 
-      alert("Course updated successfully!");
-      navigate("/admin");
+      showSuccess("Course updated successfully!", "Success", () => {
+        navigate("/admin");
+      });
     } catch (error) {
       console.error("Error updating course:", error);
-      alert("Failed to update course");
+      showError("Failed to update course");
     }
   };
 
@@ -194,6 +198,15 @@ const EditCourse = () => {
           </div>
         </form>
       </div>
+      <Modal 
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        title={modalState.title}
+        message={modalState.message}
+        type={modalState.type}
+        confirmText={modalState.confirmText}
+        onConfirm={modalState.onConfirm}
+      />
     </div>
   );
 };

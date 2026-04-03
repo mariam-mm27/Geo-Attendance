@@ -1,6 +1,17 @@
-import { db } from "../firebase.js"; // عدلي المسار حسب مشروعك
+import { isSessionActive,closeSession } from "../services/sessionService.js";
+import { db } from "../config/firebase.js"; 
 
 export const markAttendance = async (studentId, sessionId, sessionStartTime, sessionEndTime) => {
+  const sessionDoc = await db.collection("sessions").doc(sessionId).get();
+  const session = { id: sessionDoc.id, ...sessionDoc.data() };
+
+  if (new Date() > new Date(session.endTime) && !session.isActive) {
+    await closeSession(session.id);
+  }
+
+  if (!isSessionActive(session)) {
+    throw new Error("Session is not active");
+  }
   const snapshot = await db.collection("attendance")
     .where("studentId", "==", studentId)
     .get();

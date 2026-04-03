@@ -1,15 +1,25 @@
-import { markAttendance } from "../models/attendance.js";
 
-/**
- * يسجل حضور الطالب مع منع أي تداخل في المحاضرات حتى لو كورسين مختلفين
- */
-export const attendanceController = async (studentId, sessionId, sessionStartTime, sessionEndTime) => {
+import { db, auth } from "../config/firebase.js";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  doc,
+  getDoc,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
+import { markAttendance } from "../models/Attendance.js";
+
+
+
+
+export const attendanceController = async (studentId, scannedQRValue) => {
   try {
-    const result = await markAttendance(studentId, sessionId, sessionStartTime, sessionEndTime);
-    console.log({ success: true, data: result });
+    const result = await recordAttendance(scannedQRValue);
     return result;
   } catch (error) {
-    console.log({ success: false, message: error.message });
-    throw error;
+    return { success: false, message: error.message };
   }
 };

@@ -1,13 +1,17 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../../firebase";
-import { collection, getDocs, doc, updateDoc, arrayUnion } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, arrayUnion, getDoc } from "firebase/firestore";
+import Modal from "../../components/Modal";
+import { useModal } from "../../hooks/useModal";
 
 const StudentEnroll = () => {
   const navigate = useNavigate();
   const [allCourses, setAllCourses] = useState([]);
   const [enrolledCourseIds, setEnrolledCourseIds] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [studentId, setStudentId] = useState(null);
+  const { modalState, closeModal, showSuccess, showError } = useModal();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -47,10 +51,10 @@ const StudentEnroll = () => {
         enrolledStudents: arrayUnion(user.uid)
       });
       setEnrolledCourseIds([...enrolledCourseIds, courseId]);
-      alert("Successfully enrolled in course!");
+      showSuccess("Successfully enrolled in course!");
     } catch (error) {
       console.error("Error enrolling:", error);
-      alert("Failed to enroll in course");
+      showError("Failed to enroll in course");
     }
   };
 
@@ -101,6 +105,15 @@ const StudentEnroll = () => {
           ))}
         </div>
       )}
+      <Modal 
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        title={modalState.title}
+        message={modalState.message}
+        type={modalState.type}
+        confirmText={modalState.confirmText}
+        onConfirm={modalState.onConfirm}
+      />
     </div>
   );
 };

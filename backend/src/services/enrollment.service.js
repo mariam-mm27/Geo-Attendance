@@ -1,7 +1,9 @@
+
+// backend/src/services/enrollment.service.js
 import { db } from "../config/firebase.js";
 
 export async function enrollStudentToCourse(studentId, courseId) {
-  const docRef = db.collection("enrollments").doc(); // تلقائي ID
+  const docRef = db.collection("enrollments").doc(); 
   const data = {
     StudentId: studentId,
     CourseId: courseId,

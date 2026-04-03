@@ -1,12 +1,16 @@
-import { db } from "../firebase";  // ✅ صح
+import admin from "firebase-admin";
+import fs from "fs";
 
 const serviceAccount = JSON.parse(
-  readFileSync("./serviceAccount.json", "utf8")
+  fs.readFileSync("serviceAccount.json", "utf8")
 );
 
+// initialize firebase
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
-export const db = admin.firestore();
-export { admin };
+const db = admin.firestore();
+const auth = admin.auth();
+
+export { db, auth, admin };

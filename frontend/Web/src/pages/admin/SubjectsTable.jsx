@@ -1,10 +1,12 @@
 import { useNavigate } from "react-router-dom";
 
-const SubjectsTable = ({ data, onDelete, allCourses = [] }) => {
+const SubjectsTable = ({ data, onDelete, allCourses = [], onConfirmDelete }) => {
   const navigate = useNavigate();
 
   const handleDelete = (id, name) => {
-    if (window.confirm(`Are you sure you want to delete ${name}?`)) {
+    if (onConfirmDelete) {
+      onConfirmDelete(id, name);
+    } else {
       onDelete(id);
     }
   };
