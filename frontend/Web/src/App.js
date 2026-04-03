@@ -9,12 +9,15 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ProfessorProfile from "./pages/Professor/ProfessorProfile";
 import StudentProfile from "./pages/Student/StudentProfile";
-import StudentEnroll from "./pages/Student/StudentEnroll";
+import StudentEnroll from "./pages/Student/StudentEnroll";  // ← تأكد إنها موجودة
 import AttendanceHistory from "./pages/Student/AttendanceHistory";
 import CourseDetails from "./pages/admin/CourseDetails";
 import EnrollStudents from "./pages/admin/EnrollStudents";
 import CourseReports from "./pages/admin/CourseReports";
 import EditCourse from "./pages/admin/EditCourse";
+import SessionsList from "./pages/Student/SessionsList";
+import CourseSessions from "./pages/Professor/CourseSessions";
+import SessionAttendance from "./pages/Professor/SessionAttendance";
 
 function App() {
   return (
@@ -28,8 +31,12 @@ function App() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/professor" element={<ProfessorProfile />} />
         <Route path="/student" element={<StudentProfile />} />
-        <Route path="/student-enroll" element={<StudentEnroll />} />
+        
+        {/* Routes الـ Student */}
+        <Route path="/student/enroll" element={<StudentEnroll />} />  {/* ← أضف ده */}
+        <Route path="/student/sessions" element={<SessionsList />} />
         <Route path="/student/attendance-history/:courseId" element={<AttendanceHistory />} />
+        
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/reports/:courseId" element={<Reports />} />
         <Route path="/enroll-students/:courseId" element={<EnrollStudents />} />
@@ -37,6 +44,10 @@ function App() {
         <Route path="/edit-course/:courseId" element={<EditCourse />} />
         
         <Route path="/details/:type/:id" element={<CourseDetails />} />
+
+        {/* Routes الـ Professor */}
+        <Route path="/professor/courses/:courseId/sessions" element={<CourseSessions />} />
+        <Route path="/professor/sessions/:sessionId/attendance" element={<SessionAttendance />} />
       </Routes>
     </Router>
   );

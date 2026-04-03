@@ -1,455 +1,461 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom"; 
-import { auth, db } from "../../firebase"; 
-import { doc, getDoc, collection, getDocs } from "firebase/firestore";
-import { signOut, onAuthStateChanged } from "firebase/auth";
-import AttendanceBar from "../../components/AttendanceBar";
-import { calculateStudentAttendance } from '../../services/attendanceService';
+import { useNavigate } from "react-router-dom";
+import { auth, db } from "../../firebase";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+
 const StudentProfile = () => {
-  const navigate = useNavigate(); 
-  const [studentData, setStudentData] = useState({ name: "...", studentId: "", email: "" });
-  const [courses, setCourses] = useState([]);
-  const [coursesWithAttendance, setCoursesWithAttendance] = useState([]);
-  const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const navigate = useNavigate();
+  const [studentData, setStudentData] = useState({ name: "", email: "" });
+  const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
+  const [enrolledCourses, setEnrolledCourses] = useState([]);
+  const [attendedSessions, setAttendedSessions] = useState([]);
+  const [attendancePercentage, setAttendancePercentage] = useState(0);
+  const [totalSessions, setTotalSessions] = useState(0);
+
+  // منع الرجوع للخلف
   useEffect(() => {
     const preventBack = () => {
       window.history.forward();
     };
     
     window.history.pushState(null, null, window.location.href);
-    window.history.pushState(null, null, window.location.href);
-    window.history.pushState(null, null, window.location.href);
-    
     window.addEventListener("popstate", preventBack);
-    setTimeout(preventBack, 0);
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const docRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setStudentData(docSnap.data());
-          
-          const coursesSnapshot = await getDocs(collection(db, "courses"));
-          const enrolledCourses = [];
-          coursesSnapshot.forEach((courseDoc) => {
-            const courseData = courseDoc.data();
-            if ((courseData.enrolledStudents || []).includes(user.uid)) {
-              enrolledCourses.push({
-                id: courseDoc.id,
-                name: courseData.name,
-                code: courseData.code,
-                room: courseData.room,
-                time: courseData.time,
-                duration: courseData.duration,
-                professorName: courseData.professorName,
-                attendance: 0 
-              });
-            }
-          });
-          setCourses(enrolledCourses);
-        }
-      } else {
-        window.location.replace("/login"); 
-      }
-    });
-    
     return () => {
       window.removeEventListener("popstate", preventBack);
-      unsubscribe();
     };
   }, []);
 
-  // جلب نسبة الحضور لكل كورس
+  // جلب بيانات الطالب والكورسات والحضور
   useEffect(() => {
-    const fetchAttendanceForCourses = async () => {
-      if (!studentData.studentId || courses.length === 0) return;
-      
-      setLoadingAttendance(true);
-      
-      const updatedCourses = await Promise.all(
-        courses.map(async (course) => {
-const result = await calculateStudentAttendance(course.id, auth.currentUser.uid);          return {
-            ...course,
-            attendance: result.success ? result.data.percentage : "0",
-            attendanceDetails: result.success ? result.data : null
-          };
-        })
-      );
-      
-      setCoursesWithAttendance(updatedCourses);
-      setLoadingAttendance(false);
-    };
-    
-    fetchAttendanceForCourses();
-  }, [courses, studentData.studentId]);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        navigate("/login", { replace: true });
+        return;
+      }
 
+      try {
+        // جلب بيانات الطالب
+        const userSnap = await getDoc(doc(db, "users", user.uid));
+        if (userSnap.exists()) {
+          setStudentData(userSnap.data());
+        }
 
+        // جلب كل الكورسات
+        const coursesSnap = await getDocs(collection(db, "courses"));
+        const allCourses = coursesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // فلتر الكورسات اللي الطالب مسجل فيها
+        const studentCourses = allCourses.filter(course => 
+          (course.enrolledStudents || []).includes(user.uid)
+        );
+        setEnrolledCourses(studentCourses);
+
+        // جلب الحضور بتاع الطالب
+        const attendanceSnap = await getDocs(query(
+          collection(db, "attendance"),
+          where("studentId", "==", user.uid)
+        ));
+        const attendanceList = attendanceSnap.docs.map(doc => doc.data());
+        setAttendedSessions(attendanceList);
+
+        // جلب كل الجلسات بتاعة كورسات الطالب
+        let totalSessionsCount = 0;
+        let attendedSessionsCount = attendanceList.length;
+
+        for (const course of studentCourses) {
+          const sessionsSnap = await getDocs(query(
+            collection(db, "sessions"),
+            where("courseCode", "==", course.code)
+          ));
+          totalSessionsCount += sessionsSnap.size;
+        }
+
+        setTotalSessions(totalSessionsCount);
+        
+        const percentage = totalSessionsCount > 0 
+          ? (attendedSessionsCount / totalSessionsCount * 100).toFixed(2) 
+          : 0;
+        setAttendancePercentage(percentage);
+
+      } catch (err) {
+        console.error("Error fetching student data:", err);
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [navigate]);
 
   const handleLogout = async () => {
-    try {
-      setStudentData({ name: "...", studentId: "", email: "" });
-      setCourses([]);
-      
-      await signOut(auth);
-      localStorage.clear();
-      sessionStorage.clear();
-      
-      window.history.pushState(null, null, "/login");
-      window.location.replace("/login");
-    } catch (error) {
-      console.error("Logout error:", error);
-      window.location.replace("/login");
-    }
+    await signOut(auth);
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.href = "/login";
   };
 
-  const handleViewHistory = (courseId, courseName) => {
-    navigate(`/student/attendance-history/${courseId}`, { 
-      state: { courseName, courseId } 
-    });
-  };
-
-  const getAttendanceColor = (percentage) => {
-    return { bg: "#F0F9FF", text: "#173B66", border: "#E0F2FE", barColor: "#173B66" };
-  };
+  if (loading) {
+    return <div style={styles.loader}>Loading...</div>;
+  }
 
   return (
-    <div style={{ backgroundColor: "#F8FAFC", minHeight: "100vh", position: "relative" }}>
+    <div style={styles.pageWrapper}>
       {/* Sidebar */}
       {isSidebarOpen && (
-        <div style={{
-          position: "fixed", 
-          top: 0, 
-          left: 0, 
-          width: "250px", 
-          height: "100%", 
-          backgroundColor: "white", 
-          boxShadow: "2px 0 5px rgba(0,0,0,0.1)", 
-          zIndex: 1000, 
-          padding: "80px 20px"
-        }}>
-          <h3 style={{ color: "#173B66" }}>Settings</h3>
-          
-          <button 
-            onClick={() => navigate("/reset-password")} 
-            style={{ 
-              display: "block", 
-              width: "100%", 
-              padding: "10px", 
-              margin: "10px 0", 
-              border: "1px solid #ddd", 
-              borderRadius: "5px", 
-              cursor: "pointer", 
-              textAlign: "left",
-              background: "white"
-            }}
-          >
-            🔑 Reset Password
-          </button>
-
-          <button 
-            onClick={() => setIsSidebarOpen(false)} 
-            style={{ 
-              marginTop: "20px", 
-              color: "red", 
-              border: "none", 
-              background: "none", 
-              cursor: "pointer" 
-            }}
-          >
-            Close
-          </button>
+        <div style={styles.sidebarOverlay} onClick={() => setIsSidebarOpen(false)}>
+          <div style={styles.sidebar} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: "20px", fontSize: "18px", fontWeight: "bold", color: "#173B66" }}>Menu</div>
+            <div style={styles.sidebarItem} onClick={() => navigate("/reset-password")}>🔑 Reset Password</div>
+            <div style={{...styles.sidebarItem, color: "#173B66", fontWeight: "bold"}} onClick={() => setIsSidebarOpen(false)}>Close</div>
+          </div>
         </div>
       )}
 
       {/* Navbar */}
-      <div style={{ 
-        backgroundColor: "white",
-        padding: "20px 40px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
-      }}>
-        <div 
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          style={{ cursor: "pointer", fontSize: "24px", color: "#173B66" }}
-        >
-          ☰
+      <nav style={styles.navbar}>
+        <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+          <div style={styles.menuBtn} onClick={() => setIsSidebarOpen(true)}>☰</div>
+          <div style={styles.navTitle}>Student Dashboard</div>
         </div>
-        
-        <button 
-          onClick={handleLogout}
-          style={{ 
-            backgroundColor: "#173B66", 
-            color: "white", 
-            border: "none", 
-            padding: "10px 24px", 
-            borderRadius: "8px", 
-            cursor: "pointer", 
-            fontWeight: "600",
-            fontSize: "14px"
-          }}
-        >
-          Log Out
-        </button>
-      </div>
+        <button onClick={handleLogout} style={styles.logoutBtn}>Logout</button>
+      </nav>
 
-      {/* Main Content */}
-      <div style={{ padding: "50px 100px", maxWidth: "1600px", margin: "0 auto" }}>
-        {/* Title */}
-        <h1 style={{ 
-          color: "#173B66", 
-          fontSize: "36px", 
-          fontWeight: "700", 
-          textAlign: "center", 
-          marginBottom: "50px",
-          marginTop: "0"
-        }}>
-          Student Dashboard
-        </h1>
+      <main style={styles.mainContent}>
+        {/* Profile Section */}
+        <section style={styles.profileSection}>
+          <h2 style={styles.sectionHeading}>Profile Information</h2>
+          <div style={styles.profileCard}>
+            <div style={styles.avatarLarge}>{studentData.name?.charAt(0) || "S"}</div>
+            <div style={styles.infoText}>
+              <div style={styles.label}>Name</div>
+              <div style={styles.value}>{studentData.name || "Student"}</div>
+              <div style={styles.label}>Email</div>
+              <div style={styles.value}>{studentData.email}</div>
+              <div style={styles.label}>Student ID</div>
+              <div style={styles.value}>{auth.currentUser?.uid?.slice(0, 8)}...</div>
+            </div>
+          </div>
+        </section>
 
-        {/* Personal Information */}
-        <div style={{ 
-          backgroundColor: "white", 
-          padding: "35px 45px", 
-          borderRadius: "15px", 
-          boxShadow: "0 2px 4px rgba(0,0,0,0.08)", 
-          marginBottom: "50px"
-        }}>
-          <h2 style={{ 
-            color: "#173B66", 
-            margin: "0 0 25px 0", 
-            fontSize: "20px", 
-            fontWeight: "700" 
-          }}>
-            Personal Information
-          </h2>
-          <div style={{ lineHeight: "2" }}>
-            <p style={{ margin: "8px 0", color: "#1E293B", fontSize: "16px" }}>
-              <strong style={{ fontWeight: "600" }}>Name:</strong> {studentData.name}
-            </p>
-            <p style={{ margin: "8px 0", color: "#1E293B", fontSize: "16px" }}>
-              <strong style={{ fontWeight: "600" }}>ID:</strong> {studentData.studentId}
-            </p>
-            <p style={{ margin: "8px 0", color: "#1E293B", fontSize: "16px" }}>
-              <strong style={{ fontWeight: "600" }}>Email:</strong> {studentData.email}
-            </p>
+        {/* Stats Bar */}
+        <div style={styles.statsBar}>
+          <div style={styles.statItem}>
+            <div style={styles.statNumber}>{enrolledCourses.length}</div>
+            <div style={styles.statLabel}>Enrolled Courses</div>
+          </div>
+          <div style={styles.statItem}>
+            <div style={styles.statNumber}>{attendedSessions.length}</div>
+            <div style={styles.statLabel}>Attended Sessions</div>
+          </div>
+          <div style={styles.statItem}>
+            <div style={styles.statNumber}>{attendancePercentage}%</div>
+            <div style={styles.statLabel}>Attendance Rate</div>
           </div>
         </div>
 
-        {/* My Courses Header */}
-        <div style={{ 
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "30px"
-        }}>
-          <h2 style={{ 
-            color: "#173B66", 
-            margin: "0", 
-            fontSize: "24px", 
-            fontWeight: "700" 
-          }}>
-            My Courses
-          </h2>
-          <button
-            onClick={() => navigate("/student-enroll")}
-            style={{
-              backgroundColor: "#173B66 ",
-              color: "white",
-              border: "none",
-              padding: "12px 24px",
-              borderRadius: "8px",
-              cursor: "pointer",
-              fontWeight: "600",
-              fontSize: "14px"
-            }}
+        {/* Action Buttons - تم إزالة زر My Courses & Attendance */}
+        <div style={styles.actionButtons}>
+          <button 
+            onClick={() => navigate("/student/enroll")} 
+            style={{ ...styles.actionBtn, backgroundColor: "#10B981" }}
           >
-            + Enroll in Course
+            📚 Enroll in Courses
+          </button>
+          <button 
+            onClick={() => navigate("/student/sessions")} 
+            style={{ ...styles.actionBtn, backgroundColor: "#2563EB" }}
+          >
+            📋 My Sessions History
           </button>
         </div>
 
-        {/* Courses Grid */}
-        {courses.length === 0 ? (
-          <div style={{
-            backgroundColor: "white",
-            padding: "60px",
-            borderRadius: "15px",
-            boxShadow: "0 2px 4px rgba(0,0,0,0.08)",
-            textAlign: "center"
-          }}>
-            <p style={{ color: "#64748b", fontSize: "18px", margin: 0 }}>
-              You are not enrolled in any courses yet. Click "Enroll in Course" to get started.
-            </p>
-          </div>
-        ) : loadingAttendance ? (
-          <div style={{ textAlign: "center", padding: "40px" }}>
-            <p>Loading attendance data...</p>
-          </div>
-        ) : (
-          <div style={{ 
-            display: "grid", 
-            gridTemplateColumns: "repeat(3, 1fr)", 
-            gap: "30px",
-            marginBottom: "50px"
-          }}>
-            {coursesWithAttendance.map((course) => {
-              const colors = getAttendanceColor(course.attendance);
-              return (
-                <div key={course.id} style={{ 
-                  backgroundColor: "white", 
-                  padding: "30px", 
-                  borderRadius: "15px", 
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.08)"
-                }}>
-                  <div style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    marginBottom: "15px"
-                  }}>
-                    <h3 style={{ 
-                      color: "#173B66", 
-                      fontSize: "20px", 
-                      fontWeight: "700",
-                      marginTop: "0",
-                      marginBottom: "0",
-                      flex: 1
-                    }}>
-                      {course.name}
-                    </h3>
-                    <span style={{
-                      backgroundColor: "#e0f2fe",
-                      color: "#173B66",
-                      padding: "4px 10px",
-                      borderRadius: "6px",
-                      fontSize: "12px",
-                      fontWeight: "bold",
-                      marginLeft: "10px"
-                    }}>
-                      {course.code}
-                    </span>
-                  </div>
-                  
-                  <div style={{ marginBottom: "20px", paddingTop: "15px", borderTop: "1px solid #f1f5f9" }}>
-                    <p style={{ 
-                      margin: "8px 0", 
-                      color: "#64748b", 
-                      fontSize: "14px",
-                      display: "flex",
-                      alignItems: "center"
-                    }}>
-                      <span style={{ marginRight: "8px" }}>📍</span>
-                      <strong style={{ fontWeight: "600", marginRight: "5px" }}>Room:</strong> 
-                      {course.room}
-                    </p>
-                    <p style={{ 
-                      margin: "8px 0", 
-                      color: "#64748b", 
-                      fontSize: "14px",
-                      display: "flex",
-                      alignItems: "center"
-                    }}>
-                      <span style={{ marginRight: "8px" }}>🕒</span>
-                      <strong style={{ fontWeight: "600", marginRight: "5px" }}>Time:</strong> 
-                      {course.time}
-                    </p>
-                    <p style={{ 
-                      margin: "8px 0", 
-                      color: "#64748b", 
-                      fontSize: "14px",
-                      display: "flex",
-                      alignItems: "center"
-                    }}>
-                      <span style={{ marginRight: "8px" }}>⏱️</span>
-                      <strong style={{ fontWeight: "600", marginRight: "5px" }}>Duration:</strong> 
-                      {course.duration || "Not specified"}
-                    </p>
-                    <p style={{ 
-                      margin: "8px 0", 
-                      color: "#64748b", 
-                      fontSize: "14px",
-                      display: "flex",
-                      alignItems: "center"
-                    }}>
-                      <span style={{ marginRight: "8px" }}>👨‍🏫</span>
-                      <strong style={{ fontWeight: "600", marginRight: "5px" }}>Professor:</strong> 
-                      {course.professorName || "Not assigned"}
-                    </p>
-                  </div>
-
-                  {/* Attendance Section */}
-                  <div style={{ 
-                    padding: "15px",
-                    backgroundColor: colors.bg,
-                    borderRadius: "8px",
-                    border: `1px solid ${colors.border}`,
-                    marginBottom: "15px"
-                  }}>
-                    <div style={{ 
-                      display: "flex", 
-                      justifyContent: "space-between", 
-                      marginBottom: "8px", 
-                      alignItems: "center"
-                    }}>
-                      <span style={{ fontSize: "14px", color: colors.text, fontWeight: "600" }}>
-                        Attendance Rate
-                      </span>
-                      <span style={{ fontSize: "24px", fontWeight: "700", color: colors.text }}>
-                        {course.attendance}%
-                      </span>
-                    </div>
-                    <AttendanceBar attendance={parseFloat(course.attendance)} />
-                    
-                    {course.attendanceDetails && (
-                      <div style={{ 
-                        marginTop: "10px", 
-                        fontSize: "13px", 
-                        color: colors.text,
-                        display: "flex",
-                        justifyContent: "space-between"
-                      }}>
-                        <span>✅ {course.attendanceDetails.attendedSessions} attended</span>
-                        <span>📚 {course.attendanceDetails.totalSessions} total</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* History Button */}
-                  <button
-                    onClick={() => handleViewHistory(course.id, course.name)}
-                    style={{
-                      backgroundColor: "#173B66",
-                      border: "none",
-                      color: "white",
-                      padding: "10px",
-                      borderRadius: "6px",
-                      cursor: "pointer",
-                      width: "100%",
-                      fontSize: "14px",
-                      fontWeight: "600",
-                      transition: "0.3s"
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = "#0F2744";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = "#173B66";
-                    }}
-                  >
-                    📋 View Attendance History
-                  </button>
+        {/* My Courses Section */}
+        <h2 style={{ ...styles.sectionHeading, marginTop: "40px" }}>My Courses</h2>
+        <div style={styles.grid}>
+          {enrolledCourses.length === 0 ? (
+            <div style={styles.emptyCard}>
+              <p>You are not enrolled in any courses yet.</p>
+              <button onClick={() => navigate("/student/enroll")} style={styles.enrollNowBtn}>
+                Enroll Now →
+              </button>
+            </div>
+          ) : (
+            enrolledCourses.map((course) => (
+              <div key={course.id} style={styles.courseCard}>
+                <div style={styles.cardHeader}>
+                  <span style={styles.codeBadge}>{course.code}</span>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                <h3 style={styles.courseTitle}>{course.name}</h3>
+                <div style={styles.courseDetails}>
+                  <p>📍 Location: <strong>{course.room}</strong></p>
+                  <p>🕒 Time: <strong>{course.time}</strong></p>
+                  <p>👨‍🏫 Professor: <strong>{course.professorName}</strong></p>
+                </div>
+                <button 
+                  onClick={() => navigate(`/student/attendance-history/${course.id}`, { 
+                    state: { courseName: course.name } 
+                  })}
+                  style={styles.viewHistoryBtn}
+                >
+                  View Attendance History →
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </main>
     </div>
   );
+};
+
+const styles = {
+  pageWrapper: { 
+    backgroundColor: "#F8FAFC", 
+    minHeight: "100vh", 
+    fontFamily: "sans-serif" 
+  },
+  
+  navbar: { 
+    height: "70px", 
+    backgroundColor: "#173B66", 
+    display: "flex", 
+    alignItems: "center", 
+    justifyContent: "space-between", 
+    padding: "0 5%", 
+    color: "white", 
+    position: "sticky", 
+    top: 0, 
+    zIndex: 100 
+  },
+  
+  menuBtn: { 
+    fontSize: "28px", 
+    cursor: "pointer", 
+    color: "white" 
+  },
+  
+  navTitle: { 
+    fontSize: "20px", 
+    fontWeight: "bold" 
+  },
+  
+  logoutBtn: { 
+    backgroundColor: "white", 
+    border: "none", 
+    color: "#173B66", 
+    padding: "10px 24px", 
+    borderRadius: "8px", 
+    cursor: "pointer", 
+    fontWeight: "bold", 
+    fontSize: "14px" 
+  },
+  
+  sidebarOverlay: { 
+    position: "fixed", 
+    top: 0, 
+    left: 0, 
+    width: "100%", 
+    height: "100%", 
+    backgroundColor: "rgba(0,0,0,0.4)", 
+    zIndex: 6000 
+  },
+  
+  sidebar: { 
+    width: "260px", 
+    height: "100%", 
+    backgroundColor: "white", 
+    position: "absolute", 
+    left: 0, 
+    top: 0, 
+    boxShadow: "2px 0 10px rgba(0,0,0,0.1)" 
+  },
+  
+  sidebarItem: { 
+    padding: "15px 20px", 
+    color: "#173B66", 
+    cursor: "pointer", 
+    borderBottom: "1px solid #F1F5F9", 
+    fontSize: "16px" 
+  },
+  
+  mainContent: { 
+    padding: "30px 5%" 
+  },
+  
+  profileSection: { 
+    marginBottom: "30px" 
+  },
+  
+  profileCard: { 
+    backgroundColor: "white", 
+    padding: "25px", 
+    borderRadius: "15px", 
+    display: "flex", 
+    alignItems: "center", 
+    gap: "25px", 
+    boxShadow: "0 2px 10px rgba(0,0,0,0.05)" 
+  },
+  
+  avatarLarge: { 
+    width: "70px", 
+    height: "70px", 
+    backgroundColor: "#173B66", 
+    color: "white", 
+    borderRadius: "50%", 
+    display: "flex", 
+    alignItems: "center", 
+    justifyContent: "center", 
+    fontSize: "28px" 
+  },
+  
+  infoText: { 
+    display: "grid", 
+    gap: "2px" 
+  },
+  
+  label: { 
+    color: "#94A3B8", 
+    fontSize: "11px", 
+    fontWeight: "bold" 
+  },
+  
+  value: { 
+    color: "#1E293B", 
+    fontSize: "15px", 
+    fontWeight: "600" 
+  },
+  
+  statsBar: { 
+    display: "flex", 
+    gap: "20px", 
+    marginBottom: "30px" 
+  },
+  
+  statItem: { 
+    flex: 1, 
+    backgroundColor: "#173B66", 
+    padding: "20px", 
+    borderRadius: "15px", 
+    textAlign: "center", 
+    color: "white" 
+  },
+  
+  statNumber: { 
+    fontSize: "30px", 
+    fontWeight: "bold" 
+  },
+  
+  statLabel: { 
+    fontSize: "14px", 
+    opacity: 0.8 
+  },
+  
+  actionButtons: {
+    display: "flex",
+    gap: "15px",
+    marginBottom: "30px",
+    flexWrap: "wrap"
+  },
+  
+  actionBtn: {
+    padding: "12px 24px",
+    borderRadius: "10px",
+    border: "none",
+    color: "white",
+    fontWeight: "bold",
+    cursor: "pointer",
+    fontSize: "14px",
+    transition: "0.3s"
+  },
+  
+  sectionHeading: { 
+    color: "#173B66", 
+    fontSize: "22px", 
+    fontWeight: "bold", 
+    marginBottom: "20px" 
+  },
+  
+  grid: { 
+    display: "grid", 
+    gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))", 
+    gap: "25px" 
+  },
+  
+  courseCard: { 
+    backgroundColor: "white", 
+    padding: "25px", 
+    borderRadius: "20px", 
+    boxShadow: "0 10px 20px rgba(0,0,0,0.05)" 
+  },
+  
+  emptyCard: {
+    backgroundColor: "white",
+    padding: "40px",
+    borderRadius: "20px",
+    textAlign: "center",
+    color: "#64748B"
+  },
+  
+  enrollNowBtn: {
+    marginTop: "15px",
+    padding: "10px 20px",
+    backgroundColor: "#173B66",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontWeight: "bold"
+  },
+  
+  cardHeader: { 
+    display: "flex", 
+    justifyContent: "space-between", 
+    marginBottom: "15px" 
+  },
+  
+  codeBadge: { 
+    backgroundColor: "#F1F5F9", 
+    color: "#173B66", 
+    padding: "4px 10px", 
+    borderRadius: "8px", 
+    fontSize: "12px", 
+    fontWeight: "bold" 
+  },
+  
+  courseTitle: { 
+    fontSize: "19px", 
+    color: "#173B66", 
+    fontWeight: "bold", 
+    marginBottom: "15px" 
+  },
+  
+  courseDetails: { 
+    marginBottom: "20px", 
+    borderTop: "1px solid #F1F5F9", 
+    paddingTop: "15px" 
+  },
+  
+  viewHistoryBtn: { 
+    width: "100%", 
+    padding: "12px", 
+    borderRadius: "10px", 
+    border: "none", 
+    backgroundColor: "#173B66", 
+    color: "white", 
+    fontWeight: "bold", 
+    cursor: "pointer",
+    transition: "0.3s"
+  },
+  
+  loader: { 
+    textAlign: "center", 
+    marginTop: "100px", 
+    color: "#173B66", 
+    fontWeight: "bold" 
+  }
 };
 
 export default StudentProfile;

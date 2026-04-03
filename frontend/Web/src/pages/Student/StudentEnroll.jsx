@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../../firebase";
-import { collection, getDocs, doc, updateDoc, arrayUnion, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, arrayUnion } from "firebase/firestore";
 
 const StudentEnroll = () => {
   const navigate = useNavigate();
   const [allCourses, setAllCourses] = useState([]);
   const [enrolledCourseIds, setEnrolledCourseIds] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [studentId, setStudentId] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -18,8 +17,6 @@ const StudentEnroll = () => {
           navigate("/login");
           return;
         }
-
-        setStudentId(user.uid);
 
         const coursesSnapshot = await getDocs(collection(db, "courses"));
         const coursesData = coursesSnapshot.docs.map(doc => ({
@@ -44,9 +41,10 @@ const StudentEnroll = () => {
 
   const handleEnroll = async (courseId) => {
     try {
+      const user = auth.currentUser;
       const courseRef = doc(db, "courses", courseId);
       await updateDoc(courseRef, {
-        enrolledStudents: arrayUnion(studentId)
+        enrolledStudents: arrayUnion(user.uid)
       });
       setEnrolledCourseIds([...enrolledCourseIds, courseId]);
       alert("Successfully enrolled in course!");
@@ -57,7 +55,7 @@ const StudentEnroll = () => {
   };
 
   if (loading) {
-    return <div style={styles.loader}>Loading...</div>;
+    return <div style={styles.loader}>Loading courses...</div>;
   }
 
   const availableCourses = allCourses.filter(
@@ -90,41 +88,13 @@ const StudentEnroll = () => {
                 <h3 style={styles.courseName}>{course.name}</h3>
                 <span style={styles.courseCode}>{course.code}</span>
               </div>
-
               <div style={styles.courseDetails}>
-                <div style={styles.detailItem}>
-                  <span style={styles.icon}>📍</span>
-                  <span style={styles.detailLabel}>Room:</span>
-                  <span style={styles.detailValue}>{course.room}</span>
-                </div>
-                <div style={styles.detailItem}>
-                  <span style={styles.icon}>🕒</span>
-                  <span style={styles.detailLabel}>Time:</span>
-                  <span style={styles.detailValue}>{course.time}</span>
-                </div>
-                <div style={styles.detailItem}>
-                  <span style={styles.icon}>⏱️</span>
-                  <span style={styles.detailLabel}>Duration:</span>
-                  <span style={styles.detailValue}>{course.duration || "Not specified"}</span>
-                </div>
-                <div style={styles.detailItem}>
-                  <span style={styles.icon}>👨‍🏫</span>
-                  <span style={styles.detailLabel}>Professor:</span>
-                  <span style={styles.detailValue}>{course.professorName}</span>
-                </div>
-                <div style={styles.detailItem}>
-                  <span style={styles.icon}>👥</span>
-                  <span style={styles.detailLabel}>Enrolled:</span>
-                  <span style={styles.detailValue}>
-                    {(course.enrolledStudents || []).length} students
-                  </span>
-                </div>
+                <p>📍 Room: {course.room}</p>
+                <p>🕒 Time: {course.time}</p>
+                <p>👨‍🏫 Professor: {course.professorName}</p>
+                <p>👥 Enrolled: {(course.enrolledStudents || []).length} students</p>
               </div>
-
-              <button
-                onClick={() => handleEnroll(course.id)}
-                style={styles.enrollBtn}
-              >
+              <button onClick={() => handleEnroll(course.id)} style={styles.enrollBtn}>
                 Enroll Now
               </button>
             </div>
@@ -164,22 +134,19 @@ const styles = {
   coursesGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))",
-    gap: "30px",
-    maxWidth: "1400px",
-    margin: "0 auto"
+    gap: "30px"
   },
   courseCard: {
     background: "white",
-    padding: "30px",
+    padding: "25px",
     borderRadius: "15px",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-    transition: "transform 0.2s, box-shadow 0.2s"
+    boxShadow: "0 2px 8px rgba(0,0,0,0.08)"
   },
   courseHeader: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: "20px",
+    alignItems: "center",
+    marginBottom: "15px",
     paddingBottom: "15px",
     borderBottom: "2px solid #f1f5f9"
   },
@@ -187,9 +154,7 @@ const styles = {
     color: "#173B66",
     fontSize: "20px",
     fontWeight: "700",
-    margin: 0,
-    flex: 1,
-    marginRight: "10px"
+    margin: 0
   },
   courseCode: {
     background: "#e0f2fe",
@@ -200,47 +165,26 @@ const styles = {
     fontWeight: "bold"
   },
   courseDetails: {
-    marginBottom: "25px"
-  },
-  detailItem: {
-    display: "flex",
-    alignItems: "center",
-    marginBottom: "12px",
+    marginBottom: "20px",
     color: "#64748b",
     fontSize: "14px"
-  },
-  icon: {
-    marginRight: "8px",
-    fontSize: "16px"
-  },
-  detailLabel: {
-    fontWeight: "600",
-    marginRight: "6px",
-    color: "#475569"
-  },
-  detailValue: {
-    color: "#64748b"
   },
   enrollBtn: {
     width: "100%",
     background: "#173B66",
     color: "white",
     border: "none",
-    padding: "14px",
-    borderRadius: "10px",
+    padding: "12px",
+    borderRadius: "8px",
     cursor: "pointer",
     fontSize: "16px",
-    fontWeight: "700",
-    transition: "background 0.2s"
+    fontWeight: "700"
   },
   emptyState: {
     background: "white",
-    padding: "80px 40px",
+    padding: "80px",
     borderRadius: "15px",
-    textAlign: "center",
-    maxWidth: "600px",
-    margin: "0 auto",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.08)"
+    textAlign: "center"
   },
   emptyText: {
     color: "#64748b",
@@ -258,13 +202,10 @@ const styles = {
     fontWeight: "600"
   },
   loader: {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    height: "100vh",
+    textAlign: "center",
+    padding: "100px",
     fontSize: "18px",
-    color: "#173B66",
-    fontWeight: "bold"
+    color: "#173B66"
   }
 };
 

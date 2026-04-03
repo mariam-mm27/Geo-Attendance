@@ -4,6 +4,7 @@ import { auth, db } from "../../firebase";
 import { doc, getDoc, collection, onSnapshot, getDocs } from "firebase/firestore";
 import { signOut, onAuthStateChanged } from "firebase/auth";
 import { calculateCourseAttendanceStats } from '../../services/attendanceService';
+
 const ProfessorProfile = () => {
   const navigate = useNavigate();
   const [profData, setProfData] = useState({ name: "", email: "" });
@@ -238,7 +239,32 @@ const ProfessorProfile = () => {
                   </>
                 )}
               </div>
-              <button onClick={() => navigate(`/reports/${course.id}`)} style={styles.reportBtn}>Reports</button>
+              
+              {/* Existing Reports Button */}
+              <button onClick={() => navigate(`/reports/${course.id}`)} style={styles.reportBtn}>
+                Reports
+              </button>
+              
+              {/* NEW BUTTONS - Add these two buttons */}
+              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+                <button 
+                  onClick={() => navigate(`/professor/courses/${course.id}/sessions`)} 
+                  style={{ ...styles.reportBtn, backgroundColor: "#2563EB" }}
+                >
+                  📋 Manage Sessions
+                </button>
+                <button 
+                  onClick={() => navigate(`/professor/create-session/${course.id}`, { 
+                    state: { 
+                      courseName: course.name, 
+                      courseCode: course.code 
+                    } 
+                  })} 
+                  style={{ ...styles.reportBtn, backgroundColor: "#10B981" }}
+                >
+                  + New Session
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -463,10 +489,7 @@ const styles = {
     color: "white", 
     fontWeight: "bold", 
     cursor: "pointer",
-    transition: "0.3s",
-    ':hover': {
-      backgroundColor: "#0f2a4a"
-    }
+    transition: "0.3s"
   },
   
   loader: { 
