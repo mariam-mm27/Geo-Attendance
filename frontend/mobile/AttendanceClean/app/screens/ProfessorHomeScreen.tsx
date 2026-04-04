@@ -7,6 +7,7 @@ import {
   Alert,
   SafeAreaView,
   ScrollView,
+  Modal,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import QRCode from "react-native-qrcode-svg";
@@ -19,6 +20,7 @@ interface Course {
   id: string;
   name: string;
   code: string;
+  time?: string;
 }
 
 interface ActiveSession {
@@ -39,6 +41,7 @@ export default function ProfessorSessionScreen({ navigation }: any) {
   const [qrRefreshCounter, setQrRefreshCounter] = useState(0);
   const [lectureCounters, setLectureCounters] = useState<Record<string, number>>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showTimeModal, setShowTimeModal] = useState(false);
 
   const authContext = useContext(AuthContext);
   if (!authContext) return null;
@@ -70,6 +73,7 @@ export default function ProfessorSessionScreen({ navigation }: any) {
                 id: docSnap.id,
                 name: courseData.name,
                 code: courseData.code,
+                time: courseData.time,
               });
             }
           });
@@ -110,6 +114,44 @@ export default function ProfessorSessionScreen({ navigation }: any) {
     return `${min}:${sec < 10 ? "0" : ""}${sec}`;
   };
 
+  // Validate if current time is within lecture schedule
+  const validateLectureTime = (lectureTime?: string): boolean => {
+    if (!lectureTime) return true; // If no time specified, allow session creation
+
+    try {
+      // Parse time format: "4:00 pm to 6:00 pm" or "09:00 AM - 11:00 AM"
+      // Support both "to" and "-" as separators
+      const timeMatch = lectureTime.match(/(\d{1,2}):(\d{2})\s*(am|pm)\s*(?:to|-)\s*(\d{1,2}):(\d{2})\s*(am|pm)/i);
+      
+      if (!timeMatch) return true; // If format doesn't match, allow session creation
+
+      const [, startHour, startMin, startPeriod, endHour, endMin, endPeriod] = timeMatch;
+
+      // Convert to 24-hour format
+      let startHour24 = parseInt(startHour);
+      let endHour24 = parseInt(endHour);
+
+      if (startPeriod.toLowerCase() === 'pm' && startHour24 !== 12) startHour24 += 12;
+      if (startPeriod.toLowerCase() === 'am' && startHour24 === 12) startHour24 = 0;
+      if (endPeriod.toLowerCase() === 'pm' && endHour24 !== 12) endHour24 += 12;
+      if (endPeriod.toLowerCase() === 'am' && endHour24 === 12) endHour24 = 0;
+
+      // Get current time
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMin = now.getMinutes();
+      const currentTimeInMinutes = currentHour * 60 + currentMin;
+
+      const startTimeInMinutes = startHour24 * 60 + parseInt(startMin);
+      const endTimeInMinutes = endHour24 * 60 + parseInt(endMin);
+
+      return currentTimeInMinutes >= startTimeInMinutes && currentTimeInMinutes <= endTimeInMinutes;
+    } catch (error) {
+      console.error("Error parsing lecture time:", error);
+      return true; // On error, allow session creation
+    }
+  };
+
   // Generate dynamic QR code that changes every 10 seconds
   const getDynamicQRValue = () => {
     if (!activeSession) return "";
@@ -123,6 +165,12 @@ export default function ProfessorSessionScreen({ navigation }: any) {
     try {
       const selectedCourse = courses.find((c) => c.id === selectedCourseId);
       if (!selectedCourse) return Alert.alert("Error", "Course not found");
+      
+      // Validate lecture time
+      if (!validateLectureTime(selectedCourse.time)) {
+        setShowTimeModal(true);
+        return;
+      }
       
       const lectureNumber = lectureCounters[selectedCourseId] || 1;
 
@@ -265,6 +313,27 @@ export default function ProfessorSessionScreen({ navigation }: any) {
           )}
         </View>
       </ScrollView>
+
+      {/* Outside Lecture Time Modal */}
+      {showTimeModal && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.timeModal}>
+            <View style={styles.timeModalIcon}>
+              <Text style={styles.timeModalIconText}>⏰</Text>
+            </View>
+            <Text style={styles.timeModalTitle}>Outside Lecture Time</Text>
+            <Text style={styles.timeModalMessage}>
+              You can only create attendance sessions during the scheduled lecture time.
+            </Text>
+            <TouchableOpacity 
+              style={styles.timeModalButton}
+              onPress={() => setShowTimeModal(false)}
+            >
+              <Text style={styles.timeModalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -296,4 +365,12 @@ const styles = StyleSheet.create({
   qrContainer:{alignItems:"center",marginTop:20,marginBottom:15},
   qrRefreshText:{fontSize:13,color:"#F59E0B",textAlign:"center",marginTop:10,fontWeight:"600"},
   sessionIdText:{fontSize:12,color:"#64748B",textAlign:"center",marginTop:10},
-});   
+  modalOverlay:{position:"absolute",top:0,left:0,right:0,bottom:0,backgroundColor:"rgba(0,0,0,0.5)",justifyContent:"center",alignItems:"center",zIndex:9999},
+  timeModal:{backgroundColor:"white",borderRadius:16,padding:32,width:"85%",maxWidth:400,alignItems:"center",shadowColor:"#000",shadowOpacity:0.25,shadowRadius:20,shadowOffset:{width:0,height:10},elevation:10},
+  timeModalIcon:{width:64,height:64,borderRadius:32,backgroundColor:"#F59E0B",justifyContent:"center",alignItems:"center",marginBottom:20},
+  timeModalIconText:{fontSize:32,color:"white"},
+  timeModalTitle:{fontSize:24,fontWeight:"700",color:"#D97706",marginBottom:12,textAlign:"center"},
+  timeModalMessage:{fontSize:16,color:"#64748B",marginBottom:24,textAlign:"center",lineHeight:24},
+  timeModalButton:{backgroundColor:"#173B66",paddingVertical:12,paddingHorizontal:32,borderRadius:8,width:"100%"},
+  timeModalButtonText:{color:"white",fontSize:16,fontWeight:"700",textAlign:"center"},
+});
