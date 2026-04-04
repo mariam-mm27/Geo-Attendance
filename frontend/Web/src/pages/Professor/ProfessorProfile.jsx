@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { auth, db } from "../../firebase";
 import { doc, getDoc, collection, onSnapshot, getDocs } from "firebase/firestore";
 import { signOut, onAuthStateChanged } from "firebase/auth";
-import { calculateCourseAttendanceStats } from '../../services/attendanceService';
+import { calculateCourseAttendanceStats, getCourseReport } from '../../services/attendanceService';
 
 const ProfessorProfile = () => {
   const navigate = useNavigate();
@@ -15,16 +15,20 @@ const ProfessorProfile = () => {
   const [attendanceRate, setAttendanceRate] = useState(0);
   const [coursesWithAttendance, setCoursesWithAttendance] = useState([]);
 
-  // منع الرجوع للخلف
+ 
+  const [selectedCourseId, setSelectedCourseId] = useState(null);
+  const [courseReport, setCourseReport] = useState(null);
+
+  
   useEffect(() => {
     const preventBack = () => {
       window.history.forward();
     };
-    
+
     window.history.pushState(null, null, window.location.href);
     window.history.pushState(null, null, window.location.href);
     window.history.pushState(null, null, window.location.href);
-    
+
     window.addEventListener("popstate", preventBack);
     setTimeout(preventBack, 0);
 
@@ -33,7 +37,7 @@ const ProfessorProfile = () => {
     };
   }, []);
 
-  // مراقبة حالة المصادقة وجلب بيانات الدكتور والكورسات
+  
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -43,18 +47,20 @@ const ProfessorProfile = () => {
         if (snap.exists()) {
           const userData = snap.data();
           setProfData(userData);
-          
+
           const coursesSnapshot = await getDocs(collection(db, "courses"));
           const professorCourses = [];
           const userEmail = user.email?.toLowerCase();
-          
+
           coursesSnapshot.forEach((docSnap) => {
             const courseData = docSnap.data();
             const courseProfEmail = courseData.professorEmail?.toLowerCase();
-            
-            if (courseData.professorId === user.uid || 
-                courseProfEmail === userEmail ||
-                courseData.professorEmail === user.email) {
+
+            if (
+              courseData.professorId === user.uid ||
+              courseProfEmail === userEmail ||
+              courseData.professorEmail === user.email
+            ) {
               professorCourses.push({
                 id: docSnap.id,
                 ...courseData,
@@ -62,6 +68,7 @@ const ProfessorProfile = () => {
               });
             }
           });
+
           setCourses(professorCourses);
         }
         setLoading(false);
@@ -71,7 +78,7 @@ const ProfessorProfile = () => {
     return () => unsubscribeAuth();
   }, [navigate]);
 
-  // متابعة التحديثات المباشرة لعدد الطلاب
+  // realtime students
   useEffect(() => {
     if (courses.length === 0) return;
 
@@ -81,9 +88,11 @@ const ProfessorProfile = () => {
         if (docSnap.exists()) {
           const courseData = docSnap.data();
           const enrolledCount = (courseData.enrolledStudents || []).length;
-          setCourses(prev => prev.map(c => 
-            c.id === course.id ? { ...c, count: enrolledCount } : c
-          ));
+          setCourses(prev =>
+            prev.map(c =>
+              c.id === course.id ? { ...c, count: enrolledCount } : c
+            )
+          );
         }
       });
     });
@@ -93,14 +102,14 @@ const ProfessorProfile = () => {
     };
   }, [courses.length]);
 
-  // حساب متوسط نسبة الحضور لكل الكورسات
+  // overall attendance
   useEffect(() => {
     const calculateOverallAttendance = async () => {
       if (courses.length === 0) return;
-      
+
       let totalPercentage = 0;
       let coursesWithData = 0;
-      
+
       for (const course of courses) {
         const result = await calculateCourseAttendanceStats(course.id);
         if (result.success && result.data.avgAttendance) {
@@ -108,22 +117,22 @@ const ProfessorProfile = () => {
           coursesWithData++;
         }
       }
-      
-      const average = coursesWithData > 0 
-        ? (totalPercentage / coursesWithData).toFixed(2) 
+
+      const average = coursesWithData > 0
+        ? (totalPercentage / coursesWithData).toFixed(2)
         : 0;
-      
+
       setAttendanceRate(average);
     };
-    
+
     calculateOverallAttendance();
   }, [courses]);
 
-  // جلب نسبة الحضور لكل كورس على حدة
+  // course attendance
   useEffect(() => {
     const fetchCoursesAttendance = async () => {
       if (courses.length === 0) return;
-      
+
       const updatedCourses = await Promise.all(
         courses.map(async (course) => {
           const result = await calculateCourseAttendanceStats(course.id);
@@ -133,32 +142,29 @@ const ProfessorProfile = () => {
           };
         })
       );
-      
+
       setCoursesWithAttendance(updatedCourses);
     };
-    
+
     fetchCoursesAttendance();
   }, [courses]);
+
+ 
+  useEffect(() => {
+    const fetchReport = async () => {
+      if (!selectedCourseId) return;
+
+      const data = await getCourseReport(selectedCourseId);
+      setCourseReport(data);
+    };
+
+    fetchReport();
+  }, [selectedCourseId]);
 
   if (loading) return <div style={styles.loader}>Loading...</div>;
 
   return (
     <div style={styles.pageWrapper}>
-      {showToast && (
-        <div style={styles.toastContainer}>
-          <div style={styles.toast}>Student Added Successfully!✅ </div>
-        </div>
-      )}
-      
-      {isSidebarOpen && (
-        <div style={styles.sidebarOverlay} onClick={() => setIsSidebarOpen(false)}>
-          <div style={styles.sidebar} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: "20px", fontSize: "18px", fontWeight: "bold", color: "#173B66" }}>Menu</div>
-            <div style={styles.sidebarItem} onClick={() => navigate("/reset-password")}>🔑 Reset Password</div>
-            <div style={{...styles.sidebarItem, color: "#173B66", fontWeight: "bold"}} onClick={() => setIsSidebarOpen(false)}>Close</div>
-          </div>
-        </div>
-      )}
 
       <nav style={styles.navbar}>
         <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
@@ -174,319 +180,84 @@ const ProfessorProfile = () => {
       </nav>
 
       <main style={styles.mainContent}>
-        <section style={styles.profileSection}>
-          <h2 style={styles.sectionHeading}>Profile Information</h2>
-          <div style={styles.profileCard}>
-            <div style={styles.avatarLarge}>{profData.name?.charAt(0)}</div>
-            <div style={styles.infoText}>
-              <div style={styles.label}>Name</div>
-              <div style={styles.value}>{profData.name}</div>
-              <div style={styles.label}>Email</div>
-              <div style={styles.value}>{profData.email}</div>
-            </div>
-          </div>
-        </section>
 
         <div style={styles.statsBar}>
           <div style={styles.statItem}>
             <div style={styles.statNumber}>{courses.length}</div>
             <div style={styles.statLabel}>Active Courses</div>
           </div>
+
           <div style={styles.statItem}>
             <div style={styles.statNumber}>
-              {courses.reduce((total, course) => total + (course.count || 0), 0)}
+              {courses.reduce((t, c) => t + (c.count || 0), 0)}
             </div>
             <div style={styles.statLabel}>Total Students</div>
           </div>
+
           <div style={styles.statItem}>
             <div style={styles.statNumber}>{attendanceRate}%</div>
             <div style={styles.statLabel}>Attendance Rate</div>
           </div>
         </div>
 
-        <h2 style={styles.sectionHeading}>Course Management</h2>
         <div style={styles.grid}>
           {coursesWithAttendance.map((course) => (
             <div key={course.id} style={styles.courseCard}>
-              <div style={styles.cardHeader}>
-                <span style={styles.codeBadge}>{course.code}</span>
-              </div>
-              <h3 style={styles.courseTitle}>{course.name}</h3>
-              <div style={styles.courseDetails}>
-                <p>📍 Location: <strong>{course.room}</strong></p>
-                <p>🕒 Time: <strong>{course.time}</strong></p>
-                <p>👥 Enrolled: <strong style={{color: "#173B66"}}>{course.count} Students</strong></p>
-                
-                {course.attendanceData && (
-                  <>
-                    <p>📊 Attendance Rate: 
-                      <strong style={{
-                        color: parseFloat(course.attendanceData.avgAttendance) >= 75 ? "#10B981" : 
-                               parseFloat(course.attendanceData.avgAttendance) >= 50 ? "#F59E0B" : "#EF4444",
-                        marginLeft: "5px"
-                      }}>
-                        {course.attendanceData.avgAttendance}%
-                      </strong>
-                    </p>
-                    
-                    {course.attendanceData.stats && (
-                      <div style={{marginTop: "10px", fontSize: "12px", display: "flex", gap: "15px"}}>
-                        <span style={{color: "#10B981"}}>✅ {course.attendanceData.stats.good}</span>
-                        <span style={{color: "#F59E0B"}}>⚠️ {course.attendanceData.stats.warning}</span>
-                        <span style={{color: "#EF4444"}}>❌ {course.attendanceData.stats.low}</span>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-              
-              {/* Reports Button */}
+              <h3>{course.name}</h3>
+
+              <p>Students: {course.count}</p>
+
+              {course.attendanceData && (
+                <p>Attendance: {course.attendanceData.avgAttendance}%</p>
+              )}
+
+              {/* القديم */}
               <button onClick={() => navigate(`/reports/${course.id}`)} style={styles.reportBtn}>
                 Reports
               </button>
-              
-              {/* Manage Sessions Button Only */}
-              <div style={{ marginTop: "10px" }}>
-                <button 
-                  onClick={() => navigate(`/professor/courses/${course.id}/sessions`)} 
-                  style={{ ...styles.reportBtn, backgroundColor: "#2563EB" }}
-                >
-                  📋 Manage Sessions
-                </button>
-              </div>
+
+              {/* الجديد */}
+              <button
+                onClick={() => setSelectedCourseId(course.id)}
+                style={{ ...styles.reportBtn, backgroundColor: "#059669", marginTop: "10px" }}
+              >
+                📊 Quick Report
+              </button>
+
             </div>
           ))}
         </div>
+
+        {/* عرض التقرير */}
+        {courseReport && (
+          <div style={{
+            marginTop: "30px",
+            background: "white",
+            padding: "20px",
+            borderRadius: "15px"
+          }}>
+            <h3>📄 Course Report</h3>
+            <pre>{JSON.stringify(courseReport, null, 2)}</pre>
+          </div>
+        )}
+
       </main>
     </div>
   );
 };
 
 const styles = {
-  pageWrapper: { 
-    backgroundColor: "#F8FAFC", 
-    minHeight: "100vh", 
-    fontFamily: "sans-serif" 
-  },
-  
-  navbar: { 
-    height: "70px", 
-    backgroundColor: "#173B66", 
-    display: "flex", 
-    alignItems: "center", 
-    justifyContent: "space-between", 
-    padding: "0 5%", 
-    color: "white", 
-    position: "sticky", 
-    top: 0, 
-    zIndex: 100 
-  },
-  
-  menuBtn: { 
-    fontSize: "28px", 
-    cursor: "pointer", 
-    color: "white" 
-  },
-  
-  navTitle: { 
-    fontSize: "20px", 
-    fontWeight: "bold" 
-  },
-  
-  logoutBtn: { 
-    backgroundColor: "white", 
-    border: "none", 
-    color: "#173B66", 
-    padding: "10px 24px", 
-    borderRadius: "8px", 
-    cursor: "pointer", 
-    fontWeight: "bold", 
-    fontSize: "14px" 
-  },
-  
-  sidebarOverlay: { 
-    position: "fixed", 
-    top: 0, 
-    left: 0, 
-    width: "100%", 
-    height: "100%", 
-    backgroundColor: "rgba(0,0,0,0.4)", 
-    zIndex: 6000 
-  },
-  
-  sidebar: { 
-    width: "260px", 
-    height: "100%", 
-    backgroundColor: "white", 
-    position: "absolute", 
-    left: 0, 
-    top: 0, 
-    boxShadow: "2px 0 10px rgba(0,0,0,0.1)" 
-  },
-  
-  sidebarItem: { 
-    padding: "15px 20px", 
-    color: "#173B66", 
-    cursor: "pointer", 
-    borderBottom: "1px solid #F1F5F9", 
-    fontSize: "16px" 
-  },
-  
-  toastContainer: { 
-    position: "fixed", 
-    top: "20px", 
-    left: 0, 
-    width: "100%", 
-    display: "flex", 
-    justifyContent: "center", 
-    zIndex: 7000 
-  },
-  
-  toast: { 
-    backgroundColor: "#173B66", 
-    color: "white", 
-    padding: "12px 25px", 
-    borderRadius: "50px" 
-  },
-  
-  mainContent: { 
-    padding: "30px 5%" 
-  },
-  
-  profileSection: { 
-    marginBottom: "30px" 
-  },
-  
-  profileCard: { 
-    backgroundColor: "white", 
-    padding: "25px", 
-    borderRadius: "15px", 
-    display: "flex", 
-    alignItems: "center", 
-    gap: "25px", 
-    boxShadow: "0 2px 10px rgba(0,0,0,0.05)" 
-  },
-  
-  avatarLarge: { 
-    width: "70px", 
-    height: "70px", 
-    backgroundColor: "#173B66", 
-    color: "white", 
-    borderRadius: "50%", 
-    display: "flex", 
-    alignItems: "center", 
-    justifyContent: "center", 
-    fontSize: "28px" 
-  },
-  
-  infoText: { 
-    display: "grid", 
-    gap: "2px" 
-  },
-  
-  label: { 
-    color: "#94A3B8", 
-    fontSize: "11px", 
-    fontWeight: "bold" 
-  },
-  
-  value: { 
-    color: "#1E293B", 
-    fontSize: "15px", 
-    fontWeight: "600" 
-  },
-  
-  statsBar: { 
-    display: "flex", 
-    gap: "20px", 
-    marginBottom: "40px" 
-  },
-  
-  statItem: { 
-    flex: 1, 
-    backgroundColor: "#173B66", 
-    padding: "20px", 
-    borderRadius: "15px", 
-    textAlign: "center", 
-    color: "white" 
-  },
-  
-  statNumber: { 
-    fontSize: "30px", 
-    fontWeight: "bold" 
-  },
-  
-  statLabel: { 
-    fontSize: "14px", 
-    opacity: 0.8 
-  },
-  
-  sectionHeading: { 
-    color: "#173B66", 
-    fontSize: "22px", 
-    fontWeight: "bold", 
-    marginBottom: "20px" 
-  },
-  
-  grid: { 
-    display: "grid", 
-    gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))", 
-    gap: "25px" 
-  },
-  
-  courseCard: { 
-    backgroundColor: "white", 
-    padding: "25px", 
-    borderRadius: "20px", 
-    boxShadow: "0 10px 20px rgba(0,0,0,0.05)" 
-  },
-  
-  cardHeader: { 
-    display: "flex", 
-    justifyContent: "space-between", 
-    marginBottom: "15px" 
-  },
-  
-  codeBadge: { 
-    backgroundColor: "#F1F5F9", 
-    color: "#173B66", 
-    padding: "4px 10px", 
-    borderRadius: "8px", 
-    fontSize: "12px", 
-    fontWeight: "bold" 
-  },
-  
-  courseTitle: { 
-    fontSize: "19px", 
-    color: "#173B66", 
-    fontWeight: "bold", 
-    marginBottom: "15px" 
-  },
-  
-  courseDetails: { 
-    marginBottom: "20px", 
-    borderTop: "1px solid #F1F5F9", 
-    paddingTop: "15px" 
-  },
-  
-  reportBtn: { 
-    width: "100%", 
-    padding: "12px", 
-    borderRadius: "10px", 
-    border: "none", 
-    backgroundColor: "#173B66", 
-    color: "white", 
-    fontWeight: "bold", 
-    cursor: "pointer",
-    transition: "0.3s"
-  },
-  
-  loader: { 
-    textAlign: "center", 
-    marginTop: "100px", 
-    color: "#173B66", 
-    fontWeight: "bold" 
-  }
+  pageWrapper: { backgroundColor: "#F8FAFC", minHeight: "100vh" },
+  navbar: { height: "70px", backgroundColor: "#173B66", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 20px", color: "white" },
+  logoutBtn: { background: "white", border: "none", padding: "10px", borderRadius: "8px" },
+  mainContent: { padding: "20px" },
+  statsBar: { display: "flex", gap: "10px", marginBottom: "20px" },
+  statItem: { flex: 1, background: "#173B66", color: "white", padding: "15px", borderRadius: "10px" },
+  statNumber: { fontSize: "24px" },
+  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px,1fr))", gap: "15px" },
+  courseCard: { background: "white", padding: "15px", borderRadius: "10px" },
+  reportBtn: { width: "100%", padding: "10px", marginTop: "10px", background: "#173B66", color: "white", border: "none", borderRadius: "8px" },
+  loader: { textAlign: "center", marginTop: "100px" }
 };
 
 export default ProfessorProfile;
