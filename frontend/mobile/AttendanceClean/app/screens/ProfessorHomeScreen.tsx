@@ -14,7 +14,6 @@ import { signOut } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { collection, getDocs, doc, getDoc, addDoc } from "firebase/firestore";
 import { AuthContext } from "../context/AuthContext";
-import { getCourseReport } from "../services/attendanceService";
 
 interface Course {
   id: string;
@@ -40,7 +39,6 @@ export default function ProfessorSessionScreen({ navigation }: any) {
   const [qrRefreshCounter, setQrRefreshCounter] = useState(0);
   const [lectureCounters, setLectureCounters] = useState<Record<string, number>>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [courseReport, setCourseReport] = useState<any>(null);
 
   const authContext = useContext(AuthContext);
   if (!authContext) return null;
@@ -90,18 +88,7 @@ export default function ProfessorSessionScreen({ navigation }: any) {
   }, [navigation]);
 
   useEffect(() => {
-  const fetchReport = async () => {
-    if (!selectedCourseId) return;
-
-    const data = await getCourseReport(selectedCourseId);
-    setCourseReport(data);
-  };
-
-  fetchReport();
-}, [selectedCourseId]);
-
-  useEffect(() => {
-let timer: any;
+    let timer: any;
     if (timeLeft > 0) {
       timer = setInterval(() => {
         setTimeLeft((prev) => prev - 1);
@@ -254,9 +241,6 @@ let timer: any;
                     <Text style={styles.buttonText}>Create Session</Text>
                   </TouchableOpacity>
                 </View>
-
-                    
-
               ) : (
                 <View style={styles.card}>
                   <Text style={styles.noCoursesText}>No courses assigned yet.</Text>
