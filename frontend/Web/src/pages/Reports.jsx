@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { db } from "../firebase";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { calculateStudentAttendance } from '../services/attendanceService';
+import { getCourseReport } from "../services/attendanceService";
 
 const Reports = () => {
   const { courseId } = useParams();
@@ -10,6 +11,7 @@ const Reports = () => {
   const [students, setStudents] = useState([]);
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [courseReport, setCourseReport] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -18,6 +20,12 @@ const Reports = () => {
         if (courseDoc.exists()) {
           const courseData = courseDoc.data();
           setCourse({ id: courseDoc.id, ...courseData });
+
+          const reportResult = await getCourseReport(courseId);
+
+          if (reportResult.success) {
+          setCourseReport(reportResult.data);
+          }
 
           const enrolledIds = courseData.enrolledStudents || [];
           if (enrolledIds.length > 0) {
@@ -76,6 +84,24 @@ const Reports = () => {
             <p><strong>Professor:</strong> {course.professorName}</p>
           </div>
         )}
+
+        {courseReport && (
+  <div style={{
+    marginBottom: "25px",
+    padding: "20px",
+    backgroundColor: "#F8FAFC",
+    borderRadius: "12px"
+  }}>
+    <h3 style={{ color: "#173B66", marginBottom: "10px" }}>
+      Course Summary
+    </h3>
+
+    <p><strong>Total Students:</strong> {courseReport.totalStudents}</p>
+    <p><strong>Total Sessions:</strong> {courseReport.totalSessions}</p>
+    <p><strong>Average Attendance:</strong> {courseReport.averageAttendance}%</p>
+    <p><strong>Absent Students (&lt;75%):</strong> {courseReport.absentStudents}</p>
+  </div>
+)}
         
         {students.length === 0 ? (
           <p style={{ textAlign: "center", color: "#64748b", padding: "40px" }}>

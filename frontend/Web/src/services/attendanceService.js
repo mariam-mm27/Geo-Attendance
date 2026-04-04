@@ -518,3 +518,84 @@ export const recordAttendanceWeb = async (courseId, sessionId, studentId) => {
     };
   }
 };
+/* =========================
+   getCourseReport
+========================= */
+export const getCourseReport = async (courseId) => {
+  try {
+    console.log("📊 Generating course report for:", courseId);
+
+    // Get all students in course
+    const courseRef = doc(db, "courses", courseId);
+    const courseSnap = await getDoc(courseRef);
+
+    if (!courseSnap.exists()) {
+      throw new Error("Course not found");
+    }
+
+    const courseData = courseSnap.data();
+    const students = courseData.enrolledStudents || [];
+
+    // Get sessions
+    const sessionsQuery = query(
+      collection(db, "sessions"),
+      where("courseId", "==", courseId)
+    );
+    const sessionsSnap = await getDocs(sessionsQuery);
+    const totalSessions = sessionsSnap.size;
+
+    // Get attendance records
+    const attendanceQuery = query(
+      collection(db, "attendance"),
+      where("courseId", "==", courseId)
+    );
+    const attendanceSnap = await getDocs(attendanceQuery);
+
+    const totalStudents = students.length;
+
+    let attendanceMap = {};
+
+    attendanceSnap.forEach((doc) => {
+      const data = doc.data();
+      if (!attendanceMap[data.studentId]) {
+        attendanceMap[data.studentId] = 0;
+      }
+      attendanceMap[data.studentId]++;
+    });
+
+    let totalAttendancePercentage = 0;
+    let absentStudents = 0;
+
+    students.forEach((studentId) => {
+      const attended = attendanceMap[studentId] || 0;
+      const percentage =
+        totalSessions > 0 ? (attended / totalSessions) * 100 : 0;
+
+      totalAttendancePercentage += percentage;
+
+      if (percentage < 75) {
+        absentStudents++;
+      }
+    });
+
+    const averageAttendance =
+      totalStudents > 0
+        ? (totalAttendancePercentage / totalStudents).toFixed(2)
+        : "0.00";
+
+   return {
+  success: true,
+  data: {
+    totalStudents,
+    totalSessions,
+    averageAttendance,
+    absentStudents,
+  },
+};
+  } catch (error) {
+   return {
+  success: false,
+  error: error.message,
+};
+  }
+};
