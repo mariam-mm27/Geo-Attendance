@@ -1,66 +1,49 @@
-import { db, auth } from "../config/firebase";
-import {
-  collection,
-  addDoc,
-  serverTimestamp,
-  doc,
-  getDoc,
-  query,
-  where,
-  getDocs,
-} from "firebase/firestore";
+import { db } from "../config/firebase.js";
 
-export const recordAttendance = async (scannedQRValue: string) => {
+export const recordAttendance = async (
+  scannedQRValue: string,
+  studentId: string,
+  studentEmail: string
+) => {
   try {
-    const student = auth.currentUser;
-    if (!student) throw new Error("No authenticated user");
-
-    const userRef = doc(db, "users", student.uid);
-    const userSnap = await getDoc(userRef);
-
-    if (!userSnap.exists() || userSnap.data().role.toLowerCase() !== "student") {
-      throw new Error("Only students can record attendance");
-    }
-
     const baseSessionId = scannedQRValue.split("-").slice(0, 2).join("-");
 
-    const sessionsQuery = query(
-      collection(db, "sessions"),
-      where("sessionId", "==", baseSessionId)
-    );
+    // Get session
+    const sessionsSnapshot = await db
+      .collection("sessions")
+      .where("sessionId", "==", baseSessionId)
+      .get();
 
-    const sessionsSnap = await getDocs(sessionsQuery);
-
-    if (sessionsSnap.empty) {
+    if (sessionsSnapshot.empty) {
       return { success: false, message: "Session not found" };
     }
 
-    const sessionDoc = sessionsSnap.docs[0];
+    const sessionDoc = sessionsSnapshot.docs[0];
     const sessionData = sessionDoc.data();
 
-    const courseRef = doc(db, "courses", sessionData.courseId);
-    const courseSnap = await getDoc(courseRef);
+    // Check if student is enrolled
+    const courseDoc = await db.collection("courses").doc(sessionData.courseId).get();
     
-    if (!courseSnap.exists()) {
+    if (!courseDoc.exists) {
       return { success: false, message: "Course not found" };
     }
     
-    const courseData = courseSnap.data();
-    const enrolledStudents = courseData.enrolledStudents || [];
+    const courseData = courseDoc.data();
+    const enrolledStudents = courseData?.enrolledStudents || [];
     
-    if (!enrolledStudents.includes(student.uid)) {
+    if (!enrolledStudents.includes(studentId)) {
       return { success: false, message: "Not Enrolled in Course" };
     }
 
     const now = new Date();
 
-    const allActiveSessionsQuery = query(
-      collection(db, "sessions"),
-      where("active", "==", true)
-    );
-    const allActiveSessionsSnap = await getDocs(allActiveSessionsQuery);
+    // Check for concurrent attendance
+    const allActiveSessionsSnapshot = await db
+      .collection("sessions")
+      .where("active", "==", true)
+      .get();
     
-    for (const activeSessionDoc of allActiveSessionsSnap.docs) {
+    for (const activeSessionDoc of allActiveSessionsSnapshot.docs) {
       const activeSessionData = activeSessionDoc.data();
       const activeSessionId = activeSessionData.sessionId;
       
@@ -76,19 +59,20 @@ export const recordAttendance = async (scannedQRValue: string) => {
       );
       
       if (now <= sessionExpiresAt) {
-        const otherAttendanceQuery = query(
-          collection(db, "attendance"),
-          where("sessionId", "==", activeSessionId),
-          where("studentId", "==", student.uid)
-        );
-        const otherAttendanceSnap = await getDocs(otherAttendanceQuery);
+        const otherAttendanceSnapshot = await db
+          .collection("attendance")
+          .where("sessionId", "==", activeSessionId)
+          .where("studentId", "==", studentId)
+          .get();
         
-        if (!otherAttendanceSnap.empty) {
-          const conflictCourseRef = doc(db, "courses", activeSessionData.courseId);
-          const conflictCourseSnap = await getDoc(conflictCourseRef);
+        if (!otherAttendanceSnapshot.empty) {
+          const conflictCourseDoc = await db
+            .collection("courses")
+            .doc(activeSessionData.courseId)
+            .get();
 
-          const conflictCourseName = conflictCourseSnap.exists()
-            ? conflictCourseSnap.data().name
+          const conflictCourseName = conflictCourseDoc.exists
+            ? conflictCourseDoc.data()?.name
             : "another course";
           
           return { 
@@ -116,25 +100,25 @@ export const recordAttendance = async (scannedQRValue: string) => {
       return { success: false, message: "Session Expired" };
     }
 
-    const attendanceQuery = query(
-      collection(db, "attendance"),
-      where("sessionId", "==", baseSessionId),
-      where("studentId", "==", student.uid)
-    );
+    // Check if already recorded
+    const existingAttendanceSnapshot = await db
+      .collection("attendance")
+      .where("sessionId", "==", baseSessionId)
+      .where("studentId", "==", studentId)
+      .get();
 
-    const existingAttendance = await getDocs(attendanceQuery);
-
-    if (!existingAttendance.empty) {
+    if (!existingAttendanceSnapshot.empty) {
       return { success: false, message: "Already Recorded" };
     }
 
-    await addDoc(collection(db, "attendance"), {
+    // Record attendance
+    await db.collection("attendance").add({
       sessionId: baseSessionId,
-      studentId: student.uid,
-      studentEmail: student.email,
+      studentId,
+      studentEmail,
       courseId: sessionData.courseId,
       professorId: sessionData.professorId,
-      recordedAt: serverTimestamp(),
+      recordedAt: new Date(),
     });
 
     return { success: true, message: "Attendance Successful" };

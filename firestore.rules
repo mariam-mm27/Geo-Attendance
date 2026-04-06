@@ -3,33 +3,97 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Allow authenticated users to read and write
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    // Helper functions for role validation
+    function isAuthenticated() {
+      return request.auth != null;
     }
     
-    // Public read access for courses (needed for enrollment checks)
-    match /courses/{courseId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
     
-    // Users collection
+    function isAdmin() {
+      return isAuthenticated() && getUserData().role == 'admin';
+    }
+    
+    function isProfessor() {
+      return isAuthenticated() && getUserData().role == 'professor';
+    }
+    
+    function isStudent() {
+      return isAuthenticated() && getUserData().role == 'student';
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Users collection - strict role-based access
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
     }
     
-    // Sessions collection
+    // Professors collection - admin only write
+    match /professors/{professorId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    // Students collection - admin only write
+    match /students/{studentId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    // Courses collection - public read, admin/professor write
+    match /courses/{courseId} {
+      allow read: if true; // Public read for enrollment checks
+      allow create: if isAdmin();
+      allow update: if isAdmin() || (isProfessor() && resource.data.professorId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+    
+    // Sessions collection - professor creates, students read
     match /sessions/{sessionId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if isAuthenticated();
+      allow create: if isProfessor();
+      allow update: if isProfessor() && resource.data.professorId == request.auth.uid;
+      allow delete: if isProfessor() && resource.data.professorId == request.auth.uid;
     }
     
-    // Attendance collection
+    // Attendance collection - strict validation
     match /attendance/{attendanceId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if isAuthenticated();
+      allow create: if isStudent() && request.resource.data.studentId == request.auth.uid;
+      allow update: if isProfessor() || isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // Attendance appeals - students create, professors update
+    match /attendanceAppeals/{appealId} {
+      allow read: if isAuthenticated();
+      allow create: if isStudent() && request.resource.data.studentId == request.auth.uid;
+      allow update: if isProfessor() && resource.data.professorId == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+    
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Enrollments collection
+    match /enrollments/{enrollmentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || isProfessor();
+      allow update: if isAdmin() || isProfessor();
+      allow delete: if isAdmin();
     }
   }
 }

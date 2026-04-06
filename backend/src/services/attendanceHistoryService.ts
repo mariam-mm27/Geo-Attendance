@@ -1,13 +1,11 @@
-import { db } from "../config/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "../config/firebase.js";
 
 export const getStudentAttendanceHistory = async (studentId: string) => {
   try {
-    const attendanceRef = collection(db, "attendance");
-    const q = query(attendanceRef, where("studentId", "==", studentId));
-    const querySnapshot = await getDocs(q);
+    const attendanceRef = db.collection("attendance");
+    const querySnapshot = await attendanceRef.where("studentId", "==", studentId).get();
 
-    return querySnapshot.docs.map((doc) => ({
+    return querySnapshot.docs.map((doc: any) => ({
       id: doc.id,
       ...doc.data(),
     }));
@@ -19,11 +17,10 @@ export const getStudentAttendanceHistory = async (studentId: string) => {
 
 export const getCourseAttendance = async (courseId: string) => {
   try {
-    const attendanceRef = collection(db, "attendance");
-    const q = query(attendanceRef, where("courseId", "==", courseId));
-    const querySnapshot = await getDocs(q);
+    const attendanceRef = db.collection("attendance");
+    const querySnapshot = await attendanceRef.where("courseId", "==", courseId).get();
 
-    return querySnapshot.docs.map((doc) => ({
+    return querySnapshot.docs.map((doc: any) => ({
       id: doc.id,
       ...doc.data(),
     }));
