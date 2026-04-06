@@ -11,6 +11,9 @@ import ProfessorHomeScreen from "../screens/ProfessorHomeScreen";
 import ScanQRScreen from "../screens/ScanQRScreen";
 import { useAuth } from "../context/AuthContext";
 
+
+import NotificationsScreen from '../screens/NotificationsScreen';
+
 const Stack = createNativeStackNavigator();
 
 function AuthStack() {
@@ -35,6 +38,13 @@ function StudentStack() {
     >
       <Stack.Screen name="StudentHome" component={StudentHomeScreen} />
       <Stack.Screen name="ScanQR" component={ScanQRScreen} />
+       {/* ✅ Notifications Screen */}
+      <Stack.Screen 
+        name="Notifications" 
+        component={NotificationsScreen}
+        options={{ headerShown: false }}
+      />
+
     </Stack.Navigator>
   );
 }
@@ -46,6 +56,12 @@ function ProfessorStack() {
       initialRouteName="ProfessorHome"
     >
       <Stack.Screen name="ProfessorHome" component={ProfessorHomeScreen} />
+        {/* ✅ Notifications Screen */}
+      <Stack.Screen 
+        name="Notifications" 
+        component={NotificationsScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }

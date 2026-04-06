@@ -19,6 +19,9 @@ import EditCourse from "./pages/admin/EditCourse";
 import CourseSessions from "./pages/Professor/CourseSessions";
 import SessionAttendance from "./pages/Professor/SessionAttendance";
 
+import NotificationsPage from './pages/NotificationsPage';
+
+
 function App() {
   return (
     <Router>
@@ -48,6 +51,9 @@ function App() {
         {/* Professor Routes */}
         <Route path="/professor/courses/:courseId/sessions" element={<CourseSessions />} />
         <Route path="/professor/sessions/:sessionId/attendance" element={<SessionAttendance />} />
+
+         {/* ✅ Notifications Route */}
+        <Route path="/notifications" element={<NotificationsPage />} />
       </Routes>
     </Router>
   );
