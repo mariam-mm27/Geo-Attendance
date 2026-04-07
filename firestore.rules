@@ -95,5 +95,13 @@ service cloud.firestore {
       allow update: if isAdmin() || isProfessor();
       allow delete: if isAdmin();
     }
+    
+    // Security Alerts collection - admin only
+    match /securityAlerts/{alertId} {
+      allow read: if isAdmin() || isProfessor();
+      allow create: if isAuthenticated(); // Cloud Functions can create
+      allow update: if isAdmin() || isProfessor();
+      allow delete: if isAdmin();
+    }
   }
 }
