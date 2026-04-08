@@ -9,9 +9,9 @@ import { calculateStudentAttendance } from '../../services/attendanceService';
 const getAttendanceStatus = (attendance) => {
   const absence = 100 - parseFloat(attendance);
 
-  if (absence > 25) return "denied";
-  if (absence > 20) return "second";
-  if (absence > 10) return "first";
+  if (absence >= 25) return "danger";
+  if (absence >= 20) return "second warning";
+  if (absence >= 10) return "first warning";
   return "good";
 };
 
@@ -23,6 +23,8 @@ const StudentProfile = () => {
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [lowAttendanceWarnings, setLowAttendanceWarnings] = useState([]);
+  const [warningCourses, setWarningCourses] = useState([]);
+  const [dangerCourses, setDangerCourses] = useState([]);
 
   useEffect(() => {
     const preventBack = () => {
@@ -80,18 +82,39 @@ const StudentProfile = () => {
 
       setLoadingAttendance(true);
 
-      const updatedCourses = await Promise.all(
-        courses.map(async (course) => {
-          const result = await calculateStudentAttendance(course.id, auth.currentUser.uid);
-          return {
-            ...course,
-            attendance: result.success ? result.data.percentage : "0",
-            attendanceDetails: result.success ? result.data : null
-          };
-        })
-      );
+     const updatedCourses = await Promise.all(
+  courses.map(async (course) => {
+    const result = await calculateStudentAttendance(
+      course.id,
+      auth.currentUser.uid
+    );
+
+    let attendance = 0;
+    let absence = 0;
+    let status = "Safe";
+
+    if (result.success) {
+      attendance = result.data.percentage;
+      absence = 100 - attendance;
+
+      if (absence >= 25) status = "Deprived";
+      else if (absence >= 20) status = "Second Warning";
+      else if (absence >= 10) status = "First Warning";
+    }
+
+    return {
+      ...course,
+      attendance,
+      absence,
+      status,
+      attendanceDetails: result.success ? result.data : null
+    };
+  })
+);
 
       setCoursesWithAttendance(updatedCourses);
+      setWarningCourses(updatedCourses.filter(c => getAttendanceStatus(c.attendance) === "warning"));
+      setDangerCourses(updatedCourses.filter(c => getAttendanceStatus(c.attendance) === "danger"));
       const warningCourses = updatedCourses.filter(course => {
         const absence = 100 - parseFloat(course.attendance);
 
@@ -128,20 +151,12 @@ const StudentProfile = () => {
     });
   };
 
-  const getAttendanceColor = (attendance) => {
-  const absence = 100 - parseFloat(attendance);
-
-  if (absence > 25)
-    return { bg: "#FECACA", text: "#7F1D1D", border: "#EF4444" };
-
-  if (absence > 20)
-    return { bg: "#FED7AA", text: "#9A3412", border: "#FB923C" };
-
-  if (absence > 10)
-    return { bg: "#FEF9C3", text: "#854D0E", border: "#FACC15" };
-
-  return { bg: "#F0F9FF", text: "#173B66", border: "#E0F2FE" };
-};
+  const getAttendanceColor = (attendancePct) => {
+    const status = getAttendanceStatus(attendancePct);
+    if (status === "danger") return { bg: "#FEE2E2", text: "#991B1B", border: "#FECACA", barColor: "#EF4444" };
+    if (status === "warning") return { bg: "#FEF3C7", text: "#92400E", border: "#FCD34D", barColor: "#F59E0B" };
+    return { bg: "#F0F9FF", text: "#173B66", border: "#E0F2FE", barColor: "#173B66" };
+  };
 
   return (
     <div style={{ backgroundColor: "#F8FAFC", minHeight: "100vh", position: "relative" }}>
@@ -238,8 +253,50 @@ const StudentProfile = () => {
         }}>
           Student Dashboard
         </h1>
+        {/* DANGER BANNER — حرمان */}
+        {dangerCourses.length > 0 && (
+          <div style={{
+            backgroundColor: "#FEE2E2", border: "1.5px solid #EF4444",
+            borderRadius: "12px", padding: "18px 24px",
+            marginBottom: "20px", display: "flex", alignItems: "flex-start", gap: "14px"
+          }}>
+            <span style={{ fontSize: "22px" }}>🚫</span>
+            <div>
+              <p style={{ margin: "0 0 6px 0", fontWeight: "700", color: "#991B1B", fontSize: "15px" }}>
+                Deprivation Warning — Absence exceeds 25%
+              </p>
+              {dangerCourses.map(c => (
+                <p key={c.id} style={{ margin: "3px 0", color: "#991B1B", fontSize: "14px" }}>
+                  • <strong>{c.name}</strong>: attendance {c.attendance}% — absence {(100 - parseFloat(c.attendance)).toFixed(1)}%
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* WARNING BANNER — إنذار */}
+        {warningCourses.length > 0 && (
+          <div style={{
+            backgroundColor: "#FEF3C7", border: "1.5px solid #F59E0B",
+            borderRadius: "12px", padding: "18px 24px",
+            marginBottom: "24px", display: "flex", alignItems: "flex-start", gap: "14px"
+          }}>
+            <span style={{ fontSize: "22px" }}>⚠️</span>
+            <div>
+              <p style={{ margin: "0 0 6px 0", fontWeight: "700", color: "#92400E", fontSize: "15px" }}>
+                Attendance Warning — Absence between 10% and 25%
+              </p>
+              {warningCourses.map(c => (
+                <p key={c.id} style={{ margin: "3px 0", color: "#92400E", fontSize: "14px" }}>
+                  • <strong>{c.name}</strong>: attendance {c.attendance}% — absence {(100 - parseFloat(c.attendance)).toFixed(1)}%
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Personal Information */}
+
         <div style={{
           backgroundColor: "white",
           padding: "35px 45px",
@@ -325,41 +382,6 @@ const StudentProfile = () => {
             My Courses
           </h2>
         </div>
-
-        {/* ✅ Warning Banner — يظهر لو في مواد غيابها > 25% */}
-        {lowAttendanceWarnings.length > 0 && (
-          <div style={{
-            backgroundColor: "#FEF3C7",
-            border: "1px solid #F59E0B",
-            borderRadius: "12px",
-            padding: "16px 24px",
-            marginBottom: "24px",
-            display: "flex",
-            alignItems: "flex-start",
-            gap: "12px"
-          }}>
-            <span style={{ fontSize: "20px" }}>⚠️</span>
-            <div>
-              <p style={{ margin: "0 0 6px 0", fontWeight: "700", color: "#92400E", fontSize: "15px" }}>
-                Attendance Warning
-              </p>
-              {lowAttendanceWarnings.map(course => {
-                const absence = 100 - parseFloat(course.attendance);
-
-                let message = "";
-                if (absence > 25) message = "Denied";
-                else if (absence > 20) message = "Second warning";
-                else if (absence > 10) message = "First warning";
-
-                return (
-                  <p key={course.id}>
-                    • <strong>{course.name}</strong>: {message}
-                  </p>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Courses Grid */}
         {courses.length === 0 ? (
@@ -492,7 +514,21 @@ const StudentProfile = () => {
                       </span>
                     </div>
                     <AttendanceBar attendance={parseFloat(course.attendance)} />
-
+                    <div style={{ marginTop: "8px", fontSize: "12px" }}>
+                      {getAttendanceStatus(course.attendance) === "danger" && (
+                        <span style={{ color: "#991B1B", fontWeight: "700" }}>
+                          🚫 Deprivation risk — absence {(100 - parseFloat(course.attendance)).toFixed(1)}%
+                        </span>
+                      )}
+                      {getAttendanceStatus(course.attendance) === "warning" && (
+                        <span style={{ color: "#92400E", fontWeight: "600" }}>
+                          ⚠️ Warning — absence {(100 - parseFloat(course.attendance)).toFixed(1)}%
+                        </span>
+                      )}
+                      {getAttendanceStatus(course.attendance) === "ok" && (
+                        <span style={{ color: "#065F46" }}>✅ Good standing</span>
+                      )}
+                    </div>
                     {course.attendanceDetails && (
                       <div style={{
                         marginTop: "10px",

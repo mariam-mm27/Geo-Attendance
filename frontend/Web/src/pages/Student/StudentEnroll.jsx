@@ -4,6 +4,7 @@ import { auth, db } from "../../firebase";
 import { collection, getDocs, doc, updateDoc, arrayUnion, getDoc } from "firebase/firestore";
 import Modal from "../../components/Modal";
 import { useModal } from "../../hooks/useModal";
+const MAX_COURSES = 6;
 
 const StudentEnroll = () => {
   const navigate = useNavigate();
@@ -44,10 +45,10 @@ const StudentEnroll = () => {
   }, [navigate]);
 
   const handleEnroll = async (courseId) => {
-    if (enrolledCourseIds.length >= 6) {
-    showError("You have reached the maximum limit of 6 courses. Please drop a course before enrolling in a new one.");
-    return;
-  }
+    if (enrolledCourseIds.length >= MAX_COURSES) {
+      showError(`Maximum limit of ${MAX_COURSES} courses reached. Contact admin to drop a course first.`);
+      return;
+    }
 
     try {
       const user = auth.currentUser;
@@ -79,26 +80,22 @@ const StudentEnroll = () => {
         </button>
         <h1 style={styles.title}>Enroll in Courses</h1>
         <div style={{
-  marginTop: "12px",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "10px",
-  background: enrolledCourseIds.length >= 6 ? "#FEE2E2" : "#F0F9FF",
-  border: `1px solid ${enrolledCourseIds.length >= 6 ? "#EF4444" : "#BAE6FD"}`,
-  borderRadius: "8px",
-  padding: "8px 16px"
-}}>
-  <span style={{
-    fontSize: "14px",
-    fontWeight: "600",
-    color: enrolledCourseIds.length >= 6 ? "#991B1B" : "#173B66"
-  }}>
-    {enrolledCourseIds.length >= 6
-      ? "⚠️ Maximum courses reached (6/6)"
-      : `📚 Enrolled courses: ${enrolledCourseIds.length} / 6`
-    }
-  </span>
-</div>
+          marginTop: "12px",
+          display: "inline-flex", alignItems: "center", gap: "8px",
+          backgroundColor: enrolledCourseIds.length >= MAX_COURSES ? "#FEE2E2" : "#F0F9FF",
+          border: `1px solid ${enrolledCourseIds.length >= MAX_COURSES ? "#EF4444" : "#BAE6FD"}`,
+          borderRadius: "10px", padding: "8px 18px"
+        }}>
+          <span>{enrolledCourseIds.length >= MAX_COURSES ? "🚫" : "📚"}</span>
+          <span style={{
+            fontSize: "14px", fontWeight: "700",
+            color: enrolledCourseIds.length >= MAX_COURSES ? "#991B1B" : "#173B66"
+          }}>
+            {enrolledCourseIds.length >= MAX_COURSES
+              ? `Maximum reached (${enrolledCourseIds.length}/${MAX_COURSES})`
+              : `Enrolled: ${enrolledCourseIds.length} / ${MAX_COURSES}`}
+          </span>
+        </div>
       </div>
 
       {availableCourses.length === 0 ? (
@@ -131,7 +128,7 @@ const StudentEnroll = () => {
           ))}
         </div>
       )}
-      <Modal 
+      <Modal
         isOpen={modalState.isOpen}
         onClose={closeModal}
         title={modalState.title}

@@ -1,16 +1,50 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../../firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
+const useCountdown = (sessions) => {
+  const [timers, setTimers] = useState({});
+  const intervalRef = useRef(null);
+
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      const updated = {};
+      sessions.forEach((s) => {
+        if (!s.active || !s.createdAt) return;
+        const created = s.createdAt.toDate ? s.createdAt.toDate() : new Date(s.createdAt);
+        const duration = (s.duration || 10) * 60 * 1000;
+        const remaining = Math.max(0, created.getTime() + duration - now.getTime());
+        updated[s.id] = remaining;
+      });
+      setTimers(updated);
+    };
+    tick();
+    intervalRef.current = setInterval(tick, 1000);
+    return () => clearInterval(intervalRef.current);
+  }, [sessions]);
+  return timers;
+};
+
+const formatMs = (ms) => {
+  if (ms <= 0) return "Expired";
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60).toString().padStart(2, "0");
+  const s = (totalSec % 60).toString().padStart(2, "0");
+  return `${m}:${s}`;
+};
+
+
 const CourseSessions = () => {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState("active");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
+  const timers = useCountdown(sessions);
+  const activeSessions = sessions.filter(s => s.active === true);
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -121,6 +155,46 @@ const CourseSessions = () => {
           Course Sessions
         </h1>
 
+        {activeSessions.length > 0 && filter === "active" && (
+          <div style={{
+            backgroundColor: "#ECFDF5", border: "1px solid #6EE7B7",
+            borderRadius: "12px", padding: "18px 24px", marginBottom: "30px"
+          }}>
+            <p style={{ margin: "0 0 12px 0", fontWeight: "700", color: "#065F46", fontSize: "15px" }}>
+              🟢 Live Sessions — Time Remaining
+            </p>
+            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+              {activeSessions.map(s => {
+                const ms = timers[s.id] ?? null;
+                const urgent = ms !== null && ms < 120000;
+                return (
+                  <div key={s.id} style={{
+                    backgroundColor: "white", borderRadius: "10px",
+                    padding: "12px 20px",
+                    border: `1px solid ${urgent ? "#FCA5A5" : "#A7F3D0"}`,
+                    minWidth: "180px"
+                  }}>
+                    <p style={{ margin: "0 0 4px 0", fontSize: "12px", color: "#64748b", fontWeight: "600" }}>
+                      {s.courseName} — Lecture #{s.lectureNumber}
+                    </p>
+                    <p style={{
+                      margin: 0, fontSize: "26px", fontWeight: "800",
+                      color: urgent ? "#EF4444" : "#065F46", fontFamily: "monospace"
+                    }}>
+                      {ms !== null ? formatMs(ms) : "—"}
+                    </p>
+                    {urgent && ms > 0 && (
+                      <p style={{ margin: "4px 0 0 0", fontSize: "11px", color: "#EF4444", fontWeight: "600" }}>
+                        ⚠️ Ending soon
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Filter + Count */}
         <div style={{
           display: "flex", justifyContent: "space-between",
@@ -223,6 +297,28 @@ const CourseSessions = () => {
                         {session.active ? "🟢 Active" : "⚫ Closed"}
                       </span>
                     </div>
+                    {session.active && timers[session.id] !== undefined && (
+                      <div style={{
+                        backgroundColor: timers[session.id] < 120000 ? "#FEE2E2" : "#ECFDF5",
+                        borderRadius: "8px", padding: "10px 16px", marginBottom: "15px",
+                        display: "flex", alignItems: "center", justifyContent: "space-between"
+                      }}>
+                        <span style={{
+                          fontSize: "12px",
+                          color: timers[session.id] < 120000 ? "#991B1B" : "#065F46",
+                          fontWeight: "600"
+                        }}>
+                          {timers[session.id] < 120000 ? "⚠️ Ending soon" : "⏱ Time remaining"}
+                        </span>
+                        <span style={{
+                          fontSize: "22px", fontWeight: "800",
+                          color: timers[session.id] < 120000 ? "#EF4444" : "#065F46",
+                          fontFamily: "monospace"
+                        }}>
+                          {formatMs(timers[session.id])}
+                        </span>
+                      </div>
+                    )}
 
                     <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "15px", marginBottom: "15px" }}>
                       <p style={{ margin: "8px 0", color: "#64748b", fontSize: "14px", display: "flex", alignItems: "center" }}>
