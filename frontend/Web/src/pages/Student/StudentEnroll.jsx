@@ -44,6 +44,11 @@ const StudentEnroll = () => {
   }, [navigate]);
 
   const handleEnroll = async (courseId) => {
+    if (enrolledCourseIds.length >= 6) {
+    showError("You have reached the maximum limit of 6 courses. Please drop a course before enrolling in a new one.");
+    return;
+  }
+
     try {
       const user = auth.currentUser;
       const courseRef = doc(db, "courses", courseId);
@@ -73,6 +78,27 @@ const StudentEnroll = () => {
           ← Back to Dashboard
         </button>
         <h1 style={styles.title}>Enroll in Courses</h1>
+        <div style={{
+  marginTop: "12px",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "10px",
+  background: enrolledCourseIds.length >= 6 ? "#FEE2E2" : "#F0F9FF",
+  border: `1px solid ${enrolledCourseIds.length >= 6 ? "#EF4444" : "#BAE6FD"}`,
+  borderRadius: "8px",
+  padding: "8px 16px"
+}}>
+  <span style={{
+    fontSize: "14px",
+    fontWeight: "600",
+    color: enrolledCourseIds.length >= 6 ? "#991B1B" : "#173B66"
+  }}>
+    {enrolledCourseIds.length >= 6
+      ? "⚠️ Maximum courses reached (6/6)"
+      : `📚 Enrolled courses: ${enrolledCourseIds.length} / 6`
+    }
+  </span>
+</div>
       </div>
 
       {availableCourses.length === 0 ? (
