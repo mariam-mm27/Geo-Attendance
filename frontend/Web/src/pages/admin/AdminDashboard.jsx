@@ -9,6 +9,8 @@ import SubjectsTable from "./SubjectsTable";
 import AddModal from "./AddModal";
 import Modal from "../../components/Modal";
 import { useModal } from "../../hooks/useModal";
+import AttendanceLogs from "./AttendanceLogs";
+
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -19,9 +21,9 @@ const AdminDashboard = () => {
   const [profs, setProfs] = useState([]);
   const [students, setStudents] = useState([]);
   const [courses, setCourses] = useState([]);
-  const [adminInfo, setAdminInfo] = useState({ 
-    name: "Loading...", 
-    email: auth.currentUser?.email || "" 
+  const [adminInfo, setAdminInfo] = useState({
+    name: "Loading...",
+    email: auth.currentUser?.email || ""
   });
   const [loading, setLoading] = useState(true);
   const { modalState, closeModal, showSuccess, showError, showWarning } = useModal();
@@ -32,16 +34,16 @@ const AdminDashboard = () => {
     const preventBack = () => {
       window.history.forward();
     };
-    
+
     // Push multiple states to make it harder to go back
     window.history.pushState(null, null, window.location.href);
     window.history.pushState(null, null, window.location.href);
     window.history.pushState(null, null, window.location.href);
-    
+
     window.addEventListener('popstate', preventBack);
-    
+
     setTimeout(preventBack, 0);
-    
+
     return () => {
       window.removeEventListener('popstate', preventBack);
     };
@@ -52,17 +54,17 @@ const AdminDashboard = () => {
       try {
         if (user) {
           const userEmail = user.email;
-          
+
           try {
             const usersSnapshot = await getDocs(collection(db, "users"));
             let foundUser = null;
             let foundDoc = null;
-            
+
             usersSnapshot.forEach((docSnap) => {
               const userData = docSnap.data();
               const userDocEmail = (userData.Email || userData.email || "").toLowerCase();
               const loginEmail = userEmail.toLowerCase();
-              
+
               if (userDocEmail === loginEmail) {
                 foundUser = userData;
                 foundDoc = docSnap;
@@ -70,23 +72,23 @@ const AdminDashboard = () => {
                 console.log("All keys:", Object.keys(userData));
               }
             });
-            
+
             if (foundUser && foundDoc) {
               const freshData = foundDoc.data();
               let displayName = freshData.Name || freshData.name;
-              
+
               if (!displayName && userEmail === "mariamhany31017@gmail.com") {
                 console.log("Name field missing for mariamhany31017, needs to be added in Firestore");
-                displayName = "Mariam Hany Hussien"; 
+                displayName = "Mariam Hany Hussien";
               }
-              
+
               if (!displayName) {
                 displayName = userEmail.split('@')[0];
               }
-              
+
               console.log("Fresh data Name:", freshData.Name);
               console.log("Display name:", displayName);
-              
+
               setAdminInfo({
                 name: displayName,
                 email: userEmail
@@ -185,12 +187,12 @@ const AdminDashboard = () => {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      
+
       localStorage.clear();
       sessionStorage.clear();
-      
+
       window.history.replaceState(null, '', '/login');
-      
+
       navigate("/login", { replace: true });
       window.location.href = "/login";
     } catch (error) {
@@ -265,7 +267,7 @@ const AdminDashboard = () => {
   const handleConfirmDelete = (id, name, type = 'professor') => {
     const itemType = type === 'course' ? 'course' : type === 'student' ? 'student' : 'professor';
     setConfirmAction({ id, name, type: itemType });
-    
+
     showWarning(
       `Are you sure you want to delete ${name}?`,
       `Delete ${itemType.charAt(0).toUpperCase() + itemType.slice(1)}`,
@@ -312,6 +314,9 @@ const AdminDashboard = () => {
         <div onClick={() => setActiveTab("courses")} style={styles.navItem(activeTab === "courses")}>
           <FaChalkboardTeacher style={{ marginRight: "8px" }} /> Courses
         </div>
+        <div onClick={() => setActiveTab("logs")} style={styles.navItem(activeTab === "logs")}>
+          📊 Attendance Logs
+        </div>
         <button onClick={handleLogout} style={styles.logoutBtn}>
           <FaSignOutAlt style={{ marginRight: "8px" }} /> Log Out
         </button>
@@ -320,40 +325,46 @@ const AdminDashboard = () => {
       <main style={{ flex: 1, padding: "40px", overflow: "auto" }}>
         <div style={styles.header}>
           <h1 style={{ color: "#173B66", margin: 0, fontSize: "28px" }}>
-            Manage {activeTab === "professors" ? "Professors" : activeTab === "students" ? "Students" : "Courses"}
+            {activeTab === "logs"
+              ? "Attendance Logs"
+              : `Manage ${activeTab === "professors"
+                ? "Professors"
+                : activeTab === "students"
+                  ? "Students"
+                  : "Courses"
+              }`}
           </h1>
-          <button onClick={() => setShowModal(true)} style={styles.addBtn}>
-            <FaPlus style={{ marginRight: "8px" }} /> Add {activeTab === "professors" ? "Professor" : activeTab === "students" ? "Student" : "Course"}
-          </button>
-        </div>
-        <div style={styles.card}>
-          {activeTab === "professors" ? 
-            <SubjectsTable 
-              data={profs} 
-              onDelete={handleDeleteProfessor} 
-              allCourses={courses} 
+          {activeTab === "logs" ? (
+            <AttendanceLogs allCourses={courses} />
+          ) : activeTab === "professors" ? (
+            <SubjectsTable
+              data={profs}
+              onDelete={handleDeleteProfessor}
+              allCourses={courses}
               onConfirmDelete={(id, name) => handleConfirmDelete(id, name, 'professor')}
-            /> : 
-            activeTab === "students" ?
-            <UsersTable 
-              data={students} 
-              onDelete={handleDeleteStudent} 
-              allCourses={courses} 
+            />
+          ) : activeTab === "students" ? (
+            <UsersTable
+              data={students}
+              onDelete={handleDeleteStudent}
+              allCourses={courses}
               onConfirmDelete={(id, name) => handleConfirmDelete(id, name, 'student')}
-            /> :
-            <UsersTable 
-              data={courses} 
-              onDelete={handleDeleteCourse} 
-              type="courses" 
+            />
+          ) : (
+            <UsersTable
+              data={courses}
+              onDelete={handleDeleteCourse}
+              type="courses"
               onConfirmDelete={(id, name) => handleConfirmDelete(id, name, 'course')}
             />
-          }
+          )}
+          
         </div>
       </main>
       {showModal && (
-        <AddModal 
-          type={activeTab} 
-          onClose={() => setShowModal(false)} 
+        <AddModal
+          type={activeTab}
+          onClose={() => setShowModal(false)}
           onAdd={(newItem) => {
             if (activeTab === "professors") {
               handleAddProfessor(newItem);
@@ -368,7 +379,7 @@ const AdminDashboard = () => {
           onShowWarning={(message) => showWarning(message)}
         />
       )}
-      <Modal 
+      <Modal
         isOpen={modalState.isOpen}
         onClose={closeModal}
         title={modalState.title}
@@ -382,45 +393,45 @@ const AdminDashboard = () => {
 };
 const styles = {
   sidebar: { width: "260px", background: "#fff", borderRight: "1px solid #e2e8f0", padding: "20px", display: "flex", flexDirection: "column" },
-  adminPanelTitle: { 
-    textAlign: "center", 
-    marginBottom: "20px", 
-    paddingBottom: "15px", 
-    borderBottom: "2px solid #173B66" 
+  adminPanelTitle: {
+    textAlign: "center",
+    marginBottom: "20px",
+    paddingBottom: "15px",
+    borderBottom: "2px solid #173B66"
   },
   adminProfile: { textAlign: "center", marginBottom: "30px", paddingBottom: "20px", borderBottom: "1px solid #e2e8f0" },
-  navItem: (active) => ({ 
-    padding: "12px", 
-    cursor: "pointer", 
-    background: active ? "#F1F5F9" : "transparent", 
-    color: "#173B66", 
-    fontWeight: "bold", 
-    borderRadius: "8px", 
+  navItem: (active) => ({
+    padding: "12px",
+    cursor: "pointer",
+    background: active ? "#F1F5F9" : "transparent",
+    color: "#173B66",
+    fontWeight: "bold",
+    borderRadius: "8px",
     marginBottom: "5px",
     display: "flex",
     alignItems: "center",
     transition: "background 0.2s"
   }),
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" },
-  addBtn: { 
-    background: "#173B66", 
-    color: "white", 
-    padding: "10px 20px", 
-    border: "none", 
-    borderRadius: "8px", 
+  addBtn: {
+    background: "#173B66",
+    color: "white",
+    padding: "10px 20px",
+    border: "none",
+    borderRadius: "8px",
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
     fontSize: "14px",
     fontWeight: "bold"
   },
-  logoutBtn: { 
-    marginTop: "auto", 
-    background: "#173B66", 
-    color: "white", 
-    padding: "12px", 
-    border: "none", 
-    borderRadius: "8px", 
+  logoutBtn: {
+    marginTop: "auto",
+    background: "#173B66",
+    color: "white",
+    padding: "12px",
+    border: "none",
+    borderRadius: "8px",
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
