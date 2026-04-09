@@ -10,9 +10,16 @@ router.post("/enroll", async (req, res) => {
     if (!StudentId || !CourseId) {
       return res.status(400).json({ error: "StudentId and CourseId are required" });
     }
-    const result = await enrollStudentToCourse(StudentId, CourseId);
+    const result = await enrollStudentWithValidation(StudentId, CourseId);
     res.status(200).json({ success: true, data: result });
   } catch (error) {
+     if (
+      error.message === "Student cannot enroll in more than 6 courses" ||
+      error.message === "Student already enrolled in this course"
+    ) {
+      return res.status(400).json({ error: error.message });
+    }
+
     res.status(500).json({ error: error.message });
   }
 });

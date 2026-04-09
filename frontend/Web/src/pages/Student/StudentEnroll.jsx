@@ -45,24 +45,31 @@ const StudentEnroll = () => {
   }, [navigate]);
 
   const handleEnroll = async (courseId) => {
-    if (enrolledCourseIds.length >= MAX_COURSES) {
-      showError(`Maximum limit of ${MAX_COURSES} courses reached. Contact admin to drop a course first.`);
+
+  try {
+    const user = auth.currentUser;
+
+   
+    if (enrolledCourseIds.length >= 6) {
+      showError("You cannot enroll in more than 6 courses");
       return;
+
     }
 
-    try {
-      const user = auth.currentUser;
-      const courseRef = doc(db, "courses", courseId);
-      await updateDoc(courseRef, {
-        enrolledStudents: arrayUnion(user.uid)
-      });
-      setEnrolledCourseIds([...enrolledCourseIds, courseId]);
-      showSuccess("Successfully enrolled in course!");
-    } catch (error) {
-      console.error("Error enrolling:", error);
-      showError("Failed to enroll in course");
-    }
-  };
+    const courseRef = doc(db, "courses", courseId);
+
+    await updateDoc(courseRef, {
+      enrolledStudents: arrayUnion(user.uid)
+    });
+
+    setEnrolledCourseIds([...enrolledCourseIds, courseId]);
+    showSuccess("Successfully enrolled in course!");
+
+  } catch (error) {
+    console.error("Error enrolling:", error);
+    showError("Failed to enroll in course");
+  }
+};
 
   if (loading) {
     return <div style={styles.loader}>Loading courses...</div>;

@@ -4,6 +4,6 @@ import enrollmentController from "../controllers/enrollment.controller.js";
 
 const router = express.Router();
 
-router.use("/", enrollmentController);
+router.use("/enrollment", enrollmentController);
 
 export default router;

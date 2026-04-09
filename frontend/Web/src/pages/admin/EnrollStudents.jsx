@@ -41,19 +41,41 @@ const EnrollStudents = () => {
   }, [courseId]);
 
   const handleEnroll = async (studentId) => {
-    try {
-      const courseRef = doc(db, "courses", courseId);
-      await updateDoc(courseRef, {
-        enrolledStudents: arrayUnion(studentId)
-      });
-      setEnrolledStudents([...enrolledStudents, studentId]);
-      showSuccess("Student enrolled successfully!");
-    } catch (error) {
-      console.error("Error enrolling student:", error);
-      showError("Failed to enroll student");
-    }
-  };
+  try {
+   
+    const coursesSnapshot = await getDocs(collection(db, "courses"));
 
+    
+    let enrolledCount = 0;
+
+    coursesSnapshot.forEach(doc => {
+      const data = doc.data();
+      if ((data.enrolledStudents || []).includes(studentId)) {
+        enrolledCount++;
+      }
+    });
+
+    
+    if (enrolledCount >= 6) {
+      showError("This student is already enrolled in 6 courses");
+      return;
+    }
+
+    
+    const courseRef = doc(db, "courses", courseId);
+
+    await updateDoc(courseRef, {
+      enrolledStudents: arrayUnion(studentId)
+    });
+
+    setEnrolledStudents([...enrolledStudents, studentId]);
+    showSuccess("Student enrolled successfully!");
+
+  } catch (error) {
+    console.error("Error enrolling student:", error);
+    showError("Failed to enroll student");
+  }
+};
   const handleUnenroll = async (studentId) => {
     try {
       const courseRef = doc(db, "courses", courseId);
