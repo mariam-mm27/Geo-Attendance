@@ -424,8 +424,15 @@ const StudentProfile = () => {
             </p>
           </div>
         ) : loadingAttendance ? (
-          <div style={{ textAlign: "center", padding: "40px" }}>
-            <p>Loading attendance data...</p>
+          <div style={{ textAlign: "center", padding: "60px" }}>
+            <div style={{
+              width: "40px", height: "40px", margin: "0 auto 16px",
+              border: "4px solid #e0f2fe",
+              borderTop: "4px solid #173B66",
+              borderRadius: "50%",
+              animation: "spin 0.8s linear infinite"
+            }} />
+            <p style={{ color: "#64748b", fontSize: "16px" }}>Loading attendance data...</p>
           </div>
         ) : (
           <div style={{
