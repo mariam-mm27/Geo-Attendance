@@ -1,10 +1,53 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../../firebase";
-import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, query, where, addDoc } from "firebase/firestore";
 import { signOut, onAuthStateChanged } from "firebase/auth";
 import AttendanceBar from "../../components/AttendanceBar";
 import { calculateStudentAttendance } from '../../services/attendanceService';
+
+
+const sendAttendanceNotification = async (userId, course, absencePct, type) => {
+  try {
+    // تحقق لو بعتنا notification لنفس المادة في آخر 7 أيام
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const notifQuery = query(
+      collection(db, "notifications"),
+      where("userId", "==", userId),
+      where("courseId", "==", course.id),
+      where("type", "==", type === "danger" ? "absence_deprivation" : "absence_warning")
+    );
+    const existing = await getDocs(notifQuery);
+
+    // لو في notification قديمة، متبعتش تاني
+    const recentExists = existing.docs.some(d => {
+      const created = d.data().createdAt?.toDate?.() || new Date(0);
+      return created > sevenDaysAgo;
+    });
+    if (recentExists) return;
+
+    // ابعت الـ notification
+    await addDoc(collection(db, "notifications"), {
+      userId,
+      courseId: course.id,
+      courseName: course.name,
+      type: type === "danger" ? "absence_deprivation" : "absence_warning",
+      title: type === "danger"
+        ? "🚫 Deprivation Risk"
+        : "⚠️ Attendance Warning",
+      message: type === "danger"
+        ? `Your absence in "${course.name}" has exceeded 25% (absence: ${absencePct}%). You are at risk of being deprived from the final exam.`
+        : `Your absence in "${course.name}" is between 10% and 25% (absence: ${absencePct}%). Please improve your attendance.`,
+      read: false,
+      priority: type === "danger" ? "high" : "normal",
+      createdAt: new Date(),
+    });
+  } catch (err) {
+    console.error("Failed to send notification:", err);
+  }
+};
 
 const getAttendanceStatus = (attendance) => {
   const absence = 100 - parseFloat(attendance);
@@ -25,6 +68,7 @@ const StudentProfile = () => {
   const [lowAttendanceWarnings, setLowAttendanceWarnings] = useState([]);
   const [warningCourses, setWarningCourses] = useState([]);
   const [dangerCourses, setDangerCourses] = useState([]);
+  const notificationsSentRef = useRef(false);
 
   useEffect(() => {
     const preventBack = () => {
@@ -75,58 +119,49 @@ const StudentProfile = () => {
     };
   }, []);
 
-  // جلب نسبة الحضور لكل كورس
   useEffect(() => {
     const fetchAttendanceForCourses = async () => {
       if (!studentData.studentId || courses.length === 0) return;
-
       setLoadingAttendance(true);
 
-     const updatedCourses = await Promise.all(
-  courses.map(async (course) => {
-    const result = await calculateStudentAttendance(
-      course.id,
-      auth.currentUser.uid
-    );
-
-    let attendance = 0;
-    let absence = 0;
-    let status = "Safe";
-
-    if (result.success) {
-      attendance = result.data.percentage;
-      absence = 100 - attendance;
-
-      if (absence >= 25) status = "Deprived";
-      else if (absence >= 20) status = "Second Warning";
-      else if (absence >= 10) status = "First Warning";
-    }
-
-    return {
-      ...course,
-      attendance,
-      absence,
-      status,
-      attendanceDetails: result.success ? result.data : null
-    };
-  })
-);
+      const updatedCourses = await Promise.all(
+        courses.map(async (course) => {
+          const result = await calculateStudentAttendance(course.id, auth.currentUser.uid);
+          return {
+            ...course,
+            attendance: result.success ? result.data.percentage : "0",
+            attendanceDetails: result.success ? result.data : null
+          };
+        })
+      );
 
       setCoursesWithAttendance(updatedCourses);
       setWarningCourses(updatedCourses.filter(c => getAttendanceStatus(c.attendance) === "warning"));
       setDangerCourses(updatedCourses.filter(c => getAttendanceStatus(c.attendance) === "danger"));
-      const warningCourses = updatedCourses.filter(course => {
-        const absence = 100 - parseFloat(course.attendance);
 
-        return absence > 10;
-      });
+      // بعت notifications مرة واحدة بس في الجلسة
+      const uid = auth.currentUser?.uid;
+      if (uid && !notificationsSentRef.current) {
+        notificationsSentRef.current = true;
 
-      setLowAttendanceWarnings(warningCourses);
+        const coursesToNotify = updatedCourses.filter(c => {
+          const status = getAttendanceStatus(c.attendance);
+          return status === "danger" || status === "warning";
+        });
+
+        for (const c of coursesToNotify) {
+          const status = getAttendanceStatus(c.attendance);
+          const absencePct = (100 - parseFloat(c.attendance)).toFixed(1);
+          await sendAttendanceNotification(uid, c, absencePct, status);
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
       setLoadingAttendance(false);
     };
 
     fetchAttendanceForCourses();
-  }, [courses, studentData.studentId]);
+  }, [courses]);
 
   const handleLogout = async () => {
     try {
@@ -223,19 +258,11 @@ const StudentProfile = () => {
           ☰
         </div>
 
-        <button
-          onClick={handleLogout}
-          style={{
-            backgroundColor: "#173B66",
-            color: "white",
-            border: "none",
-            padding: "10px 24px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            fontWeight: "600",
-            fontSize: "14px"
-          }}
-        >
+        <button onClick={handleLogout} style={{
+          backgroundColor: "#173B66", color: "white", border: "none",
+          padding: "10px 24px", borderRadius: "8px", cursor: "pointer",
+          fontWeight: "600", fontSize: "14px"
+        }}>
           Log Out
         </button>
       </div>

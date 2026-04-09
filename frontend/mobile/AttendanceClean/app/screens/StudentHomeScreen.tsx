@@ -9,11 +9,11 @@ import {
 } from "react-native";
 import { signOut } from "firebase/auth";
 import { auth, db } from "../firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, getDocs } from "firebase/firestore";
 import { AuthContext } from "../context/AuthContext";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 
-
-import {Ionicons} from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { getUnreadCount } from "../services/notificationService";
 
 type Student = {
@@ -31,7 +31,7 @@ export default function StudentHomeScreen({ navigation }: any) {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  
+
   const [unreadCount, setUnreadCount] = useState(0);
 
   const authContext = useContext(AuthContext);
@@ -71,15 +71,18 @@ export default function StudentHomeScreen({ navigation }: any) {
 
   // ✅ load unread notifications
   useEffect(() => {
-    const loadUnreadCount = async () => {
+    const fetchUnread = async () => {
       const user = auth.currentUser;
       if (!user) return;
-
-      const count = await getUnreadCount(user.uid);
-      setUnreadCount(count);
+      const q = query(
+        collection(db, "notifications"),
+        where("userId", "==", user.uid),
+        where("read", "==", false)
+      );
+      const snap = await getDocs(q);
+      setUnreadCount(snap.size);
     };
-
-    loadUnreadCount();
+    fetchUnread();
   }, []);
 
   const handleLogout = async () => {
@@ -143,11 +146,12 @@ export default function StudentHomeScreen({ navigation }: any) {
           onPress={() => navigation.navigate("Notifications")}
           style={styles.notificationButton}
         >
-          <Ionicons name="notifications-outline" size={26} color="#173B66" />
-
+          <Text style={{ fontSize: 26 }}>🔔</Text>
           {unreadCount > 0 && (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{unreadCount}</Text>
+              <Text style={styles.badgeText}>
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </Text>
             </View>
           )}
         </TouchableOpacity>
@@ -245,20 +249,23 @@ const styles = StyleSheet.create({
 
   notificationButton: {
     position: "relative",
-    padding: 8,
+    padding: 6,
     marginRight: 10,
   },
 
   badge: {
     position: "absolute",
-    top: 2,
-    right: 2,
-    backgroundColor: "#FF6B6B",
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: "center",
+    top: -2,
+    right: -2,
+    backgroundColor: "#EF4444",
+    borderRadius: 999,
+    minWidth: 20,
+    height: 20,
     alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: "white",
   },
 
   badgeText: {
@@ -269,12 +276,14 @@ const styles = StyleSheet.create({
 
   logoutButton: {
     backgroundColor: "#173B66",
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 8,
   },
 
   logoutText: {
     color: "white",
+    fontSize: 14,
     fontWeight: "700",
   },
 

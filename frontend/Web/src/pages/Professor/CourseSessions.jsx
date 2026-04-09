@@ -44,7 +44,7 @@ const CourseSessions = () => {
   const [filter, setFilter] = useState("active");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const timers = useCountdown(sessions);
-  const activeSessions = sessions.filter(s => s.active === true);
+  const activeSessions = sessions.filter(s => s.active === true || s.isActive == true);
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -89,11 +89,10 @@ const CourseSessions = () => {
   };
 
   const filtered = sessions.filter((s) => {
-    if (filter === "active") return s.active === true;
-    if (filter === "closed") return s.active === false;
+    if (filter === "active") return s.active === true || s.isActive === true;
+    if (filter === "closed") return s.active === false && s.isActive !== true;
     return true;
   });
-
   // Group by courseCode
   const grouped = filtered.reduce((acc, session) => {
     const key = session.courseCode || "Unknown";
@@ -155,7 +154,7 @@ const CourseSessions = () => {
           Course Sessions
         </h1>
 
-        {activeSessions.length > 0 && filter === "active" && (
+        {activeSessions.length > 0 && (
           <div style={{
             backgroundColor: "#ECFDF5", border: "1px solid #6EE7B7",
             borderRadius: "12px", padding: "18px 24px", marginBottom: "30px"
@@ -166,7 +165,8 @@ const CourseSessions = () => {
             <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
               {activeSessions.map(s => {
                 const ms = timers[s.id] ?? null;
-                const urgent = ms !== null && ms < 120000;
+                const isActive = s.active === true || s.isActive === true;
+                const urgent = ms !== null && ms < 120000 && isActive;
                 return (
                   <div key={s.id} style={{
                     backgroundColor: "white", borderRadius: "10px",

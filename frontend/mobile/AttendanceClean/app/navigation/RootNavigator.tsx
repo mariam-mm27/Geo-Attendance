@@ -10,8 +10,6 @@ import StudentHomeScreen from "../screens/StudentHomeScreen";
 import ProfessorHomeScreen from "../screens/ProfessorHomeScreen";
 import ScanQRScreen from "../screens/ScanQRScreen";
 import { useAuth } from "../context/AuthContext";
-
-
 import NotificationsScreen from '../screens/NotificationsScreen';
 
 const Stack = createNativeStackNavigator();
@@ -26,6 +24,7 @@ function AuthStack() {
       <Stack.Screen name="Register" component={RegisterScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 }
