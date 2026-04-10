@@ -10,6 +10,17 @@ import {
   getDocs,
 } from "firebase/firestore";
 
+export const isSessionLiveNow = (session: any) => {
+  const now = new Date();
+
+  const createdAt = session.createdAt?.toDate?.() || session.createdAt;
+  const duration = session.duration || 10;
+
+  const expiresAt = new Date(createdAt.getTime() + duration * 60 * 1000);
+
+  return now >= createdAt && now <= expiresAt;
+};
+
 /**
  * Record attendance for a scanned dynamic QR
  * QR format: SESSION-XXXXX-N (dynamic part N)
@@ -48,10 +59,9 @@ export const recordAttendance = async (scannedQRValue: string) => {
     if (sessionData.active === false) return { success: false, message: "Session Expired" };
 
     // Check session expiry (duration in minutes)
-    const createdAt = sessionData.createdAt?.toDate();
-    const duration = sessionData.duration || 10; // default 10 minutes
-    const expiresAt = new Date(createdAt.getTime() + duration * 60 * 1000);
-    if (new Date() > expiresAt) return { success: false, message: "Session Expired" };
+    if (!isSessionLiveNow(sessionData)) {
+  return { success: false, message: "Session is not active now" };
+}
 
     // Check for duplicate attendance
     const attendanceQuery = query(
@@ -244,5 +254,40 @@ export const getCourseReport = async (courseId: string) => {
   } catch (error) {
     console.error("Error generating report:", error);
     return null;
+  }
+};
+export const getActiveSessionsForProfessor = async (professorId: string) => {
+  try {
+    const q = query(
+      collection(db, "sessions"),
+      where("professorId", "==", professorId)
+    );
+
+    const snap = await getDocs(q);
+
+    const activeSessions: any[] = [];
+
+    snap.forEach((doc) => {
+      const data = doc.data();
+
+      if (isSessionLiveNow(data)) {
+        activeSessions.push({
+          id: doc.id,
+          ...data
+        });
+      }
+    });
+
+    return {
+      success: true,
+      data: activeSessions
+    };
+
+  } catch (error: any) {
+    console.error("Error fetching sessions:", error);
+    return {
+      success: false,
+      error: error.message
+    };
   }
 };
