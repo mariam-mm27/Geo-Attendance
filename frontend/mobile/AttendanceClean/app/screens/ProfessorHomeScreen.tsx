@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+  import React, { useState, useEffect, useContext } from "react";
 import {
   View,
   Text,
@@ -15,12 +15,16 @@ import { auth, db } from "../firebase";
 import { collection, getDocs, doc, getDoc, addDoc } from "firebase/firestore";
 import { AuthContext } from "../context/AuthContext";
 import { getCourseReport } from "../services/attendanceService";
-
+import { getActiveSessionsForProfessor , isSessionLiveNow } from "../services/attendanceService";
+import { filterCoursesByCurrentTime } from "../services/attendanceService";
+ 
 interface Course {
   id: string;
   name: string;
   code: string;
+  schedule?: { startTime: string; endTime: string }[];
 }
+
 
 interface ActiveSession {
   sessionId: string;
@@ -41,7 +45,7 @@ export default function ProfessorSessionScreen({ navigation }: any) {
   const [lectureCounters, setLectureCounters] = useState<Record<string, number>>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [courseReport, setCourseReport] = useState<any>(null);
-
+const [activeSessionsList, setActiveSessionsList] = useState<any[]>([]);
   const authContext = useContext(AuthContext);
   if (!authContext) return null;
   const { setUser, setRole } = authContext;
@@ -69,14 +73,19 @@ export default function ProfessorSessionScreen({ navigation }: any) {
               courseProfEmail === userEmail
             ) {
               professorCourses.push({
-                id: docSnap.id,
-                name: courseData.name,
-                code: courseData.code,
-              });
+              id: docSnap.id,
+              name: courseData.name,
+              code: courseData.code,
+              schedule: courseData.schedule || [],
+});
+            
+
             }
           });
 
-          setCourses(professorCourses);
+          const filteredCourses = filterCoursesByCurrentTime(professorCourses);
+          setCourses(filteredCourses);
+
         }
       } catch (error) {
         console.error(error);
@@ -88,6 +97,20 @@ export default function ProfessorSessionScreen({ navigation }: any) {
 
     fetchUserAndCourses();
   }, [navigation]);
+useEffect(() => {
+  const fetchActiveSessions = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+   const result = await getActiveSessionsForProfessor(user.uid);
+
+if (result.success) {
+  setActiveSessionsList(result.data ?? []);
+}
+  };
+
+  fetchActiveSessions();
+}, []);
 
   useEffect(() => {
   const fetchReport = async () => {
@@ -101,7 +124,7 @@ export default function ProfessorSessionScreen({ navigation }: any) {
 }, [selectedCourseId]);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+let timer: ReturnType<typeof setInterval>;
     if (timeLeft > 0) {
       timer = setInterval(() => {
         setTimeLeft((prev) => prev - 1);
@@ -270,28 +293,8 @@ export default function ProfessorSessionScreen({ navigation }: any) {
       </TouchableOpacity>
     </View>
 
-    {/* Course Report */}
-    {selectedCourseId && courseReport && (
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Course Report</Text>
 
-        <Text style={styles.infoText}>
-          Total Students: {courseReport.totalStudents}
-        </Text>
-
-        <Text style={styles.infoText}>
-          Total Sessions: {courseReport.totalSessions}
-        </Text>
-
-        <Text style={styles.infoText}>
-          Average Attendance: {courseReport.averageAttendance}%
-        </Text>
-
-        <Text style={styles.infoText}>
-          Absent Students (&lt;75%): {courseReport.absentStudents}
-        </Text>
-      </View>
-    )}
+   
   </>
 ) : (
   <View style={styles.card}>

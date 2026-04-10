@@ -9,16 +9,23 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
-
 export const isSessionLiveNow = (session: any) => {
   const now = new Date();
 
-  const createdAt = session.createdAt?.toDate?.() || session.createdAt;
+  const createdAt =
+    session.createdAt?.toDate?.() || new Date(session.createdAt);
+
   const duration = session.duration || 10;
 
-  const expiresAt = new Date(createdAt.getTime() + duration * 60 * 1000);
+  const expiresAt = new Date(
+    createdAt.getTime() + duration * 60 * 1000
+  );
 
-  return now >= createdAt && now <= expiresAt;
+  return (
+    session.active === true &&
+    now >= createdAt &&
+    now <= expiresAt
+  );
 };
 
 /**
@@ -253,14 +260,21 @@ export const getCourseReport = async (courseId: string) => {
 
   } catch (error) {
     console.error("Error generating report:", error);
-    return null;
+
+    return {
+      totalStudents: 0,
+      totalSessions: 0,
+      averageAttendance: 0,
+      absentStudents: 0,
+    };
   }
 };
 export const getActiveSessionsForProfessor = async (professorId: string) => {
   try {
     const q = query(
       collection(db, "sessions"),
-      where("professorId", "==", professorId)
+      where("professorId", "==", professorId),
+      where("active", "==", true)
     );
 
     const snap = await getDocs(q);
@@ -273,21 +287,47 @@ export const getActiveSessionsForProfessor = async (professorId: string) => {
       if (isSessionLiveNow(data)) {
         activeSessions.push({
           id: doc.id,
-          ...data
+          ...data,
         });
       }
     });
 
     return {
       success: true,
-      data: activeSessions
+      data: activeSessions,
     };
-
   } catch (error: any) {
-    console.error("Error fetching sessions:", error);
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
+};
+export const filterCoursesByCurrentTime = (courses: any[]) => {
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  return courses.filter((course: any) => {
+    if (!course.schedule || !Array.isArray(course.schedule)) return false;
+
+    return course.schedule.some((slot: any) => {
+      const parseTime = (t: string) => {
+        const clean = t.replace(/"/g, "").trim();
+        const [h, m] = clean.split(":").map(Number);
+        return h * 60 + m;
+      };
+
+      const start = parseTime(slot.startTime);
+      const end = parseTime(slot.endTime);
+
+      // حالة عادية: 10:00 - 12:00
+      if (end > start) {
+        return currentMinutes >= start && currentMinutes <= end;
+      }
+
+      // حالة midnight: 22:00 - 00:00
+      // end بيبقى 0 أو أصغر من start
+      return currentMinutes >= start || currentMinutes <= end;
+    });
+  });
 };
