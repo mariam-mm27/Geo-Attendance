@@ -1,9 +1,22 @@
 import { useState, useEffect } from "react";
-import { auth, db } from "../../firebase";
+import { auth } from "../../firebase";
 import { signOut } from "firebase/auth";
-import { collection, getDocs, addDoc, deleteDoc, doc, getDoc, onSnapshot } from "firebase/firestore";
-import { FaUserGraduate, FaChalkboardTeacher, FaSignOutAlt, FaPlus, FaUserShield } from "react-icons/fa";
 import { useNavigate, useSearchParams } from "react-router-dom";
+
+import {
+  getProfessors,
+  addProfessor,
+  deleteProfessor,
+  getStudents,
+  addStudent,
+  deleteStudent,
+  getCourses,
+  addCourse,
+  deleteCourse
+} from "../../services/adminService";
+
+import { FaUserGraduate, FaChalkboardTeacher, FaSignOutAlt, FaUserShield } from "react-icons/fa";
+
 import UsersTable from "./UsersTable";
 import SubjectsTable from "./SubjectsTable";
 import AddModal from "./AddModal";
@@ -11,374 +24,191 @@ import Modal from "../../components/Modal";
 import { useModal } from "../../hooks/useModal";
 import AttendanceLogs from "./AttendanceLogs";
 
-
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const tabFromUrl = searchParams.get('tab') || 'professors';
+  const tabFromUrl = searchParams.get("tab") || "professors";
+
   const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [showModal, setShowModal] = useState(false);
+
   const [profs, setProfs] = useState([]);
   const [students, setStudents] = useState([]);
   const [courses, setCourses] = useState([]);
+
   const [adminInfo, setAdminInfo] = useState({
     name: "Loading...",
     email: auth.currentUser?.email || ""
   });
+
   const [loading, setLoading] = useState(true);
+
   const { modalState, closeModal, showSuccess, showError, showWarning } = useModal();
   const [confirmAction, setConfirmAction] = useState(null);
 
+  
   useEffect(() => {
-    // Aggressive back button prevention
-    const preventBack = () => {
-      window.history.forward();
-    };
-
-    // Push multiple states to make it harder to go back
-    window.history.pushState(null, null, window.location.href);
-    window.history.pushState(null, null, window.location.href);
-    window.history.pushState(null, null, window.location.href);
-
-    window.addEventListener('popstate', preventBack);
-
-    setTimeout(preventBack, 0);
-
-    return () => {
-      window.removeEventListener('popstate', preventBack);
-    };
-  }, []);
-
-  useEffect(() => {
-    const fetchAdminInfo = async (user) => {
+    const fetchData = async () => {
       try {
-        if (user) {
-          const userEmail = user.email;
-
-          try {
-            const usersSnapshot = await getDocs(collection(db, "users"));
-            let foundUser = null;
-            let foundDoc = null;
-
-            usersSnapshot.forEach((docSnap) => {
-              const userData = docSnap.data();
-              const userDocEmail = (userData.Email || userData.email || "").toLowerCase();
-              const loginEmail = userEmail.toLowerCase();
-
-              if (userDocEmail === loginEmail) {
-                foundUser = userData;
-                foundDoc = docSnap;
-                console.log("MATCHED! Name:", userData.Name, "Email:", userData.Email);
-                console.log("All keys:", Object.keys(userData));
-              }
-            });
-
-            if (foundUser && foundDoc) {
-              const freshData = foundDoc.data();
-              let displayName = freshData.Name || freshData.name;
-
-              if (!displayName && userEmail === "mariamhany31017@gmail.com") {
-                console.log("Name field missing for mariamhany31017, needs to be added in Firestore");
-                displayName = "Mariam Hany Hussien";
-              }
-
-              if (!displayName) {
-                displayName = userEmail.split('@')[0];
-              }
-
-              console.log("Fresh data Name:", freshData.Name);
-              console.log("Display name:", displayName);
-
-              setAdminInfo({
-                name: displayName,
-                email: userEmail
-              });
-            } else {
-              console.log("No match found for:", userEmail, "Trying UID...");
-              const adminDoc = await getDoc(doc(db, "users", user.uid));
-              if (adminDoc.exists()) {
-                const data = adminDoc.data();
-                console.log("Found by UID:", data.Name);
-                setAdminInfo({
-                  name: data.Name || data.name || userEmail.split('@')[0],
-                  email: userEmail
-                });
-              } else {
-                console.log("Not found by UID, using email username");
-                setAdminInfo({
-                  name: userEmail.split('@')[0],
-                  email: userEmail
-                });
-              }
-            }
-          } catch (firestoreError) {
-            console.error("Firestore error:", firestoreError);
-            setAdminInfo({
-              name: user.displayName || userEmail.split('@')[0],
-              email: userEmail
-            });
-          }
-        } else {
-          navigate("/login", { replace: true });
-        }
+        const data = await getProfessors();
+        setProfs(data);
       } catch (error) {
-        console.error("Error fetching admin info:", error);
-      }
-    };
-
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) {
-        fetchAdminInfo(user);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [navigate]);
-
-  useEffect(() => {
-    const fetchProfessors = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "professors"));
-        const professorsData = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setProfs(professorsData);
-      } catch (error) {
-        console.error("Error fetching professors:", error);
-        setProfs([]);
+        console.error(error);
       } finally {
         setLoading(false);
       }
     };
-    fetchProfessors();
+
+    fetchData();
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "students"), (snapshot) => {
-      const studentsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setStudents(studentsData);
-    }, (error) => {
-      console.error("Error fetching students:", error);
-      setStudents([]);
-    });
+    const fetchData = async () => {
+      try {
+        const data = await getStudents();
+        setStudents(data);
+      } catch (error) {
+        console.error(error);
+      }
+    };
 
-    return () => unsubscribe();
+    fetchData();
   }, []);
 
+  
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "courses"), (snapshot) => {
-      const coursesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setCourses(coursesData);
-    }, (error) => {
-      console.error("Error fetching courses:", error);
-      setCourses([]);
-    });
+    const fetchData = async () => {
+      try {
+        const data = await getCourses();
+        setCourses(data);
+      } catch (error) {
+        console.error(error);
+      }
+    };
 
-    return () => unsubscribe();
+    fetchData();
   }, []);
 
+  
   const handleLogout = async () => {
-    try {
-      await signOut(auth);
-
-      localStorage.clear();
-      sessionStorage.clear();
-
-      window.history.replaceState(null, '', '/login');
-
-      navigate("/login", { replace: true });
-      window.location.href = "/login";
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
+    await signOut(auth);
+    navigate("/login", { replace: true });
   };
 
-  const handleAddProfessor = async (newProf) => {
-    try {
-      const docRef = await addDoc(collection(db, "professors"), newProf);
-      setProfs([...profs, { id: docRef.id, ...newProf }]);
-    } catch (error) {
-      console.error("Error adding professor:", error);
-    }
+  
+  const handleAddProfessor = async (data) => {
+    await addProfessor(data);
+    setProfs(await getProfessors());
   };
 
-  const handleAddStudent = async (newStudent) => {
-    try {
-      const docRef = await addDoc(collection(db, "students"), newStudent);
-      setStudents([...students, { id: docRef.id, ...newStudent }]);
-      showSuccess("Student added successfully!");
-    } catch (error) {
-      console.error("Error adding student:", error);
-      showError("Failed to add student");
-    }
+  const handleAddStudent = async (data) => {
+    await addStudent(data);
+    setStudents(await getStudents());
+    showSuccess("Student added successfully!");
+  };
+
+  const handleAddCourse = async (data) => {
+    await addCourse(data);
+    setCourses(await getCourses());
+    showSuccess("Course added successfully!");
   };
 
   const handleDeleteProfessor = async (id) => {
-    try {
-      await deleteDoc(doc(db, "professors", id));
-      setProfs(profs.filter(prof => prof.id !== id));
-      showSuccess("Professor deleted successfully!");
-    } catch (error) {
-      console.error("Error deleting professor:", error);
-      showError("Failed to delete professor");
-    }
+    await deleteProfessor(id);
+    setProfs(profs.filter((p) => p.id !== id));
   };
 
   const handleDeleteStudent = async (id) => {
-    try {
-      await deleteDoc(doc(db, "students", id));
-      setStudents(students.filter(student => student.id !== id));
-      showSuccess("Student deleted successfully!");
-    } catch (error) {
-      console.error("Error deleting student:", error);
-      showError("Failed to delete student");
-    }
-  };
-
-  const handleAddCourse = async (newCourse) => {
-    try {
-      const docRef = await addDoc(collection(db, "courses"), newCourse);
-      setCourses([...courses, { id: docRef.id, ...newCourse }]);
-      showSuccess("Course added successfully!");
-    } catch (error) {
-      console.error("Error adding course:", error);
-      showError("Failed to add course");
-    }
+    await deleteStudent(id);
+    setStudents(students.filter((s) => s.id !== id));
   };
 
   const handleDeleteCourse = async (id) => {
-    try {
-      await deleteDoc(doc(db, "courses", id));
-      setCourses(courses.filter(course => course.id !== id));
-      showSuccess("Course deleted successfully!");
-    } catch (error) {
-      console.error("Error deleting course:", error);
-      showError("Failed to delete course");
-    }
+    await deleteCourse(id);
+    setCourses(courses.filter((c) => c.id !== id));
   };
 
-  const handleConfirmDelete = (id, name, type = 'professor') => {
-    const itemType = type === 'course' ? 'course' : type === 'student' ? 'student' : 'professor';
-    setConfirmAction({ id, name, type: itemType });
+  const handleConfirmDelete = (id, name, type = "professor") => {
+    setConfirmAction({ id, name, type });
 
     showWarning(
       `Are you sure you want to delete ${name}?`,
-      `Delete ${itemType.charAt(0).toUpperCase() + itemType.slice(1)}`,
+      "Confirm Delete",
       () => {
-        if (itemType === 'professor') {
-          handleDeleteProfessor(id);
-        } else if (itemType === 'student') {
-          handleDeleteStudent(id);
-        } else if (itemType === 'course') {
-          handleDeleteCourse(id);
-        }
-        setConfirmAction(null);
+        if (type === "professor") handleDeleteProfessor(id);
+        if (type === "student") handleDeleteStudent(id);
+        if (type === "course") handleDeleteCourse(id);
       }
     );
   };
 
   if (loading) {
-    return <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>Loading...</div>;
+    return <div>Loading...</div>;
   }
 
   return (
     <div style={{ display: "flex", height: "100vh", background: "#F8FAFC" }}>
-      <nav style={styles.sidebar}>
-        <div style={styles.adminPanelTitle}>
-          <h2 style={{ margin: 0, color: "#173B66", fontSize: "20px", fontWeight: "bold", textAlign: "center" }}>
-            Admin Panel
-          </h2>
-        </div>
-        <div style={styles.adminProfile}>
-          <FaUserShield size={40} color="#173B66" />
-          <h3 style={{ margin: "10px 0 5px", color: "#173B66", fontSize: "18px", fontWeight: "bold" }}>
-            {adminInfo.name || auth.currentUser?.email?.split('@')[0] || "Loading..."}
-          </h3>
-          <p style={{ margin: 0, fontSize: "13px", color: "#64748b", wordBreak: "break-word" }}>
-            {adminInfo.email || auth.currentUser?.email || ""}
-          </p>
-        </div>
-        <div onClick={() => setActiveTab("professors")} style={styles.navItem(activeTab === "professors")}>
-          <FaChalkboardTeacher style={{ marginRight: "8px" }} /> Professors
-        </div>
-        <div onClick={() => setActiveTab("students")} style={styles.navItem(activeTab === "students")}>
-          <FaUserGraduate style={{ marginRight: "8px" }} /> Students
-        </div>
-        <div onClick={() => setActiveTab("courses")} style={styles.navItem(activeTab === "courses")}>
-          <FaChalkboardTeacher style={{ marginRight: "8px" }} /> Courses
-        </div>
-        <div onClick={() => setActiveTab("logs")} style={styles.navItem(activeTab === "logs")}>
-          📊 Attendance Logs
-        </div>
-        <button onClick={handleLogout} style={styles.logoutBtn}>
-          <FaSignOutAlt style={{ marginRight: "8px" }} /> Log Out
+      
+      {/* Sidebar */}
+      <nav style={{ width: "260px", background: "#fff", padding: "20px" }}>
+        <h2>Admin Panel</h2>
+
+        <div onClick={() => setActiveTab("professors")}>Professors</div>
+        <div onClick={() => setActiveTab("students")}>Students</div>
+        <div onClick={() => setActiveTab("courses")}>Courses</div>
+        <div onClick={() => setActiveTab("logs")}>Attendance Logs</div>
+
+        <button onClick={handleLogout}>
+          <FaSignOutAlt /> Logout
         </button>
       </nav>
 
-      <main style={{ flex: 1, padding: "40px", overflow: "auto" }}>
-        <div style={styles.header}>
-          <h1 style={{ color: "#173B66", margin: 0, fontSize: "28px" }}>
-            {activeTab === "logs"
-              ? "Attendance Logs"
-              : `Manage ${activeTab === "professors"
-                ? "Professors"
-                : activeTab === "students"
-                  ? "Students"
-                  : "Courses"
-              }`}
-          </h1>
-          {activeTab === "logs" ? (
-            <AttendanceLogs allCourses={courses} />
-          ) : activeTab === "professors" ? (
-            <SubjectsTable
-              data={profs}
-              onDelete={handleDeleteProfessor}
-              allCourses={courses}
-              onConfirmDelete={(id, name) => handleConfirmDelete(id, name, 'professor')}
-            />
-          ) : activeTab === "students" ? (
-            <UsersTable
-              data={students}
-              onDelete={handleDeleteStudent}
-              allCourses={courses}
-              onConfirmDelete={(id, name) => handleConfirmDelete(id, name, 'student')}
-            />
-          ) : (
-            <UsersTable
-              data={courses}
-              onDelete={handleDeleteCourse}
-              type="courses"
-              onConfirmDelete={(id, name) => handleConfirmDelete(id, name, 'course')}
-            />
-          )}
-          
-        </div>
+      {/* Main */}
+      <main style={{ flex: 1, padding: "40px" }}>
+        
+        <h1>
+          {activeTab === "logs"
+            ? "Attendance Logs"
+            : `Manage ${activeTab}`}
+        </h1>
+
+        {activeTab === "logs" ? (
+          <AttendanceLogs allCourses={courses} />
+        ) : activeTab === "professors" ? (
+          <SubjectsTable
+            data={profs}
+            onDelete={handleDeleteProfessor}
+            onConfirmDelete={(id, name) => handleConfirmDelete(id, name, "professor")}
+          />
+        ) : activeTab === "students" ? (
+          <UsersTable
+            data={students}
+            onDelete={handleDeleteStudent}
+            onConfirmDelete={(id, name) => handleConfirmDelete(id, name, "student")}
+          />
+        ) : (
+          <UsersTable
+            data={courses}
+            onDelete={handleDeleteCourse}
+            onConfirmDelete={(id, name) => handleConfirmDelete(id, name, "course")}
+          />
+        )}
       </main>
+
+      {/* Modal */}
       {showModal && (
         <AddModal
           type={activeTab}
           onClose={() => setShowModal(false)}
-          onAdd={(newItem) => {
-            if (activeTab === "professors") {
-              handleAddProfessor(newItem);
-            } else if (activeTab === "students") {
-              handleAddStudent(newItem);
-            } else {
-              handleAddCourse(newItem);
-            }
+          onAdd={(data) => {
+            if (activeTab === "professors") handleAddProfessor(data);
+            if (activeTab === "students") handleAddStudent(data);
+            if (activeTab === "courses") handleAddCourse(data);
             setShowModal(false);
           }}
-          professors={profs}
-          onShowWarning={(message) => showWarning(message)}
         />
       )}
+
       <Modal
         isOpen={modalState.isOpen}
         onClose={closeModal}
@@ -391,53 +221,5 @@ const AdminDashboard = () => {
     </div>
   );
 };
-const styles = {
-  sidebar: { width: "260px", background: "#fff", borderRight: "1px solid #e2e8f0", padding: "20px", display: "flex", flexDirection: "column" },
-  adminPanelTitle: {
-    textAlign: "center",
-    marginBottom: "20px",
-    paddingBottom: "15px",
-    borderBottom: "2px solid #173B66"
-  },
-  adminProfile: { textAlign: "center", marginBottom: "30px", paddingBottom: "20px", borderBottom: "1px solid #e2e8f0" },
-  navItem: (active) => ({
-    padding: "12px",
-    cursor: "pointer",
-    background: active ? "#F1F5F9" : "transparent",
-    color: "#173B66",
-    fontWeight: "bold",
-    borderRadius: "8px",
-    marginBottom: "5px",
-    display: "flex",
-    alignItems: "center",
-    transition: "background 0.2s"
-  }),
-  header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" },
-  addBtn: {
-    background: "#173B66",
-    color: "white",
-    padding: "10px 20px",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    fontSize: "14px",
-    fontWeight: "bold"
-  },
-  logoutBtn: {
-    marginTop: "auto",
-    background: "#173B66",
-    color: "white",
-    padding: "12px",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: "bold"
-  },
-  card: { background: "white", padding: "20px", borderRadius: "12px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }
-};
+
 export default AdminDashboard;
