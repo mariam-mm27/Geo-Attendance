@@ -1,4 +1,3 @@
-
 import { db } from "../firebase";
 import {
   collection,
@@ -6,7 +5,9 @@ import {
   addDoc,
   deleteDoc,
   doc,
-  getDoc
+  getDoc,
+  query,
+  where
 } from "firebase/firestore";
 
 
@@ -59,5 +60,20 @@ export const deleteCourse = (id) =>
 
 
 
-export const getUserById = (uid) =>
-  getDoc(doc(db, "users", uid));
+export const getUserByStudentId = async (studentId) => {
+  const q = query(
+    collection(db, "users"),
+    where("studentId", "==", studentId)
+  );
+
+  const snapshot = await getDocs(q);
+
+  if (snapshot.empty) {
+    return null;
+  }
+
+  return {
+    id: snapshot.docs[0].id,
+    ...snapshot.docs[0].data()
+  };
+};

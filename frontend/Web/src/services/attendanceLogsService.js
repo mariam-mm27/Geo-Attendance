@@ -29,6 +29,7 @@ export const searchStudentLogs = async (studentId) => {
       ...userDoc.data()
     };
 
+    
     const attSnap = await getDocs(
       query(collection(db, "attendance"), where("studentId", "==", uid))
     );
@@ -38,14 +39,25 @@ export const searchStudentLogs = async (studentId) => {
         const data = d.data();
 
         let sessionInfo = {};
-        const sessSnap = await getDocs(
-          query(collection(db, "sessions"), where("sessionId", "==", data.sessionId))
-        );
-        if (!sessSnap.empty) sessionInfo = sessSnap.docs[0].data();
+        if (data.sessionId) {
+          const sessSnap = await getDocs(
+            query(
+              collection(db, "sessions"),
+              where("sessionId", "==", data.sessionId)
+            )
+          );
+          if (!sessSnap.empty) {
+            sessionInfo = sessSnap.docs[0].data();
+          }
+        }
 
         let courseName = data.courseId;
+
         if (data.courseId) {
-          const courseSnap = await getDoc(doc(db, "courses", data.courseId));
+          const courseSnap = await getDoc(
+            doc(db, "courses", data.courseId)
+          );
+
           if (courseSnap.exists()) {
             courseName = courseSnap.data().name || courseName;
           }
@@ -61,8 +73,10 @@ export const searchStudentLogs = async (studentId) => {
       })
     );
 
-    logs.sort((a, b) =>
-      (b.recordedAt?.seconds ?? 0) - (a.recordedAt?.seconds ?? 0)
+    logs.sort(
+      (a, b) =>
+        (b.recordedAt?.seconds ?? 0) -
+        (a.recordedAt?.seconds ?? 0)
     );
 
     return {
