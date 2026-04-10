@@ -11,7 +11,9 @@ const EditCourse = () => {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [room, setRoom] = useState("");
-  const [time, setTime] = useState("");
+  const [timeHour, setTimeHour] = useState("09");
+  const [timeMinute, setTimeMinute] = useState("00");
+  const [timePeriod, setTimePeriod] = useState("AM");
   const [duration, setDuration] = useState("");
   const [professorId, setProfessorId] = useState("");
   const [professors, setProfessors] = useState([]);
@@ -21,16 +23,23 @@ const EditCourse = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch course details
         const courseDoc = await getDoc(doc(db, "courses", courseId));
         if (courseDoc.exists()) {
           const courseData = courseDoc.data();
           setName(courseData.name || "");
           setCode(courseData.code || "");
           setRoom(courseData.room || "");
-          setTime(courseData.time || "");
           setDuration(courseData.duration || "");
           setProfessorId(courseData.professorId || "");
+
+          // Parse existing time string e.g. "09:00 AM"
+          const existingTime = courseData.time || "";
+          const match = existingTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+          if (match) {
+            setTimeHour(match[1].padStart(2, "0"));
+            setTimeMinute(match[2]);
+            setTimePeriod(match[3].toUpperCase());
+          }
         }
 
         const profsSnapshot = await getDocs(collection(db, "professors"));
@@ -64,10 +73,6 @@ const EditCourse = () => {
       showWarning("Please enter a room");
       return;
     }
-    if (!time.trim()) {
-      showWarning("Please enter a time");
-      return;
-    }
     if (!duration.trim()) {
       showWarning("Please enter a duration");
       return;
@@ -80,12 +85,12 @@ const EditCourse = () => {
     try {
       const selectedProf = professors.find(p => p.id === professorId);
       const courseRef = doc(db, "courses", courseId);
-      
+
       await updateDoc(courseRef, {
         name: name.trim(),
         code: code.trim(),
         room: room.trim(),
-        time: time.trim(),
+        time: `${timeHour}:${timeMinute} ${timePeriod}`,
         duration: duration.trim(),
         professorId: professorId,
         professorEmail: selectedProf?.email || "",
@@ -117,64 +122,114 @@ const EditCourse = () => {
 
       <div style={styles.card}>
         <form onSubmit={handleSubmit}>
+
           <div style={styles.formGroup}>
             <label style={styles.label}>Course Name</label>
-            <input 
+            <input
               type="text"
-              placeholder="Course Name" 
+              placeholder="Course Name"
               value={name}
-              onChange={e => setName(e.target.value)} 
-              style={styles.input} 
+              onChange={e => setName(e.target.value)}
+              style={styles.input}
             />
           </div>
 
           <div style={styles.formGroup}>
             <label style={styles.label}>Course Code</label>
-            <input 
+            <input
               type="text"
-              placeholder="Course Code (e.g., CS301)" 
+              placeholder="Course Code (e.g., CS301)"
               value={code}
               onChange={e => setCode(e.target.value)}
-              style={styles.input} 
+              style={styles.input}
             />
           </div>
 
           <div style={styles.formGroup}>
             <label style={styles.label}>Room</label>
-            <input 
+            <input
               type="text"
-              placeholder="Room (e.g., Lab 5)" 
+              placeholder="Room (e.g., Lab 5)"
               value={room}
               onChange={e => setRoom(e.target.value)}
-              style={styles.input} 
+              style={styles.input}
             />
           </div>
 
+          {/* Time Picker */}
           <div style={styles.formGroup}>
             <label style={styles.label}>Time</label>
-            <input 
-              type="text"
-              placeholder="Time (e.g., 09:00 AM - 11:00 AM)" 
-              value={time}
-              onChange={e => setTime(e.target.value)}
-              style={styles.input} 
-            />
+            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+
+              {/* Hour */}
+              <div style={{ flex: 1 }}>
+                <label style={styles.subLabel}>Hour</label>
+                <select
+                  value={timeHour}
+                  onChange={e => setTimeHour(e.target.value)}
+                  style={styles.input}
+                >
+                  {Array.from({ length: 12 }, (_, i) =>
+                    String(i + 1).padStart(2, "0")
+                  ).map(h => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+              </div>
+
+              <span style={{ fontSize: "24px", fontWeight: "700", color: "#173B66", marginTop: "18px" }}>
+                :
+              </span>
+
+              {/* Minute */}
+              <div style={{ flex: 1 }}>
+                <label style={styles.subLabel}>Minute</label>
+                <select
+                  value={timeMinute}
+                  onChange={e => setTimeMinute(e.target.value)}
+                  style={styles.input}
+                >
+                  {["00", "15", "30", "45"].map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* AM/PM */}
+              <div style={{ flex: 1 }}>
+                <label style={styles.subLabel}>AM / PM</label>
+                <select
+                  value={timePeriod}
+                  onChange={e => setTimePeriod(e.target.value)}
+                  style={styles.input}
+                >
+                  <option value="AM">AM</option>
+                  <option value="PM">PM</option>
+                </select>
+              </div>
+
+            </div>
+
+            {/* Preview */}
+            <div style={styles.timePreview}>
+              🕒 Selected time: <strong>{timeHour}:{timeMinute} {timePeriod}</strong>
+            </div>
           </div>
 
           <div style={styles.formGroup}>
             <label style={styles.label}>Duration</label>
-            <input 
+            <input
               type="text"
-              placeholder="Duration (e.g., 2 hours)" 
+              placeholder="Duration (e.g., 2 hours)"
               value={duration}
               onChange={e => setDuration(e.target.value)}
-              style={styles.input} 
+              style={styles.input}
             />
           </div>
 
           <div style={styles.formGroup}>
             <label style={styles.label}>Professor</label>
-            <select 
+            <select
               value={professorId}
               onChange={e => setProfessorId(e.target.value)}
               style={styles.input}
@@ -196,9 +251,11 @@ const EditCourse = () => {
               Cancel
             </button>
           </div>
+
         </form>
       </div>
-      <Modal 
+
+      <Modal
         isOpen={modalState.isOpen}
         onClose={closeModal}
         title={modalState.title}
@@ -212,13 +269,13 @@ const EditCourse = () => {
 };
 
 const styles = {
-  container: { 
-    minHeight: "100vh", 
-    background: "#F8FAFC", 
-    padding: "40px" 
+  container: {
+    minHeight: "100vh",
+    background: "#F8FAFC",
+    padding: "40px"
   },
-  header: { 
-    marginBottom: "30px" 
+  header: {
+    marginBottom: "30px"
   },
   backBtn: {
     background: "#173B66",
@@ -231,15 +288,15 @@ const styles = {
     fontWeight: "bold",
     marginBottom: "20px"
   },
-  title: { 
-    color: "#173B66", 
-    fontSize: "32px", 
-    margin: 0 
+  title: {
+    color: "#173B66",
+    fontSize: "32px",
+    margin: 0
   },
-  card: { 
-    background: "white", 
-    padding: "40px", 
-    borderRadius: "12px", 
+  card: {
+    background: "white",
+    padding: "40px",
+    borderRadius: "12px",
     boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
     maxWidth: "600px"
   },
@@ -253,45 +310,64 @@ const styles = {
     fontWeight: "bold",
     marginBottom: "8px"
   },
-  input: { 
-    width: "100%", 
-    padding: "12px", 
+  subLabel: {
+    display: "block",
+    color: "#64748b",
+    fontSize: "12px",
+    fontWeight: "600",
+    marginBottom: "6px"
+  },
+  input: {
+    width: "100%",
+    padding: "12px",
     border: "1px solid #e2e8f0",
     borderRadius: "8px",
     fontSize: "14px",
-    boxSizing: "border-box"
+    boxSizing: "border-box",
+    backgroundColor: "white",
+    color: "#1E293B",
+    cursor: "pointer"
+  },
+  timePreview: {
+    marginTop: "12px",
+    padding: "10px 16px",
+    backgroundColor: "#F0F9FF",
+    border: "1px solid #E0F2FE",
+    borderRadius: "8px",
+    fontSize: "14px",
+    color: "#173B66"
   },
   buttonGroup: {
     display: "flex",
     gap: "15px",
     marginTop: "30px"
   },
-  saveBtn: { 
+  saveBtn: {
     flex: 1,
-    background: "#173B66", 
-    color: "white", 
-    padding: "14px", 
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: "bold",
-    fontSize: "16px"
-  }, 
-  cancelBtn: { 
-    flex: 1,
-    background: "#e2e8f0", 
-    color: "#64748b",
-    padding: "14px", 
+    background: "#173B66",
+    color: "white",
+    padding: "14px",
     border: "none",
     borderRadius: "8px",
     cursor: "pointer",
     fontWeight: "bold",
     fontSize: "16px"
   },
-  loader: { 
-    display: "flex", 
-    justifyContent: "center", 
-    alignItems: "center", 
+  cancelBtn: {
+    flex: 1,
+    background: "#e2e8f0",
+    color: "#64748b",
+    padding: "14px",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontWeight: "bold",
+    fontSize: "16px"
+  },
+  loader: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
     height: "100vh",
     fontSize: "18px",
     color: "#173B66",
