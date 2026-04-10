@@ -153,6 +153,25 @@ const CourseSessions = () => {
         }}>
           Course Sessions
         </h1>
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            backgroundColor: "white",
+            border: "1px solid #ddd",
+            color: "#173B66",
+            padding: "8px 20px",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontWeight: "600",
+            fontSize: "14px",
+            marginBottom: "30px",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px"
+          }}
+        >
+          ← Back
+        </button>
 
         {activeSessions.length > 0 && (
           <div style={{
