@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+  import React, { useState, useEffect, useContext } from "react";
 import {
   View,
   Text,
@@ -15,13 +15,18 @@ import { signOut } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { collection, getDocs, doc, getDoc, addDoc } from "firebase/firestore";
 import { AuthContext } from "../context/AuthContext";
-
+import { getCourseReport } from "../services/attendanceService";
+import { getActiveSessionsForProfessor , isSessionLiveNow } from "../services/attendanceService";
+import { filterCoursesByCurrentTime } from "../services/attendanceService";
+ 
 interface Course {
   id: string;
   name: string;
   code: string;
+  schedule?: { startTime: string; endTime: string }[];
   time?: string;
 }
+
 
 interface ActiveSession {
   sessionId: string;
@@ -41,11 +46,13 @@ export default function ProfessorSessionScreen({ navigation }: any) {
   const [qrRefreshCounter, setQrRefreshCounter] = useState(0);
   const [lectureCounters, setLectureCounters] = useState<Record<string, number>>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [showTimeModal, setShowTimeModal] = useState(false);
-
+  const [courseReport, setCourseReport] = useState<any>(null);
+const [activeSessionsList, setActiveSessionsList] = useState<any[]>([]);
+const [showTimeModal, setShowTimeModal] = useState(false);
   const authContext = useContext(AuthContext);
   if (!authContext) return null;
   const { setUser, setRole } = authContext;
+
 
   useEffect(() => {
     const fetchUserAndCourses = async () => {
@@ -70,15 +77,19 @@ export default function ProfessorSessionScreen({ navigation }: any) {
               courseProfEmail === userEmail
             ) {
               professorCourses.push({
-                id: docSnap.id,
-                name: courseData.name,
-                code: courseData.code,
-                time: courseData.time,
-              });
+              id: docSnap.id,
+              name: courseData.name,
+              code: courseData.code,
+              schedule: courseData.schedule || [],
+});
+            
+
             }
           });
 
-          setCourses(professorCourses);
+          const filteredCourses = filterCoursesByCurrentTime(professorCourses);
+          setCourses(filteredCourses);
+
         }
       } catch (error) {
         console.error(error);
@@ -90,9 +101,34 @@ export default function ProfessorSessionScreen({ navigation }: any) {
 
     fetchUserAndCourses();
   }, [navigation]);
+useEffect(() => {
+  const fetchActiveSessions = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+   const result = await getActiveSessionsForProfessor(user.uid);
+
+if (result.success) {
+  setActiveSessionsList(result.data ?? []);
+}
+  };
+
+  fetchActiveSessions();
+}, []);
 
   useEffect(() => {
-    let timer: any;
+  const fetchReport = async () => {
+    if (!selectedCourseId) return;
+
+    const data = await getCourseReport(selectedCourseId);
+    setCourseReport(data);
+  };
+
+  fetchReport();
+}, [selectedCourseId]);
+
+  useEffect(() => {
+let timer: ReturnType<typeof setInterval>;
     if (timeLeft > 0) {
       timer = setInterval(() => {
         setTimeLeft((prev) => prev - 1);
@@ -276,24 +312,45 @@ export default function ProfessorSessionScreen({ navigation }: any) {
                 <Text style={styles.infoText}>Email: {userData.email}</Text>
               </View>
 
-              {courses.length > 0 ? (
-                <View style={styles.card}>
-                  <Text style={styles.cardTitle}>Create Attendance Session</Text>
-                  <Picker selectedValue={selectedCourseId} onValueChange={(v) => setSelectedCourseId(v)} style={styles.picker}>
-                    <Picker.Item label="Select a Course..." value={null} />
-                    {courses.map((c) => (
-                      <Picker.Item key={c.id} label={`${c.code} - ${c.name}`} value={c.id} />
-                    ))}
-                  </Picker>
-                  <TouchableOpacity style={styles.createButton} onPress={handleCreateSession}>
-                    <Text style={styles.buttonText}>Create Session</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={styles.card}>
-                  <Text style={styles.noCoursesText}>No courses assigned yet.</Text>
-                </View>
-              )}
+             {courses.length > 0 ? (
+  <>
+    {/* Create Session Card */}
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Create Attendance Session</Text>
+
+      <Picker
+        selectedValue={selectedCourseId}
+        onValueChange={(v) => setSelectedCourseId(v)}
+        style={styles.picker}
+      >
+        <Picker.Item label="Select a Course..." value={null} />
+        {courses.map((c) => (
+          <Picker.Item
+            key={c.id}
+            label={`${c.code} - ${c.name}`}
+            value={c.id}
+          />
+        ))}
+      </Picker>
+
+      <TouchableOpacity
+        style={styles.createButton}
+        onPress={handleCreateSession}
+      >
+        <Text style={styles.buttonText}>Create Session</Text>
+      </TouchableOpacity>
+    </View>
+
+
+   
+  </>
+) : (
+  <View style={styles.card}>
+    <Text style={styles.noCoursesText}>
+      No courses assigned yet.
+    </Text>
+  </View>
+)}
 
               {activeSession && (
                 <View style={styles.card}>

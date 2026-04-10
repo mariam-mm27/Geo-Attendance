@@ -9,6 +9,24 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
+export const isSessionLiveNow = (session: any) => {
+  const now = new Date();
+
+  const createdAt =
+    session.createdAt?.toDate?.() || new Date(session.createdAt);
+
+  const duration = session.duration || 10;
+
+  const expiresAt = new Date(
+    createdAt.getTime() + duration * 60 * 1000
+  );
+
+  return (
+    session.active === true &&
+    now >= createdAt &&
+    now <= expiresAt
+  );
+};
 
 
 export const recordAttendance = async (scannedQRValue: string) => {
@@ -56,10 +74,10 @@ export const recordAttendance = async (scannedQRValue: string) => {
 
     if (sessionData.active === false) return { success: false, message: "Session Expired" };
 
-    const createdAt = sessionData.createdAt?.toDate();
-    const duration = sessionData.duration || 10; 
-    const expiresAt = new Date(createdAt.getTime() + duration * 60 * 1000);
-    if (new Date() > expiresAt) return { success: false, message: "Session Expired" };
+    // Check session expiry (duration in minutes)
+    if (!isSessionLiveNow(sessionData)) {
+  return { success: false, message: "Session is not active now" };
+}
 
     const attendanceQuery = query(
       collection(db, "attendance"),
@@ -164,4 +182,151 @@ export const validateStudentInCourse = async (studentId: string, courseId: strin
     console.error("Enrollment validation error:", error);
     return { valid: false, message: "Server error" };
   }
+};
+
+export const getCourseReport = async (courseId: string) => {
+  try {
+    // 1️⃣ Get all students in course
+    const enrollmentsQuery = query(
+      collection(db, "enrollments"),
+      where("courseId", "==", courseId)
+    );
+
+    const enrollmentsSnap = await getDocs(enrollmentsQuery);
+    const students = enrollmentsSnap.docs.map(doc => doc.data().studentId);
+
+    const totalStudents = students.length;
+
+    // 2️⃣ Get all sessions of this course
+    const sessionsQuery = query(
+      collection(db, "sessions"),
+      where("courseId", "==", courseId)
+    );
+
+    const sessionsSnap = await getDocs(sessionsQuery);
+    const totalSessions = sessionsSnap.size;
+
+    // 3️⃣ Get attendance records
+    const attendanceQuery = query(
+      collection(db, "attendance"),
+      where("courseId", "==", courseId)
+    );
+
+    const attendanceSnap = await getDocs(attendanceQuery);
+
+    // 4️⃣ Count attendance per student
+    const attendanceMap: { [key: string]: number } = {};
+
+    attendanceSnap.docs.forEach(doc => {
+      const data = doc.data();
+      const studentId = data.studentId;
+
+      if (!attendanceMap[studentId]) {
+        attendanceMap[studentId] = 0;
+      }
+
+      attendanceMap[studentId]++;
+    });
+
+    // 5️⃣ Calculate average attendance
+    let totalAttendancePercent = 0;
+    let absentStudents = 0;
+
+    students.forEach(studentId => {
+      const attended = attendanceMap[studentId] || 0;
+
+      const percent =
+        totalSessions === 0 ? 0 : (attended / totalSessions) * 100;
+
+      totalAttendancePercent += percent;
+
+      if (percent < 75) {
+        absentStudents++;
+      }
+    });
+
+    const averageAttendance =
+      totalStudents === 0
+        ? 0
+        : totalAttendancePercent / totalStudents;
+
+    return {
+      totalStudents,
+      totalSessions,
+      averageAttendance: Math.round(averageAttendance),
+      absentStudents,
+    };
+
+  } catch (error) {
+    console.error("Error generating report:", error);
+
+    return {
+      totalStudents: 0,
+      totalSessions: 0,
+      averageAttendance: 0,
+      absentStudents: 0,
+    };
+  }
+};
+export const getActiveSessionsForProfessor = async (professorId: string) => {
+  try {
+    const q = query(
+      collection(db, "sessions"),
+      where("professorId", "==", professorId),
+      where("active", "==", true)
+    );
+
+    const snap = await getDocs(q);
+
+    const activeSessions: any[] = [];
+
+    snap.forEach((doc) => {
+      const data = doc.data();
+
+      if (isSessionLiveNow(data)) {
+        activeSessions.push({
+          id: doc.id,
+          ...data,
+        });
+      }
+    });
+
+    return {
+      success: true,
+      data: activeSessions,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
+export const filterCoursesByCurrentTime = (courses: any[]) => {
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  return courses.filter((course: any) => {
+    if (!course.schedule || !Array.isArray(course.schedule)) return false;
+
+    return course.schedule.some((slot: any) => {
+      const parseTime = (t: string) => {
+        const clean = t.replace(/"/g, "").trim();
+        const [h, m] = clean.split(":").map(Number);
+        return h * 60 + m;
+      };
+
+      const start = parseTime(slot.startTime);
+      const end = parseTime(slot.endTime);
+
+      // حالة عادية: 10:00 - 12:00
+      if (end > start) {
+        return currentMinutes >= start && currentMinutes <= end;
+      }
+
+      // حالة midnight: 22:00 - 00:00
+      // end بيبقى 0 أو أصغر من start
+      return currentMinutes >= start || currentMinutes <= end;
+    });
+  });
 };
