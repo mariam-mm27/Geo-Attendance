@@ -5,6 +5,7 @@ import { doc, getDoc, collection, getDocs, query, where, addDoc } from "firebase
 import { signOut, onAuthStateChanged } from "firebase/auth";
 import AttendanceBar from "../../components/AttendanceBar";
 import { calculateStudentAttendance } from '../../services/attendanceService';
+import UploadProfileImage from "../../components/UploadProfileImage";
 
 
 const sendAttendanceNotification = async (userId, course, absencePct, type) => {
@@ -337,6 +338,9 @@ const StudentProfile = () => {
             fontSize: "20px",
             fontWeight: "700"
           }}>
+            <div style={{ marginBottom: "25px" }}>
+  <UploadProfileImage />
+</div>
             Personal Information
           </h2>
           <div style={{ lineHeight: "2" }}>

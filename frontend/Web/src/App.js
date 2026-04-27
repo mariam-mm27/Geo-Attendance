@@ -21,11 +21,13 @@ import SessionAttendance from "./pages/Professor/SessionAttendance";
 
 import NotificationsPage from './pages/NotificationsPage';
 
+import UploadProfileImage from "./components/UploadProfileImage";
 
 function App() {
   return (
     <Router>
       <Routes>
+
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -33,8 +35,18 @@ function App() {
         
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/professor" element={<ProfessorProfile />} />
-        <Route path="/student" element={<StudentProfile />} />
-        
+
+        {/* ✅ هنا ضفنا upload مؤقتًا */}
+        <Route 
+          path="/student" 
+          element={
+            <div>
+              <StudentProfile />
+              <UploadProfileImage />
+            </div>
+          } 
+        />
+
         {/* Student Routes */}
         <Route path="/student-enroll" element={<StudentEnroll />} />
         <Route path="/student/sessions" element={<SessionsList />} />
@@ -52,8 +64,9 @@ function App() {
         <Route path="/professor/courses/:courseId/sessions" element={<CourseSessions />} />
         <Route path="/professor/sessions/:sessionId/attendance" element={<SessionAttendance />} />
 
-         {/* ✅ Notifications Route */}
+        {/* Notifications */}
         <Route path="/notifications" element={<NotificationsPage />} />
+
       </Routes>
     </Router>
   );
