@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../../firebase";
 import { doc, getDoc, collection, getDocs, query, where, addDoc } from "firebase/firestore";
@@ -343,6 +343,21 @@ const StudentProfile = () => {
 </div>
             Personal Information
           </h2>
+          {studentData.photoURL && (
+  <div style={{ marginBottom: "15px" }}>
+    <img
+      src={studentData.photoURL}
+      alt="profile"
+      style={{
+        width: "90px",
+        height: "90px",
+        borderRadius: "50%",
+        objectFit: "cover",
+        border: "2px solid #173B66"
+      }}
+    />
+  </div>
+)}
           <div style={{ lineHeight: "2" }}>
             <p style={{ margin: "8px 0", color: "#1E293B", fontSize: "16px" }}>
               <strong style={{ fontWeight: "600" }}>Name:</strong> {studentData.name}
