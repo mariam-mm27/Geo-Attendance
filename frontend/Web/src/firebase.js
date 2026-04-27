@@ -1,10 +1,10 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyASFFQCKoJ8tOvfroQk2OsTa-_O3SzH69o",
+  apiKey: "AIzaSyASFFQCKoJ8tOvfroO3SzH69o",
   authDomain: "geo-attendance-f0d04.firebaseapp.com",
   projectId: "geo-attendance-f0d04",
   storageBucket: "geo-attendance-f0d04.firebasestorage.app",
@@ -15,7 +15,9 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
-export { auth, db };
+export { auth, db, storage };
