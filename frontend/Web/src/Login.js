@@ -189,86 +189,99 @@ function Login() {
     }
   };
 
-  const handleLogin = async () => {
-    const error = validateLogin({ email, password });
-    if (error) {
-      alert(error);
-      return;
-    }
-
-    const detectedRole = detectRoleFromEmail(email);
-    if (!detectedRole) {
-      alert(
-        "Invalid email domain. Please use:\n- @std.sci.cu.edu.eg for students\n- @sci.cu.edu.eg for professors\n- Authorized admin emails",
-      );
-      return;
-    }
-
+  const sendWelcomeEmail = async (toEmail, toName) => {
     try {
-     const cred = await signInWithEmailAndPassword(
-  auth,
-  email.trim(),
-  password,
-);
+      console.log("📨 sending email...");
 
-// 🟡 1. منع الدخول قبل التحقق من الإيميل
-if (!cred.user.emailVerified) {
-  try {
-    await sendEmailVerification(cred.user);
+      const res = await emailjs.send(
+        "service_27llv96",
+        "template_s4w6wf5",
+        {
+          to_email: toEmail,
+          to_name: toName,
+        },
+        "BQqjidSAaAp7XGeqf",
+      );
 
-    alert(
-      "Your email is not verified. A verification email has been sent again. Please check your inbox."
-    );
-
-    await signOut(auth);
-  } catch (err) {
-    console.log("Failed to resend verification email:", err.message);
-  }
-  return;
-}
-
-// 🟡 2. جلب بيانات المستخدم من Firestore
-const userRef = doc(db, "users", cred.user.uid);
-const userSnap = await getDoc(userRef);
-
-if (!userSnap.exists()) {
-  alert("Account not found in Database.");
-  await signOut(auth);
-  return;
-}
-
-// 🟡 3. إرسال Email Login Notification (Person 1 feature)
-try {
-  const functions = getFunctions();
-  const sendLoginEmail = httpsCallable(functions, "sendLoginEmail");
-
-  await sendLoginEmail({
-    email: email,
-    name: userSnap.data().name || "User",
-  });
-} catch (err) {
-  console.log("Login email failed (non-blocking):", err.message);
-}
-
-// 🟡 4. redirect زي ما هو بدون تغيير
-redirectUser(userSnap.data(), email);
-
-  
-
-
-      if (!userSnap.exists()) {
-        alert("Account not found in Database.");
-        await signOut(auth);
-        return;
-      }
-
-    
-
-      redirectUser(userSnap.data(), email);
+      console.log("✅ email sent:", res);
     } catch (err) {
-      alert("Invalid email or password.");
+      console.log("❌ EmailJS FULL ERROR:", err);
     }
   };
+
+ const handleLogin = async () => {
+  const error = validateLogin({ email, password });
+  if (error) {
+    alert(error);
+    return;
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  const detectedRole = detectRoleFromEmail(cleanEmail);
+  if (!detectedRole) {
+    alert("Invalid email domain.");
+    return;
+  }
+
+  try {
+    const cred = await signInWithEmailAndPassword(
+      auth,
+      cleanEmail,
+      password
+    );
+
+    
+    await cred.user.reload();
+
+    const user = cred.user;
+
+    
+    if (!user.emailVerified) {
+      try {
+        await sendEmailVerification(user);
+        alert("Email not verified. Check your inbox.");
+      } catch (err) {
+        console.log("Verification email error:", err);
+        alert("Failed to resend verification email.");
+      }
+
+      await signOut(auth);
+      return;
+    }
+
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
+
+    if (!userSnap.exists()) {
+      alert("Account not found.");
+      await signOut(auth);
+      return;
+    }
+
+    const userData = userSnap.data();
+
+    
+    if (userData.role?.toLowerCase() !== detectedRole) {
+      await signOut(auth);
+      alert("Role mismatch.");
+      return;
+    }
+
+     console.log("🔥 BEFORE EMAIL CALL");
+    sendWelcomeEmail(cleanEmail, userData.name || "User").catch((err) => {
+      console.log("Email failed but login continues:", err);
+    });
+    console.log("🔥 AFTER EMAIL CALL");
+
+    
+    redirectUser(userData, cleanEmail);
+
+  } catch (err) {
+    console.log("LOGIN ERROR:", err);
+    alert("Invalid email or password.");
+  }
+};
 
   const handleForgotPassword = async () => {
     if (!resetEmail.trim()) {

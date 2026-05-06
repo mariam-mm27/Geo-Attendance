@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged, User , signOut  } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
@@ -25,6 +25,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         if (firebaseUser) {
+          await firebaseUser.reload();
+
+           if (!firebaseUser.emailVerified) {
+          await signOut(auth);
+          setUser(null);
+          setRole(null);
+          return;
+           }
+
+           
           setUser(firebaseUser);
 
           const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
