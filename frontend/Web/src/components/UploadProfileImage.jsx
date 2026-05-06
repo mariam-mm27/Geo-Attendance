@@ -1,19 +1,15 @@
 import { useState } from "react";
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import { doc, updateDoc } from "firebase/firestore";
-import { auth, db, storage } from "../firebase";
-export default function UploadProfileImage({ onUploadSuccess, currentPhotoURL }) {
-  const [preview, setPreview] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [progress, setProgress] = useState(0);
+import { auth, db } from "../firebase";
 
-  const hasPhoto = preview || currentPhotoURL;
+export default function UploadProfileImage({ onUploadSuccess, currentPhotoURL }) {
+  const [uploading, setUploading] = useState(false);
+
+  const hasPhoto = currentPhotoURL && currentPhotoURL !== "";
 
   const handleChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setPreview(URL.createObjectURL(file));
     uploadImage(file);
   };
 
@@ -21,53 +17,43 @@ export default function UploadProfileImage({ onUploadSuccess, currentPhotoURL })
     const user = auth.currentUser;
     if (!user) return;
 
-    setUploading(true);
-    const storageRef = ref(storage, `profileImages/${user.uid}`);
-    const uploadTask = uploadBytesResumable(storageRef, file);
+    // تحقق من حجم الصورة — لازم تكون أقل من 500KB
+    if (file.size > 500 * 1024) {
+      alert("Image too large! Please choose an image smaller than 500KB.");
+      return;
+    }
 
-    uploadTask.on(
-      "state_changed",
-      (snapshot) => {
-        const pct = Math.round(
-          (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-        );
-        setProgress(pct);
-      },
-      (error) => {
-        console.error("Upload failed:", error);
+    setUploading(true);
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
+        const base64 = reader.result;
+        await updateDoc(doc(db, "users", user.uid), { photoURL: base64 });
         setUploading(false);
-      },
-      async () => {
-        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-        await updateDoc(doc(db, "users", user.uid), { photoURL: downloadURL });
+        if (onUploadSuccess) onUploadSuccess(base64);
+      } catch (err) {
+        console.error("Error saving image:", err);
         setUploading(false);
-        setProgress(0);
-        if (onUploadSuccess) onUploadSuccess(downloadURL);
       }
-    );
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDelete = async () => {
     const user = auth.currentUser;
     if (!user) return;
 
-    setDeleting(true);
     try {
-      const storageRef = ref(storage, `profileImages/${user.uid}`);
-      await deleteObject(storageRef);
-    } catch (error) {
-      console.log("No image in storage or already deleted");
+      await updateDoc(doc(db, "users", user.uid), { photoURL: "" });
+      if (onUploadSuccess) onUploadSuccess("");
+    } catch (err) {
+      console.error("Error deleting image:", err);
     }
-
-    await updateDoc(doc(db, "users", user.uid), { photoURL: "" });
-    setPreview(null);
-    setDeleting(false);
-    if (onUploadSuccess) onUploadSuccess("");
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-      {/* Change Photo */}
       <input
         type="file"
         accept="image/*"
@@ -75,6 +61,8 @@ export default function UploadProfileImage({ onUploadSuccess, currentPhotoURL })
         style={{ display: "none" }}
         id="profile-image-input"
       />
+
+      {/* Choose أو Change حسب الحالة */}
       <label
         htmlFor="profile-image-input"
         style={{
@@ -89,27 +77,26 @@ export default function UploadProfileImage({ onUploadSuccess, currentPhotoURL })
           textAlign: "center",
         }}
       >
-        {uploading ? `Uploading... ${progress}%` : "📷 Change Photo"}
+        {uploading ? "Uploading..." : hasPhoto ? "📷 Change Photo" : "📷 Choose Photo"}
       </label>
 
-      {/* Delete - بيظهر دايما لو في صورة */}
-      {hasPhoto && (
+      {/* Delete - بيظهر بس لو في صورة */}
+      {hasPhoto && !uploading && (
         <button
           onClick={handleDelete}
-          disabled={deleting}
           style={{
             backgroundColor: "transparent",
-            color: deleting ? "#94a3b8" : "#EF4444",
+            color: "#EF4444",
             padding: "4px 14px",
             borderRadius: "6px",
-            cursor: deleting ? "not-allowed" : "pointer",
+            cursor: "pointer",
             fontSize: "11px",
             fontWeight: "500",
             border: "1px solid #EF4444",
             textAlign: "center",
           }}
         >
-          {deleting ? "Deleting..." : "🗑️ Delete Photo"}
+          🗑️ Delete Photo
         </button>
       )}
     </div>

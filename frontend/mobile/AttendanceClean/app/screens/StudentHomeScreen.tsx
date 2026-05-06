@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Alert,
+  Image,
 } from "react-native";
 import { signOut } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { doc, getDoc, getDocs } from "firebase/firestore";
 import { AuthContext } from "../context/AuthContext";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
-
 import { Ionicons } from "@expo/vector-icons";
 import { getUnreadCount } from "../services/notificationService";
 
@@ -20,6 +20,8 @@ type Student = {
   name: string;
   id: string;
   email: string;
+  
+  photoURL: string;
 };
 
 export default function StudentHomeScreen({ navigation }: any) {
@@ -27,11 +29,10 @@ export default function StudentHomeScreen({ navigation }: any) {
     name: "",
     id: "",
     email: "",
+    photoURL: "",
   });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-
   const [unreadCount, setUnreadCount] = useState(0);
 
   const authContext = useContext(AuthContext);
@@ -52,12 +53,14 @@ export default function StudentHomeScreen({ navigation }: any) {
             name: string;
             studentId: string;
             email: string;
+            photoURL: string;
           };
 
           setStudent({
             name: data.name,
             id: data.studentId,
             email: data.email,
+            photoURL: data.photoURL || "",
           });
         }
       } catch (error) {
@@ -88,7 +91,7 @@ export default function StudentHomeScreen({ navigation }: any) {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      setStudent({ name: "", id: "", email: "" });
+      setStudent({ name: "", id: "", email: "", photoURL: "" });
       setUser(null);
       setRole(null);
       navigation.reset({ index: 0, routes: [{ name: "Login" }] });
@@ -168,6 +171,20 @@ export default function StudentHomeScreen({ navigation }: any) {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Personal Information</Text>
 
+          {/* ← الإضافة بتاعتي - صورة البروفايل */}
+          <View style={styles.photoContainer}>
+            {student.photoURL ? (
+              <Image
+                source={{ uri: student.photoURL }}
+                style={styles.profilePhoto}
+              />
+            ) : (
+              <View style={styles.photoPlaceholder}>
+                <Text style={styles.photoPlaceholderText}>👤</Text>
+              </View>
+            )}
+          </View>
+
           <View style={styles.row}>
             <Text style={styles.label}>Name</Text>
             <Text style={styles.value}>{student.name}</Text>
@@ -195,7 +212,6 @@ export default function StudentHomeScreen({ navigation }: any) {
   );
 }
 
-/* ✅ SINGLE StyleSheet (merged correctly) */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
 
@@ -306,6 +322,35 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 20,
+  },
+
+  // ← styles الإضافة بتاعتي
+  photoContainer: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+
+  profilePhoto: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    borderWidth: 3,
+    borderColor: "#173B66",
+  },
+
+  photoPlaceholder: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: "#E0F2FE",
+    borderWidth: 3,
+    borderColor: "#173B66",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  photoPlaceholderText: {
+    fontSize: 36,
   },
 
   row: { marginBottom: 12 },
