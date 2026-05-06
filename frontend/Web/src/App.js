@@ -12,6 +12,7 @@ import StudentProfile from "./pages/Student/StudentProfile";
 import StudentEnroll from "./pages/Student/StudentEnroll";
 import AttendanceHistory from "./pages/Student/AttendanceHistory";
 import SessionsList from "./pages/Student/SessionsList";
+import StudentNotifications from "./pages/Student/StudentNotifications";
 import CourseDetails from "./pages/admin/CourseDetails";
 import EnrollStudents from "./pages/admin/EnrollStudents";
 import CourseReports from "./pages/admin/CourseReports";
@@ -51,6 +52,7 @@ function App() {
         <Route path="/student-enroll" element={<StudentEnroll />} />
         <Route path="/student/sessions" element={<SessionsList />} />
         <Route path="/student/attendance-history/:courseId" element={<AttendanceHistory />} />
+        <Route path="/student/notifications" element={<StudentNotifications />} />
         
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/reports/:courseId" element={<Reports />} />

@@ -12,12 +12,31 @@ export default function UploadProfileImage() {
 
   return (
     <div>
-      <h3>Profile Image</h3>
-
-      <input type="file" onChange={handleChange} />
+      <input 
+        type="file" 
+        onChange={handleChange} 
+        style={{ display: 'none' }}
+        id="profile-image-input"
+      />
+      <label 
+        htmlFor="profile-image-input"
+        style={{
+          backgroundColor: "#173B66",
+          color: "white",
+          padding: "8px 16px",
+          borderRadius: "6px",
+          cursor: "pointer",
+          fontSize: "12px",
+          fontWeight: "600",
+          border: "none",
+          display: "inline-block"
+        }}
+      >
+        📷 Change Photo
+      </label>
 
       {preview && (
-        <img src={preview} alt="preview" width="150" />
+        <img src={preview} alt="preview" width="150" style={{ marginTop: "10px" }} />
       )}
     </div>
   );

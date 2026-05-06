@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 
-const SubjectsTable = ({ data, onDelete, allCourses = [], onConfirmDelete }) => {
+const SubjectsTable = ({ data, onDelete, allCourses = [], onConfirmDelete, type = "professors" }) => {
   const navigate = useNavigate();
 
   const handleDelete = (id, name) => {
@@ -28,51 +28,49 @@ const SubjectsTable = ({ data, onDelete, allCourses = [], onConfirmDelete }) => 
       <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
         <thead>
           <tr style={{ borderBottom: "2px solid #e2e8f0", background: "#F8FAFC" }}>
-            <th style={{ ...styles.th, width: "20%" }}>Name</th>
-            <th style={{ ...styles.th, width: "25%" }}>Email</th>
-            <th style={{ ...styles.th, width: "10%", textAlign: "center" }}>Courses</th>
-            <th style={{ ...styles.th, width: "10%", textAlign: "center" }}>Details</th>
-            <th style={{ ...styles.th, width: "12%", textAlign: "center" }}>Attendance</th>
-            <th style={{ ...styles.th, width: "23%", textAlign: "center" }}>Actions</th>
+            <th style={{ ...styles.th, width: "35%" }}>Name</th>
+            <th style={{ ...styles.th, width: "35%" }}>Email</th>
+            <th style={{ ...styles.th, width: "15%", textAlign: "center" }}>Details</th>
+            <th style={{ ...styles.th, width: "15%", textAlign: "center" }}>Actions</th>
           </tr>
         </thead>
         <tbody>
           {data.length === 0 ? (
             <tr>
-              <td colSpan="6" style={{ ...styles.td, textAlign: "center", color: "#64748b" }}>
+              <td colSpan="4" style={{ ...styles.td, textAlign: "center", color: "#64748b" }}>
                 No professors found. Click "Add Professor" to get started.
               </td>
             </tr>
           ) : (
-            data.map(item => {
-              const courseCount = getProfessorCourseCount(item.id, item.email);
-              return (
-                <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  <td style={styles.td}>{item.name}</td>
-                  <td style={styles.td}>{item.email}</td>
-                  <td style={{ ...styles.td, textAlign: "center" }}>
-                    <span style={styles.courseBadge}>{courseCount}</span>
-                  </td>
-                  <td style={{ ...styles.td, textAlign: "center" }}>
-                    <button 
-                      style={styles.viewBtn} 
-                      onClick={() => handleView(item.id)}
-                    >
-                      View
-                    </button>
-                  </td>
-                  <td style={{ ...styles.td, textAlign: "center" }}>{item.attendance || "0%"}</td>
-                  <td style={{ ...styles.td, textAlign: "center" }}>
-                    <button 
-                      onClick={() => handleDelete(item.id, item.name)} 
-                      style={styles.deleteBtn}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              );
-            })
+            data.map(item => (
+              <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                <td style={styles.td}>
+                  <div style={styles.nameCell}>
+                    <div style={styles.avatar}>
+                      {(item.name || 'P').charAt(0).toUpperCase()}
+                    </div>
+                    <span>{item.name || 'Unknown'}</span>
+                  </div>
+                </td>
+                <td style={styles.td}>{item.email || 'No email'}</td>
+                <td style={{ ...styles.td, textAlign: "center" }}>
+                  <button 
+                    style={styles.viewBtn} 
+                    onClick={() => handleView(item.id)}
+                  >
+                    View
+                  </button>
+                </td>
+                <td style={{ ...styles.td, textAlign: "center" }}>
+                  <button 
+                    onClick={() => handleDelete(item.id, item.name)} 
+                    style={styles.deleteBtn}
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))
           )}
         </tbody>
       </table>
@@ -94,6 +92,27 @@ const styles = {
     fontSize: "14px",
     wordBreak: "break-word"
   }, 
+  
+  // Name cell with avatar
+  nameCell: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px"
+  },
+  avatar: {
+    width: "40px",
+    height: "40px",
+    borderRadius: "50%",
+    backgroundColor: "#173B66",
+    color: "white",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "16px",
+    fontWeight: "600",
+    flexShrink: 0
+  },
+  
   viewBtn: { 
     background: "#173B66", 
     color: "white", 
@@ -107,7 +126,7 @@ const styles = {
     whiteSpace: "nowrap"
   },
   deleteBtn: {
-    background: "#173B66", 
+    background: "#DC2626", 
     color: "white", 
     border: "none", 
     padding: "8px 16px", 

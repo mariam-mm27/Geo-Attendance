@@ -504,6 +504,21 @@ export const recordAttendanceWeb = async (courseId, sessionId, studentId) => {
       professorId: sessionData.professorId,
       recordedAt: serverTimestamp()
     });
+
+    // Trigger email alert check after recording attendance
+    try {
+      const API_BASE_URL = "http://localhost:3000/api";
+      await fetch(`${API_BASE_URL}/email/trigger-on-attendance`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ studentId, courseId }),
+      });
+    } catch (error) {
+      console.error("Error triggering email check:", error);
+      // Don't fail attendance recording if email trigger fails
+    }
     
     return {
       success: true,

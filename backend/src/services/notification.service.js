@@ -1,18 +1,35 @@
 import { db } from "../config/firebase.js";
+import nodemailer from "nodemailer";
 
 /**
- * Check if student's absence exceeds threshold
- * @param {string} studentId - Student ID
- * @param {string} courseId - Course ID
- * @returns {Promise<{exceeded: boolean, attendanceRate: number, totalSessions: number, attendedSessions: number}>}
+ * 1. إعداد الـ Transporter لبعت الإيميلات
+ * تأكدي من تفعيل "2-Step Verification" في حساب جوجل 
+ * واستخدام الـ 16 حرف بتوع الـ App Password هنا
+ */
+const transporter = nodemailer.createTransport({
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // استخدام التشفير الكامل (SSL)
+  auth: {
+    user: 'mariam2789309@gmail.com', 
+    pass: 'plbtlkamvqjccpje' 
+  },
+  tls: {
+    // دي مهمة جداً عشان لو فيه مشكلة في الـ Network أو الـ SSL بتاع الجهاز
+    rejectUnauthorized: false
+  }
+});
+
+/**
+ * Check if student's absence exceeds threshold (25%)
  */
 export const checkAbsenceThreshold = async (studentId, courseId) => {
   try {
-    // Get all sessions for the course
+    // جلب كل المحاضرات المنتهية للكورس
     const sessionsSnapshot = await db
       .collection("sessions")
       .where("courseId", "==", courseId)
-      .where("active", "==", false) // Only count completed sessions
+      .where("active", "==", false) 
       .get();
 
     const totalSessions = sessionsSnapshot.size;
@@ -26,7 +43,7 @@ export const checkAbsenceThreshold = async (studentId, courseId) => {
       };
     }
 
-    // Get student's attendance records for this course
+    // جلب سجلات حضور الطالب لهذا الكورس
     const attendanceSnapshot = await db
       .collection("attendance")
       .where("studentId", "==", studentId)
@@ -38,7 +55,7 @@ export const checkAbsenceThreshold = async (studentId, courseId) => {
     const absenceRate = 100 - attendanceRate;
 
     return {
-      exceeded: absenceRate > 25, // Alert if absence > 25%
+      exceeded: absenceRate > 25, // التنبيه لو الغياب أكبر من 25% (الحضور أقل من 75%)
       attendanceRate: Math.round(attendanceRate * 100) / 100,
       absenceRate: Math.round(absenceRate * 100) / 100,
       totalSessions,
@@ -52,15 +69,11 @@ export const checkAbsenceThreshold = async (studentId, courseId) => {
 };
 
 /**
- * Send absence alert notification to student
- * @param {string} studentId - Student ID
- * @param {string} courseId - Course ID
- * @param {object} attendanceData - Attendance statistics
- * @returns {Promise<{success: boolean, notificationId?: string}>}
+ * Send absence alert notification (In-app + Email)
  */
 export const sendAbsenceAlert = async (studentId, courseId, attendanceData) => {
   try {
-    // Get student and course details
+    // جلب بيانات الطالب والكورس من Firestore
     const studentDoc = await db.collection("users").doc(studentId).get();
     const courseDoc = await db.collection("courses").doc(courseId).get();
 
@@ -71,7 +84,7 @@ export const sendAbsenceAlert = async (studentId, courseId, attendanceData) => {
     const studentData = studentDoc.data();
     const courseData = courseDoc.data();
 
-    // Create notification
+    // أولاً: إنشاء الإشعار داخل الأبلكيشن (Firestore)
     const notification = {
       userId: studentId,
       type: "absence_alert",
@@ -88,9 +101,21 @@ export const sendAbsenceAlert = async (studentId, courseId, attendanceData) => {
 
     const notificationRef = await db.collection("notifications").add(notification);
 
-    console.log(
-      `Absence alert sent to ${studentData.email} for ${courseData.name}`
-    );
+    // ثانياً: إرسال الإيميل الفعلي للطالب (Nodemailer)
+    const mailOptions = {
+      from: '"Geo-Attendance System" <mariam2789309@gmail.com>',
+      to: studentData.email,
+      subject: `Attendance Warning: ${courseData.name}`,
+      text: `Dear ${studentData.name},\n\nThis is an automated warning regarding your attendance in ${courseData.name}.\n\n` +
+            `Current Attendance Rate: ${attendanceData.attendanceRate}%\n` +
+            `Total Sessions: ${attendanceData.totalSessions}\n` +
+            `Sessions Missed: ${attendanceData.missedSessions}\n\n` +
+            `Please ensure you attend future sessions to avoid any academic penalties.`
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    console.log(`[Success] Absence alert sent to ${studentData.email} for ${courseData.name}`);
 
     return {
       success: true,
@@ -107,12 +132,9 @@ export const sendAbsenceAlert = async (studentId, courseId, attendanceData) => {
 
 /**
  * Check all students in a course and send alerts if needed
- * @param {string} courseId - Course ID
- * @returns {Promise<{alertsSent: number, studentsChecked: number}>}
  */
 export const checkCourseAbsences = async (courseId) => {
   try {
-    // Get all enrolled students
     const courseDoc = await db.collection("courses").doc(courseId).get();
 
     if (!courseDoc.exists) {
@@ -128,7 +150,7 @@ export const checkCourseAbsences = async (courseId) => {
       const absenceData = await checkAbsenceThreshold(studentId, courseId);
 
       if (absenceData.exceeded) {
-        // Check if alert was already sent recently (within last 7 days)
+        // منع الإزعاج: لا ترسل تنبيه إذا تم إرسال واحد في آخر 7 أيام
         const recentAlertsSnapshot = await db
           .collection("notifications")
           .where("userId", "==", studentId)
@@ -146,7 +168,7 @@ export const checkCourseAbsences = async (courseId) => {
             (new Date() - lastAlert.createdAt.toDate()) / (1000 * 60 * 60 * 24);
 
           if (daysSinceLastAlert < 7) {
-            shouldSendAlert = false; // Don't spam alerts
+            shouldSendAlert = false;
           }
         }
 
@@ -169,9 +191,6 @@ export const checkCourseAbsences = async (courseId) => {
 
 /**
  * Get notifications for a user
- * @param {string} userId - User ID
- * @param {number} limit - Number of notifications to fetch
- * @returns {Promise<Array>}
  */
 export const getUserNotifications = async (userId, limit = 20) => {
   try {
@@ -194,8 +213,6 @@ export const getUserNotifications = async (userId, limit = 20) => {
 
 /**
  * Mark notification as read
- * @param {string} notificationId - Notification ID
- * @returns {Promise<{success: boolean}>}
  */
 export const markNotificationAsRead = async (notificationId) => {
   try {
@@ -213,12 +230,6 @@ export const markNotificationAsRead = async (notificationId) => {
 
 /**
  * Send custom notification
- * @param {string} userId - User ID
- * @param {string} title - Notification title
- * @param {string} message - Notification message
- * @param {string} type - Notification type
- * @param {object} metadata - Additional metadata
- * @returns {Promise<{success: boolean, notificationId?: string}>}
  */
 export const sendNotification = async (
   userId,

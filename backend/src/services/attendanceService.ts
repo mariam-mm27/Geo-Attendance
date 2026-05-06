@@ -121,6 +121,24 @@ export const recordAttendance = async (
       recordedAt: new Date(),
     });
 
+    // Trigger email alert check after recording attendance
+    try {
+      // Import the email service function
+      const { checkAndSendAbsenceAlertDirect } = await import("../services/email-direct.service.js");
+      const alertResult = await checkAndSendAbsenceAlertDirect(studentId, sessionData.courseId);
+      
+      if (alertResult.emailSent) {
+        console.log(`📧 Automatic email alert sent: ${alertResult.alertLevel} to ${alertResult.recipient}`);
+      } else if (alertResult.success) {
+        console.log(`✅ Attendance check completed: ${alertResult.message}`);
+      } else {
+        console.error(`⚠️ Email alert check failed: ${alertResult.error}`);
+      }
+    } catch (error) {
+      console.error("Error triggering automatic email alert:", error);
+      // Don't fail attendance recording if email trigger fails
+    }
+
     return { success: true, message: "Attendance Successful" };
 
   } catch (error: any) {
