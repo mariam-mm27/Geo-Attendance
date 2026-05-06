@@ -15,7 +15,7 @@ const AttendanceHistory = () => {
     const fetchHistory = async () => {
       setLoading(true);
       const result = await getStudentAttendanceHistory(courseId, auth.currentUser.uid);
-      
+
       if (result.success) {
         setSessions(result.data);
       }
@@ -28,7 +28,7 @@ const AttendanceHistory = () => {
   return (
     <div style={{ backgroundColor: "#F8FAFC", minHeight: "100vh" }}>
       {/* Navbar */}
-      <div style={{ 
+      <div style={{
         backgroundColor: "white",
         padding: "20px 40px",
         display: "flex",
@@ -36,9 +36,9 @@ const AttendanceHistory = () => {
         alignItems: "center",
         boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
       }}>
-        <button 
+        <button
           onClick={() => navigate("/student")}
-          style={{ 
+          style={{
             backgroundColor: "transparent",
             border: "none",
             color: "#173B66",
@@ -49,7 +49,7 @@ const AttendanceHistory = () => {
         >
           ← Back
         </button>
-        
+
         <h2 style={{ color: "#173B66", margin: 0 }}>Attendance History</h2>
         <div style={{ width: "60px" }}></div>
       </div>
@@ -57,10 +57,10 @@ const AttendanceHistory = () => {
 
       {/* Main Content */}
       <div style={{ padding: "50px 100px", maxWidth: "1200px", margin: "0 auto" }}>
-        <h1 style={{ 
-          color: "#173B66", 
-          fontSize: "32px", 
-          fontWeight: "700", 
+        <h1 style={{
+          color: "#173B66",
+          fontSize: "32px",
+          fontWeight: "700",
           marginBottom: "10px"
         }}>
           {courseName}
@@ -94,17 +94,18 @@ const AttendanceHistory = () => {
                   <th style={{ padding: "20px", textAlign: "left", fontWeight: "600" }}>Lecture #</th>
                   <th style={{ padding: "20px", textAlign: "center", fontWeight: "600" }}>Status</th>
                   <th style={{ padding: "20px", textAlign: "left", fontWeight: "600" }}>Time Recorded</th>
+                  <th style={{ padding: "20px", textAlign: "center", fontWeight: "600" }}>Review</th>
                 </tr>
               </thead>
               <tbody>
                 {sessions.map((session, index) => (
                   <tr key={index} style={{ borderBottom: "1px solid #E2E8F0" }}>
                     <td style={{ padding: "20px", color: "#1E293B" }}>
-                      {new Date(session.date).toLocaleDateString('en-US', { 
-                        weekday: 'long', 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
+                      {new Date(session.date).toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
                       })}
                     </td>
                     <td style={{ padding: "20px", color: "#64748B" }}>
@@ -136,14 +137,39 @@ const AttendanceHistory = () => {
                       )}
                     </td>
                     <td style={{ padding: "20px", color: "#64748B" }}>
-                      {session.attended && session.recordedAt ? 
-                        new Date(session.recordedAt).toLocaleTimeString('en-US', { 
-                          hour: '2-digit', 
-                          minute: '2-digit' 
-                        }) : 
+                      {session.attended && session.recordedAt ?
+                        new Date(session.recordedAt).toLocaleTimeString('en-US', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }) :
                         '-'
                       }
                     </td>
+                    <td style={{ padding: "20px", textAlign: "center" }}>
+                      {session.attended && (
+                        <button
+                          onClick={() => navigate(`/student/review/${session.sessionId}`, {
+                            state: {
+                              courseName: courseName,
+                              lectureNumber: session.lectureNumber || index + 1
+                            }
+                          })}
+                          style={{
+                            backgroundColor: "white",
+                            border: "1px solid #173B66",
+                            color: "#173B66",
+                            padding: "6px 16px",
+                            borderRadius: "8px",
+                            cursor: "pointer",
+                            fontWeight: "600",
+                            fontSize: "13px"
+                          }}
+                        >
+                          ⭐ Review
+                        </button>
+                      )}
+                    </td>
+
                   </tr>
                 ))}
               </tbody>

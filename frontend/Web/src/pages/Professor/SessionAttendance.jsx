@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { auth, db } from "../../firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
 const SessionAttendance = () => {
@@ -12,6 +12,9 @@ const SessionAttendance = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("attendance");
+  const [reviews, setReviews] = useState([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -44,6 +47,23 @@ const SessionAttendance = () => {
             return a.recordedAt.seconds - b.recordedAt.seconds;
           });
         setAttendees(data);
+        const reviewsQ = query(
+          collection(db, "reviews"),
+          where("sessionId", "==", sessionId)
+        );
+        const reviewsSnap = await getDocs(reviewsQ);
+        const reviewsData = await Promise.all(
+          reviewsSnap.docs.map(async (d) => {
+            const r = d.data();
+            let studentName = r.studentId;
+            try {
+              const userSnap = await getDoc(doc(db, "users", r.studentId));
+              if (userSnap.exists()) studentName = userSnap.data().name;
+            } catch { }
+            return { id: d.id, ...r, studentName };
+          })
+        );
+        setReviews(reviewsData);
       } catch (err) {
         console.error("Error fetching attendance:", err);
       } finally {
@@ -202,79 +222,158 @@ const SessionAttendance = () => {
           </div>
         )}
 
-        {/* Search */}
-        <div style={{ marginBottom: "20px" }}>
-          <input
-            type="text"
-            placeholder="🔍  Search by student email..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+        {/* Tabs */}
+        <div style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
+          <button
+            onClick={() => setActiveTab("attendance")}
             style={{
-              padding: "12px 16px", border: "1px solid #ddd", borderRadius: "8px",
-              fontSize: "14px", width: "320px", outline: "none",
-              backgroundColor: "white", color: "#1E293B"
+              padding: "10px 24px", borderRadius: "8px",
+              backgroundColor: activeTab === "attendance" ? "#173B66" : "white",
+              color: activeTab === "attendance" ? "white" : "#64748b",
+              fontWeight: "600", fontSize: "14px", cursor: "pointer",
+              border: "1px solid #ddd"
             }}
-          />
+          >
+            📋 Attendance ({attendees.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("reviews")}
+            style={{
+              padding: "10px 24px", borderRadius: "8px",
+              backgroundColor: activeTab === "reviews" ? "#173B66" : "white",
+              color: activeTab === "reviews" ? "white" : "#64748b",
+              fontWeight: "600", fontSize: "14px", cursor: "pointer",
+              border: "1px solid #ddd"
+            }}
+          >
+            ⭐ Reviews ({reviews.length})
+          </button>
         </div>
 
-        {/* Table */}
-        {loading ? (
-          <div style={{ textAlign: "center", padding: "60px" }}>
-            <p style={{ color: "#64748b", fontSize: "16px" }}>Loading attendance...</p>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div style={{
-            backgroundColor: "white", padding: "60px", borderRadius: "15px",
-            boxShadow: "0 2px 4px rgba(0,0,0,0.08)", textAlign: "center"
-          }}>
-            <p style={{ color: "#64748b", fontSize: "18px", margin: 0 }}>
-              {search ? "No students match your search." : "No attendance recorded for this session."}
-            </p>
-          </div>
-        ) : (
-          <div style={{
-            backgroundColor: "white", borderRadius: "15px",
-            boxShadow: "0 2px 4px rgba(0,0,0,0.08)", overflow: "hidden"
-          }}>
-            {/* Table Header */}
-            <div style={{
-              display: "grid", gridTemplateColumns: "0.3fr 2.5fr 2.5fr 2fr",
-              padding: "16px 30px", backgroundColor: "#F0F9FF",
-              borderBottom: "1px solid #E0F2FE"
-            }}>
-              {["#", "Student Email", "Student ID", "Recorded At"].map((h) => (
-                <span key={h} style={{ fontSize: "13px", fontWeight: "700", color: "#173B66", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                  {h}
-                </span>
-              ))}
+        {/* Attendance Tab */}
+        {activeTab === "attendance" && (
+          <>
+            <div style={{ marginBottom: "20px" }}>
+              <input
+                type="text"
+                placeholder="🔍  Search by student email..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  padding: "12px 16px", border: "1px solid #ddd", borderRadius: "8px",
+                  fontSize: "14px", width: "320px", outline: "none",
+                  backgroundColor: "white", color: "#1E293B"
+                }}
+              />
             </div>
 
-            {/* Table Rows */}
-            {filtered.map((record, index) => (
-              <div
-                key={record.id}
-                style={{
-                  display: "grid", gridTemplateColumns: "0.3fr 2.5fr 2.5fr 2fr",
-                  padding: "16px 30px", borderBottom: "1px solid #f1f5f9",
-                  alignItems: "center",
-                  backgroundColor: index % 2 === 0 ? "white" : "#FAFCFF"
-                }}
-              >
-                <span style={{ fontSize: "14px", color: "#94a3b8", fontWeight: "700" }}>
-                  {index + 1}
-                </span>
-                <span style={{ fontSize: "14px", color: "#1E293B", fontWeight: "500" }}>
-                  {record.studentEmail}
-                </span>
-                <span style={{ fontSize: "13px", color: "#64748b", fontFamily: "monospace" }}>
-                  {record.studentId}
-                </span>
-                <span style={{ fontSize: "13px", color: "#64748b" }}>
-                  {formatDate(record.recordedAt)}
-                </span>
+            {loading ? (
+              <div style={{ textAlign: "center", padding: "60px" }}>
+                <p style={{ color: "#64748b", fontSize: "16px" }}>Loading attendance...</p>
               </div>
-            ))}
-          </div>
+            ) : filtered.length === 0 ? (
+              <div style={{
+                backgroundColor: "white", padding: "60px", borderRadius: "15px",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.08)", textAlign: "center"
+              }}>
+                <p style={{ color: "#64748b", fontSize: "18px", margin: 0 }}>
+                  {search ? "No students match your search." : "No attendance recorded for this session."}
+                </p>
+              </div>
+            ) : (
+              <div style={{
+                backgroundColor: "white", borderRadius: "15px",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.08)", overflow: "hidden"
+              }}>
+                <div style={{
+                  display: "grid", gridTemplateColumns: "0.3fr 2.5fr 2.5fr 2fr",
+                  padding: "16px 30px", backgroundColor: "#F0F9FF",
+                  borderBottom: "1px solid #E0F2FE"
+                }}>
+                  {["#", "Student Email", "Student ID", "Recorded At"].map((h) => (
+                    <span key={h} style={{ fontSize: "13px", fontWeight: "700", color: "#173B66", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      {h}
+                    </span>
+                  ))}
+                </div>
+                {filtered.map((record, index) => (
+                  <div key={record.id} style={{
+                    display: "grid", gridTemplateColumns: "0.3fr 2.5fr 2.5fr 2fr",
+                    padding: "16px 30px", borderBottom: "1px solid #f1f5f9",
+                    alignItems: "center",
+                    backgroundColor: index % 2 === 0 ? "white" : "#FAFCFF"
+                  }}>
+                    <span style={{ fontSize: "14px", color: "#94a3b8", fontWeight: "700" }}>{index + 1}</span>
+                    <span style={{ fontSize: "14px", color: "#1E293B", fontWeight: "500" }}>{record.studentEmail}</span>
+                    <span style={{ fontSize: "13px", color: "#64748b", fontFamily: "monospace" }}>{record.studentId}</span>
+                    <span style={{ fontSize: "13px", color: "#64748b" }}>{formatDate(record.recordedAt)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Reviews Tab */}
+        {activeTab === "reviews" && (
+          reviews.length === 0 ? (
+            <div style={{
+              backgroundColor: "white", padding: "60px", borderRadius: "15px",
+              boxShadow: "0 2px 4px rgba(0,0,0,0.08)", textAlign: "center"
+            }}>
+              <p style={{ color: "#64748b", fontSize: "18px", margin: 0 }}>
+                No reviews submitted for this session yet.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div style={{
+                backgroundColor: "#173B66", borderRadius: "12px",
+                padding: "20px 30px", color: "white",
+                display: "flex", alignItems: "center", gap: "20px"
+              }}>
+                <div>
+                  <p style={{ margin: "0 0 4px 0", fontSize: "13px", opacity: 0.7 }}>Average Rating</p>
+                  <p style={{ margin: 0, fontSize: "42px", fontWeight: "800", lineHeight: 1 }}>
+                    {(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)}
+                  </p>
+                </div>
+                <div style={{ fontSize: "32px", color: "#F59E0B" }}>
+                  {"★".repeat(Math.round(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length))}
+                  {"☆".repeat(5 - Math.round(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length))}
+                </div>
+                <div style={{ marginLeft: "auto", fontSize: "14px", opacity: 0.8 }}>
+                  {reviews.length} review{reviews.length > 1 ? "s" : ""}
+                </div>
+              </div>
+
+              {reviews.map(r => (
+                <div key={r.id} style={{
+                  backgroundColor: "white", borderRadius: "12px",
+                  padding: "20px 24px", boxShadow: "0 2px 4px rgba(0,0,0,0.06)",
+                  borderLeft: "4px solid #F59E0B"
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                    <span style={{ fontWeight: "700", color: "#173B66", fontSize: "15px" }}>
+                      {r.studentName}
+                    </span>
+                    <span style={{ color: "#F59E0B", fontSize: "20px" }}>
+                      {"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}
+                    </span>
+                  </div>
+                  {r.comment ? (
+                    <p style={{ margin: 0, color: "#64748b", fontSize: "14px", lineHeight: "1.6" }}>
+                      "{r.comment}"
+                    </p>
+                  ) : (
+                    <p style={{ margin: 0, color: "#94A3B8", fontSize: "13px", fontStyle: "italic" }}>
+                      No comment provided.
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )
         )}
       </div>
     </div>
