@@ -107,7 +107,7 @@ export const calculateCourseAttendanceStats = async (courseId) => {
       };
     }
     
-const studentIds = courseData.enrolledStudents || [];    
+    const studentIds = courseData.enrolledStudents || [];    
     console.log(`👥 Enrolled students: ${studentIds.length}`);
     
     if (studentIds.length === 0) {
@@ -162,7 +162,6 @@ export const getStudentAttendanceHistory = async (courseId, studentId) => {
   try {
     console.log('🔍 Fetching history for:', { courseId, studentId });
     
-    // Get all sessions for this course
     const sessionsQuery = query(
       collection(db, "sessions"),
       where("courseId", "==", courseId)
@@ -175,11 +174,10 @@ export const getStudentAttendanceHistory = async (courseId, studentId) => {
     
     for (const sessionDoc of sessionsSnap.docs) {
       const sessionData = sessionDoc.data();
-      const sessionId = sessionData.sessionId; // Use the sessionId field, not document ID
+      const sessionId = sessionData.sessionId;
       
       console.log(`📅 Session ${sessionId}:`, sessionData);
       
-      // Check if student attended this session using the sessionId field
       const attendanceQuery = query(
         collection(db, "attendance"),
         where("sessionId", "==", sessionId),
@@ -206,7 +204,6 @@ export const getStudentAttendanceHistory = async (courseId, studentId) => {
       });
     }
     
-    // Sort by date, newest first
     const sorted = sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
     console.log('✅ Final history:', sorted);
     
@@ -268,10 +265,9 @@ export const getActiveSessions = async (courseId) => {
     for (const sessionDoc of sessionsSnap.docs) {
       const sessionData = sessionDoc.data();
       const createdAt = sessionData.createdAt?.toDate();
-      const duration = sessionData.duration || 10; // default 10 minutes
+      const duration = sessionData.duration || 10;
       const expiresAt = new Date(createdAt.getTime() + duration * 60 * 1000);
       
-      // Only include sessions that haven't expired
       if (now <= expiresAt) {
         activeSessions.push({
           id: sessionDoc.id,
@@ -306,7 +302,6 @@ export const calculateOverallStudentAttendance = async (studentId) => {
   try {
     console.log('🔍 Calculating overall attendance for student:', studentId);
     
-    // Get all courses the student is enrolled in
     const coursesSnapshot = await getDocs(collection(db, "courses"));
     const enrolledCourses = [];
     
@@ -335,7 +330,6 @@ export const calculateOverallStudentAttendance = async (studentId) => {
     let totalSessions = 0;
     let totalAttended = 0;
     
-    // Calculate attendance for each course
     for (const courseId of enrolledCourses) {
       const result = await calculateStudentAttendance(courseId, studentId);
       if (result.success) {
@@ -374,7 +368,6 @@ export const calculateOverallStudentAttendance = async (studentId) => {
 ========================= */
 export const calculateOverallProfessorAttendance = async (professorId, professorEmail) => {
   try {
-    // Get all courses assigned to this professor
     const coursesSnapshot = await getDocs(collection(db, "courses"));
     const professorCourses = [];
     
@@ -403,7 +396,6 @@ export const calculateOverallProfessorAttendance = async (professorId, professor
     let totalPercentage = 0;
     let coursesWithData = 0;
     
-    // Calculate average attendance across all courses
     for (const courseId of professorCourses) {
       const result = await calculateCourseAttendanceStats(courseId);
       if (result.success && result.data.avgAttendance) {
@@ -431,6 +423,10 @@ export const calculateOverallProfessorAttendance = async (professorId, professor
     };
   }
 };
+
+/* =========================
+   recordAttendanceWeb
+========================= */
 export const recordAttendanceWeb = async (courseId, sessionId, studentId) => {
   try {
     // Validate enrollment
@@ -468,9 +464,9 @@ export const recordAttendanceWeb = async (courseId, sessionId, studentId) => {
       };
     }
     
-    // Check session expiry (duration in minutes)
+    // Check session expiry
     const createdAt = sessionData.createdAt?.toDate();
-    const duration = sessionData.duration || 10; // default 10 minutes
+    const duration = sessionData.duration || 10;
     const expiresAt = new Date(createdAt.getTime() + duration * 60 * 1000);
     
     if (new Date() > expiresAt) {
@@ -478,6 +474,49 @@ export const recordAttendanceWeb = async (courseId, sessionId, studentId) => {
         success: false,
         message: "Session has expired"
       };
+    }
+
+    // ✅ الإضافة بتاعتك — تحقق إن الطالب مش مسجل في session تانية دلوقتي
+    const now = new Date();
+    const allActiveSessionsQuery = query(
+      collection(db, "sessions"),
+      where("active", "==", true)
+    );
+    const allActiveSessionsSnap = await getDocs(allActiveSessionsQuery);
+
+    for (const activeSessionDoc of allActiveSessionsSnap.docs) {
+      const activeSessionData = activeSessionDoc.data();
+      const activeSessionId = activeSessionData.sessionId;
+
+      // skip لو نفس الـ session
+      if (activeSessionId === sessionId) continue;
+
+      // تحقق لو الـ session لسه في وقته
+      const sessionCreatedAt = activeSessionData.createdAt?.toDate();
+      const sessionDuration = activeSessionData.duration || 10;
+      const sessionExpiresAt = new Date(sessionCreatedAt.getTime() + sessionDuration * 60 * 1000);
+
+      if (now <= sessionExpiresAt) {
+        const otherAttendanceQuery = query(
+          collection(db, "attendance"),
+          where("sessionId", "==", activeSessionId),
+          where("studentId", "==", studentId)
+        );
+        const otherAttendanceSnap = await getDocs(otherAttendanceQuery);
+
+        if (!otherAttendanceSnap.empty) {
+          const conflictCourseRef = doc(db, "courses", activeSessionData.courseId);
+          const conflictCourseSnap = await getDoc(conflictCourseRef);
+          const conflictCourseName = conflictCourseSnap.exists()
+            ? conflictCourseSnap.data().name
+            : "another course";
+
+          return {
+            success: false,
+            message: `Already attending ${conflictCourseName}. Wait until that lecture ends.`
+          };
+        }
+      }
     }
     
     // Check for duplicate attendance
@@ -505,7 +544,7 @@ export const recordAttendanceWeb = async (courseId, sessionId, studentId) => {
       recordedAt: serverTimestamp()
     });
 
-    // Trigger email alert check after recording attendance
+    // Trigger email alert check
     try {
       const API_BASE_URL = "http://localhost:3000/api";
       await fetch(`${API_BASE_URL}/email/trigger-on-attendance`, {
@@ -517,7 +556,6 @@ export const recordAttendanceWeb = async (courseId, sessionId, studentId) => {
       });
     } catch (error) {
       console.error("Error triggering email check:", error);
-      // Don't fail attendance recording if email trigger fails
     }
     
     return {
@@ -533,6 +571,7 @@ export const recordAttendanceWeb = async (courseId, sessionId, studentId) => {
     };
   }
 };
+
 /* =========================
    getCourseReport
 ========================= */
@@ -540,7 +579,6 @@ export const getCourseReport = async (courseId) => {
   try {
     console.log("📊 Generating course report for:", courseId);
 
-    // Get all students in course
     const courseRef = doc(db, "courses", courseId);
     const courseSnap = await getDoc(courseRef);
 
@@ -551,7 +589,6 @@ export const getCourseReport = async (courseId) => {
     const courseData = courseSnap.data();
     const students = courseData.enrolledStudents || [];
 
-    // Get sessions
     const sessionsQuery = query(
       collection(db, "sessions"),
       where("courseId", "==", courseId)
@@ -559,7 +596,6 @@ export const getCourseReport = async (courseId) => {
     const sessionsSnap = await getDocs(sessionsQuery);
     const totalSessions = sessionsSnap.size;
 
-    // Get attendance records
     const attendanceQuery = query(
       collection(db, "attendance"),
       where("courseId", "==", courseId)
@@ -567,7 +603,6 @@ export const getCourseReport = async (courseId) => {
     const attendanceSnap = await getDocs(attendanceQuery);
 
     const totalStudents = students.length;
-
     let attendanceMap = {};
 
     attendanceSnap.forEach((doc) => {
@@ -598,19 +633,19 @@ export const getCourseReport = async (courseId) => {
         ? (totalAttendancePercentage / totalStudents).toFixed(2)
         : "0.00";
 
-   return {
-  success: true,
-  data: {
-    totalStudents,
-    totalSessions,
-    averageAttendance,
-    absentStudents,
-  },
-};
+    return {
+      success: true,
+      data: {
+        totalStudents,
+        totalSessions,
+        averageAttendance,
+        absentStudents,
+      },
+    };
   } catch (error) {
-   return {
-  success: false,
-  error: error.message,
-};
+    return {
+      success: false,
+      error: error.message,
+    };
   }
 };
