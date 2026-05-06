@@ -1,5 +1,7 @@
 {
   "dependencies": {
+    "@emailjs/browser": "^4.4.1",
+    "@emailjs/react-native": "^5.1.0",
     "expo": "^55.0.13",
     "express": "^5.2.1",
     "nodemailer": "^8.0.7",

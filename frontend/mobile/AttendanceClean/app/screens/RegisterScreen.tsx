@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from "react";
-import {
-  TextInput,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-} from "react-native";
+import { TextInput, StyleSheet, Text, TouchableOpacity } from "react-native";
 import AuthLayout from "../components/AuthInput";
 import { COLORS } from "../theme/color";
 import { auth, db } from "../firebase";
-import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  signOut,
+  sendEmailVerification,
+} from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
 export default function RegisterScreen({ navigation }: any) {
@@ -27,14 +26,16 @@ export default function RegisterScreen({ navigation }: any) {
       setPassword("");
       setError("");
     };
-    
+
     clearFields();
-    
+
     const unsubscribe = navigation.addListener("focus", clearFields);
     return unsubscribe;
   }, [navigation]);
 
-  const detectRoleFromEmail = (email: string): "student" | "professor" | null => {
+  const detectRoleFromEmail = (
+    email: string,
+  ): "student" | "professor" | null => {
     const cleanEmail = email.trim().toLowerCase();
     if (cleanEmail.endsWith("@std.sci.cu.edu.eg")) return "student";
     if (cleanEmail.endsWith("@sci.cu.edu.eg")) return "professor";
@@ -59,10 +60,18 @@ export default function RegisterScreen({ navigation }: any) {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email.trim(),
-        password
+        password,
       );
 
       const user = userCredential.user;
+
+      await user.reload();
+
+      try {
+        await sendEmailVerification(user);
+      } catch (emailErr) {
+        console.log("Email verification error:", emailErr);
+      }
 
       // 1️⃣ Save in "users" collection
       await setDoc(doc(db, "users", user.uid), {
@@ -95,9 +104,17 @@ export default function RegisterScreen({ navigation }: any) {
 
       console.log("User registered successfully");
 
-      // Logout after registration
-      await signOut(auth);
 
+      setName("");
+      setId("");
+      setEmail("");
+      setPassword("");
+
+    
+      alert(
+        "Registration successful! Please check your email to verify your account before logging in.",
+      );
+      await signOut(auth);
       navigation.replace("Login");
     } catch (err: any) {
       console.log("Register Error:", err);

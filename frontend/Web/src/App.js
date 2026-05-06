@@ -24,6 +24,8 @@ import NotificationsPage from './pages/NotificationsPage';
 
 import UploadProfileImage from "./components/UploadProfileImage";
 
+import LectureReview from "./pages/Student/LectureReview";
+
 function App() {
   return (
     <Router>
@@ -36,7 +38,7 @@ function App() {
         
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/professor" element={<ProfessorProfile />} />
-
+          
         {/* ✅ هنا ضفنا upload مؤقتًا */}
         <Route 
           path="/student" 
@@ -61,6 +63,7 @@ function App() {
         <Route path="/edit-course/:courseId" element={<EditCourse />} />
         
         <Route path="/details/:type/:id" element={<CourseDetails />} />
+        <Route path="/student/review/:sessionId" element={<LectureReview />} />
 
         {/* Professor Routes */}
         <Route path="/professor/courses/:courseId/sessions" element={<CourseSessions />} />
