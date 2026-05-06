@@ -14,6 +14,17 @@ export const AuthProvider = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       try {
         if (currentUser) {
+
+           await currentUser.reload();
+
+  
+        if (!currentUser.emailVerified) {
+          setUser(null);
+          setRole(null);
+          setLoading(false);
+          return;
+        }
+
           const docRef = doc(db, "users", currentUser.uid);
           const docSnap = await getDoc(docRef);
 

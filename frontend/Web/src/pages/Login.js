@@ -6,6 +6,7 @@ import { auth, db } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import Modal from "../components/Modal";
 import { useModal } from "../hooks/useModal";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -31,6 +32,13 @@ function Login() {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
 
+        await cred.user.reload();
+
+    if (!cred.user.emailVerified) {
+      showWarning("Please verify your email first");
+      return;
+    }
+
       const userRef = doc(db, "users", cred.user.uid);
       const userSnap = await getDoc(userRef);
 
@@ -46,6 +54,18 @@ function Login() {
         showError("Selected role does not match your account.");
         return;
       }
+
+       try {
+      const functions = getFunctions();
+      const sendLoginEmail = httpsCallable(functions, "sendLoginEmail");
+
+      await sendLoginEmail({
+        email: cred.user.email,
+        name: userData.name || "User"
+      });
+    } catch (e) {
+      console.log("Email error:", e);
+    }
 
       if (realRole === "admin") {
         navigate("/admin");
