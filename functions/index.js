@@ -20,7 +20,7 @@ setGlobalOptions({maxInstances: 10, region: "us-central1"});
  * Check if student's absence exceeds threshold (>25%)
  * @param {string} studentId
  * @param {string} courseId
- * @returns {Promise<object>}
+ * @return {Promise<object>}
  */
 async function checkAbsenceThreshold(studentId, courseId) {
   try {
@@ -127,7 +127,7 @@ async function sendAbsenceAlert(studentId, courseId, attendanceData) {
     const notificationRef = await db.collection("notifications").add(notification);
 
     logger.info(
-        `Absence alert sent to ${studentData.email} for ${courseData.name}`
+        `Absence alert sent to ${studentData.email} for ${courseData.name}`,
     );
 
     return {
@@ -179,7 +179,7 @@ exports.onAttendanceCreated = onDocumentCreated(
         logger.error("Error in onAttendanceCreated:", error);
         return null;
       }
-    }
+    },
 );
 
 /**
@@ -195,7 +195,7 @@ exports.onAttendanceDeleted = onDocumentCreated(
       // For deletion handling, we'd need onDocumentDeleted trigger
       // For now, we check on every new attendance record
       return null;
-    }
+    },
 );
 
 /**
@@ -254,7 +254,7 @@ exports.dailyAbsenceCheck = onSchedule(
         logger.error("Error in dailyAbsenceCheck:", error);
         throw error;
       }
-    }
+    },
 );
 
 /**
@@ -319,7 +319,7 @@ exports.checkCourseAbsencesHttp = require("firebase-functions/v2/https").onReque
         logger.error("Error in checkCourseAbsencesHttp:", error);
         res.status(500).json({error: error.message});
       }
-    }
+    },
 );
 
 /**
@@ -346,15 +346,21 @@ exports.securityAuditAttendance = onDocumentCreated(
 
         const sessionData = sessionDoc.data();
         const now = new Date();
-        const sessionStart = sessionData.startTime?.toDate?.() || new Date(sessionData.startTime);
-        const sessionEnd = sessionData.endTime?.toDate?.() || new Date(sessionData.endTime);
+        const sessionStart =
+  sessionData.startTime && sessionData.startTime.toDate ?
+    sessionData.startTime.toDate() :
+    new Date(sessionData.startTime);
 
+        const sessionEnd =
+  sessionData.endTime && sessionData.endTime.toDate ?
+    sessionData.endTime.toDate() :
+    new Date(sessionData.endTime);
         // Check if attendance was recorded outside session window
         if (now < sessionStart || now > sessionEnd) {
           logger.warn(
               `SECURITY: Attendance recorded outside session time. ` +
               `Student: ${studentId}, Session: ${sessionId}, ` +
-              `Time: ${now}, Session window: ${sessionStart} - ${sessionEnd}`
+              `Time: ${now}, Session window: ${sessionStart} - ${sessionEnd}`,
           );
 
           // Create security alert notification for admins
@@ -378,5 +384,51 @@ exports.securityAuditAttendance = onDocumentCreated(
       } catch (error) {
         logger.error("Error in securityAuditAttendance:", error);
       }
-    }
+    },
+);
+
+
+const {onCall} = require("firebase-functions/v2/https");
+const nodemailer = require("nodemailer");
+
+
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "mariamhany31017@gmail.com",
+    pass: "okydgndrscezwlic",
+  },
+});
+
+exports.sendLoginEmail = onCall(
+    {region: "us-central1", maxInstances: 5},
+    async (request) => {
+      try {
+        const {email, name} = request.data;
+
+        if (!email) {
+          throw new Error("Email is required");
+        }
+
+        await transporter.sendMail({
+          from: "Geo Attendance System",
+          to: email,
+          subject: "Login Alert",
+          text: `Hello ${name || "User"} 👋
+
+You have successfully logged into your account.
+
+Time: ${new Date().toLocaleString()}
+
+If this wasn't you, please contact support immediately.`,
+        });
+
+        logger.info(`Login email sent to ${email}`);
+
+        return {success: true};
+      } catch (error) {
+        logger.error("Error sending login email:", error);
+        throw new Error("Failed to send email");
+      }
+    },
 );
