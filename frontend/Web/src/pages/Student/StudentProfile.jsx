@@ -631,8 +631,12 @@ const StudentProfile = () => {
                   👤
                 </div>
               )}
-              <UploadProfileImage />
-            </div>
+<UploadProfileImage
+  currentPhotoURL={studentData.photoURL}
+  onUploadSuccess={(url) =>
+    setStudentData((prev) => ({ ...prev, photoURL: url }))
+  }
+/>            </div>
 
             {/* Personal Info */}
             <div style={{ lineHeight: "1.8" }}>
