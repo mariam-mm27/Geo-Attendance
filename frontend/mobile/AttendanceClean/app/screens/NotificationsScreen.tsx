@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, FlatList,
   TouchableOpacity, SafeAreaView, ActivityIndicator
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth, db } from "../firebase";
 import {
   collection, query, where, getDocs,
@@ -17,11 +18,139 @@ type Notification = {
   read: boolean;
   createdAt: any;
   courseName?: string;
+  isCalculated?: boolean;
 };
 
 export default function NotificationsScreen({ navigation }: any) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [calculatedAlerts, setCalculatedAlerts] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Fetch calculated alerts from course attendance data - generate all warning types with enrollment-based calculation
+  const fetchCalculatedAlerts = async (uid: string) => {
+    try {
+      const coursesSnapshot = await getDocs(collection(db, "courses"));
+      const alerts: Notification[] = [];
+
+      // Get read calculated alerts from AsyncStorage
+      const readCalculatedAlerts = JSON.parse(
+        await AsyncStorage.getItem(`readCalculatedAlerts_${uid}`) || '[]'
+      );
+
+      for (const courseDoc of coursesSnapshot.docs) {
+        const courseData = courseDoc.data();
+        if ((courseData.enrolledStudents || []).includes(uid)) {
+          // Get enrollment date for this student in this course
+          const enrollmentQuery = query(
+            collection(db, "enrollments"),
+            where("studentId", "==", uid),
+            where("courseId", "==", courseDoc.id)
+          );
+          const enrollmentSnap = await getDocs(enrollmentQuery);
+          
+          let enrollmentDate = null;
+          if (!enrollmentSnap.empty) {
+            const enrollmentData = enrollmentSnap.docs[0].data();
+            enrollmentDate = enrollmentData.enrolledAt?.toDate?.() || enrollmentData.enrolledAt;
+          }
+
+          // Calculate enrollment-based attendance
+          const sessionsQuery = query(
+            collection(db, "sessions"),
+            where("courseId", "==", courseDoc.id)
+          );
+          const sessionsSnapshot = await getDocs(sessionsQuery);
+          
+          // Filter sessions to only count those after enrollment date
+          let totalSessions = 0;
+          let sessionsAfterEnrollment: string[] = [];
+          
+          sessionsSnapshot.forEach((sessionDoc) => {
+            const sessionData = sessionDoc.data();
+            const sessionDate = sessionData.createdAt?.toDate?.() || sessionData.createdAt;
+            
+            // If no enrollment date found, count all sessions (backward compatibility)
+            // If enrollment date exists, only count sessions after enrollment
+            if (!enrollmentDate || !sessionDate || sessionDate >= enrollmentDate) {
+              totalSessions++;
+              sessionsAfterEnrollment.push(sessionData.sessionId);
+            }
+          });
+
+          // Get attendance records for sessions after enrollment
+          const attendanceQuery = query(
+            collection(db, "attendance"),
+            where("studentId", "==", uid),
+            where("courseId", "==", courseDoc.id)
+          );
+          const attendanceSnapshot = await getDocs(attendanceQuery);
+          
+          let attendedSessions = 0;
+          
+          // Count only attendance for sessions after enrollment
+          attendanceSnapshot.forEach((attendanceDoc) => {
+            const attendanceData = attendanceDoc.data();
+            if (sessionsAfterEnrollment.includes(attendanceData.sessionId)) {
+              attendedSessions++;
+            }
+          });
+
+          const attendanceRate = totalSessions > 0 ? (attendedSessions / totalSessions) * 100 : 100;
+          const sessionsBeforeEnrollment = sessionsSnapshot.size - totalSessions;
+
+          console.log(`📊 Mobile: Course ${courseData.name} - ${attendedSessions}/${totalSessions} = ${attendanceRate.toFixed(2)}% (${sessionsBeforeEnrollment} sessions before enrollment excluded)`);
+
+          // Always generate all three types of warnings for each course
+          // First Warning (10%)
+          const firstAlertId = `calc-${courseDoc.id}-first`;
+          const isFirstRead = readCalculatedAlerts.includes(firstAlertId);
+          alerts.push({
+            id: firstAlertId,
+            type: "absence_alert",
+            title: "⚠️ First Warning",
+            message: `Your attendance in "${courseData.name}" requires attention. This is your first warning. Please improve your attendance to avoid further warnings. ${enrollmentDate ? `(Calculated from enrollment date: ${enrollmentDate.toLocaleDateString()})` : ''}`,
+            courseName: courseData.name,
+            read: isFirstRead,
+            isCalculated: true,
+            createdAt: { seconds: Date.now() / 1000 - 3 * 24 * 60 * 60 }, // 3 days ago
+          });
+
+          // Second Warning (20%)
+          const secondAlertId = `calc-${courseDoc.id}-second`;
+          const isSecondRead = readCalculatedAlerts.includes(secondAlertId);
+          alerts.push({
+            id: secondAlertId,
+            type: "absence_warning",
+            title: "⚠️ Second Warning",
+            message: `Your attendance in "${courseData.name}" requires immediate attention. This is your second warning. You received your first warning at 10% absence. Improve your attendance immediately to avoid being denied from the final exam. ${enrollmentDate ? `(Calculated from enrollment date: ${enrollmentDate.toLocaleDateString()})` : ''}`,
+            courseName: courseData.name,
+            read: isSecondRead,
+            isCalculated: true,
+            createdAt: { seconds: Date.now() / 1000 - 2 * 24 * 60 * 60 }, // 2 days ago
+          });
+
+          // Denied from Final Exam (25%)
+          const deniedAlertId = `calc-${courseDoc.id}-denied`;
+          const isDeniedRead = readCalculatedAlerts.includes(deniedAlertId);
+          alerts.push({
+            id: deniedAlertId,
+            type: "absence_deprivation",
+            title: "🚫 Denied from Final Exam",
+            message: `You have been denied from taking the final exam in "${courseData.name}" due to excessive absence. You received first warning at 10% and second warning at 20%. ${enrollmentDate ? `(Calculated from enrollment date: ${enrollmentDate.toLocaleDateString()})` : ''}`,
+            courseName: courseData.name,
+            read: isDeniedRead,
+            isCalculated: true,
+            createdAt: { seconds: Date.now() / 1000 - 1 * 24 * 60 * 60 }, // 1 day ago
+          });
+        }
+      }
+
+      setCalculatedAlerts(alerts);
+    } catch (error) {
+      console.error("Error fetching calculated alerts:", error);
+    }
+  };
+
   useEffect(() => {
     const fetchNotifications = async () => {
       const user = auth.currentUser;
@@ -31,19 +160,24 @@ export default function NotificationsScreen({ navigation }: any) {
       }
 
       try {
+        // Fetch database notifications
         const q = query(
           collection(db, "notifications"),
           where("userId", "==", user.uid)
         );
         const snap = await getDocs(q);
-        const data = snap.docs
+        const dbNotifications = snap.docs
           .map(d => ({ id: d.id, ...d.data() } as Notification))
           .sort((a, b) => {
             const ta = a.createdAt?.seconds ?? 0;
             const tb = b.createdAt?.seconds ?? 0;
             return tb - ta;
           });
-        setNotifications(data);
+        
+        setNotifications(dbNotifications);
+        
+        // Fetch calculated alerts
+        await fetchCalculatedAlerts(user.uid);
       } catch (err) {
         console.error(err);
       } finally {
@@ -52,16 +186,66 @@ export default function NotificationsScreen({ navigation }: any) {
     };
 
     fetchNotifications();
-  }, []);
-  const markRead = async (id: string) => {
+
+    // Add focus listener to refresh when user returns to this screen
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchNotifications();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+  const markRead = async (id: string, isCalculated?: boolean) => {
+    if (isCalculated) {
+      // For calculated alerts, update local state and save to AsyncStorage
+      setCalculatedAlerts((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
+      
+      // Save to AsyncStorage
+      const user = auth.currentUser;
+      if (user) {
+        const readCalculatedAlerts = JSON.parse(
+          await AsyncStorage.getItem(`readCalculatedAlerts_${user.uid}`) || '[]'
+        );
+        if (!readCalculatedAlerts.includes(id)) {
+          readCalculatedAlerts.push(id);
+          await AsyncStorage.setItem(`readCalculatedAlerts_${user.uid}`, JSON.stringify(readCalculatedAlerts));
+        }
+      }
+      return;
+    }
+
+    // For database notifications, update in Firestore
     await updateDoc(doc(db, "notifications", id), { read: true });
+    setNotifications(prev => 
+      prev.map(n => n.id === id ? { ...n, read: true } : n)
+    );
   };
 
   const markAllRead = async () => {
-    const unread = notifications.filter(n => !n.read);
-    await Promise.all(unread.map(n =>
+    const user = auth.currentUser;
+    if (!user) return;
+
+    // Mark database notifications as read
+    const unreadNotifications = notifications.filter(n => !n.read);
+    await Promise.all(unreadNotifications.map(n =>
       updateDoc(doc(db, "notifications", n.id), { read: true })
     ));
+    
+    // Update local state for database notifications
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    
+    // Update local state for calculated alerts and save to AsyncStorage
+    const unreadCalculatedAlerts = calculatedAlerts.filter(n => !n.read);
+    setCalculatedAlerts(prev => prev.map(n => ({ ...n, read: true })));
+    
+    // Save all calculated alert IDs to AsyncStorage
+    const readCalculatedAlerts = JSON.parse(
+      await AsyncStorage.getItem(`readCalculatedAlerts_${user.uid}`) || '[]'
+    );
+    const newReadAlerts = unreadCalculatedAlerts.map(alert => alert.id);
+    const updatedReadAlerts = [...new Set([...readCalculatedAlerts, ...newReadAlerts])];
+    await AsyncStorage.setItem(`readCalculatedAlerts_${user.uid}`, JSON.stringify(updatedReadAlerts));
   };
 
   const formatTime = (ts: any) => {
@@ -92,11 +276,26 @@ export default function NotificationsScreen({ navigation }: any) {
     return "#F0F9FF";
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  // Combine notifications and calculated alerts with filtering
+  const getAllNotifications = () => {
+    let combined = [...notifications, ...calculatedAlerts];
+    
+    // Sort by creation date (newest first)
+    combined.sort((a, b) => {
+      const dateA = a.createdAt?.seconds || a.createdAt || 0;
+      const dateB = b.createdAt?.seconds || b.createdAt || 0;
+      return dateB - dateA;
+    });
+    
+    return combined;
+  };
+
+  const allNotifications = getAllNotifications();
+  const unreadCount = allNotifications.filter(n => !n.read).length;
 
   const renderItem = ({ item }: { item: Notification }) => (
     <TouchableOpacity
-      onPress={() => markRead(item.id)}
+      onPress={() => markRead(item.id, item.isCalculated)}
       style={[
         styles.card,
         {
@@ -169,14 +368,14 @@ export default function NotificationsScreen({ navigation }: any) {
           <ActivityIndicator size="large" color="#173B66" />
           <Text style={{ color: "#94A3B8", fontSize: 14 }}>Loading...</Text>
         </View>
-      ) : notifications.length === 0 ? (
+      ) : allNotifications.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.emptyIcon}>🔔</Text>
           <Text style={styles.emptyText}>No notifications yet</Text>
         </View>
       ) : (
         <FlatList
-          data={notifications}
+          data={allNotifications}
           keyExtractor={item => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}

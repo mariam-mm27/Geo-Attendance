@@ -12,6 +12,7 @@ import StudentProfile from "./pages/Student/StudentProfile";
 import StudentEnroll from "./pages/Student/StudentEnroll";
 import AttendanceHistory from "./pages/Student/AttendanceHistory";
 import SessionsList from "./pages/Student/SessionsList";
+import StudentNotifications from "./pages/Student/StudentNotifications";
 import CourseDetails from "./pages/admin/CourseDetails";
 import EnrollStudents from "./pages/admin/EnrollStudents";
 import CourseReports from "./pages/admin/CourseReports";
@@ -20,8 +21,6 @@ import CourseSessions from "./pages/Professor/CourseSessions";
 import SessionAttendance from "./pages/Professor/SessionAttendance";
 
 import NotificationsPage from './pages/NotificationsPage';
-
-import UploadProfileImage from "./components/UploadProfileImage";
 
 import LectureReview from "./pages/Student/LectureReview";
 
@@ -38,21 +37,14 @@ function App() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/professor" element={<ProfessorProfile />} />
           
-        {/* ✅ هنا ضفنا upload مؤقتًا */}
-        <Route 
-          path="/student" 
-          element={
-            <div>
-              <StudentProfile />
-              <UploadProfileImage />
-            </div>
-          } 
-        />
+        {/* Student Dashboard */}
+        <Route path="/student" element={<StudentProfile />} />
 
         {/* Student Routes */}
         <Route path="/student-enroll" element={<StudentEnroll />} />
         <Route path="/student/sessions" element={<SessionsList />} />
         <Route path="/student/attendance-history/:courseId" element={<AttendanceHistory />} />
+        <Route path="/student/notifications" element={<StudentNotifications />} />
         
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/reports/:courseId" element={<Reports />} />

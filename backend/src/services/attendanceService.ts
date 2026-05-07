@@ -1,4 +1,98 @@
 import { db } from "../config/firebase.js";
+import { checkAndSendAbsenceAlertDirect } from "../services/email-direct.service.js";
+
+/**
+ * Get enrollment date for a student in a specific course
+ */
+const getEnrollmentDate = async (studentId: string, courseId: string) => {
+  try {
+    const enrollmentSnapshot = await db
+      .collection("enrollments")
+      .where("studentId", "==", studentId)
+      .where("courseId", "==", courseId)
+      .get();
+
+    if (!enrollmentSnapshot.empty) {
+      const enrollmentData = enrollmentSnapshot.docs[0].data();
+      return enrollmentData.enrolledAt?.toDate() || enrollmentData.enrolledAt;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error getting enrollment date:", error);
+    return null;
+  }
+};
+
+/**
+ * Calculate attendance based on enrollment date
+ */
+const calculateAttendanceFromEnrollment = async (studentId: string, courseId: string) => {
+  try {
+    // Get enrollment date
+    const enrollmentDate = await getEnrollmentDate(studentId, courseId);
+    console.log(`📅 Student ${studentId} enrolled on:`, enrollmentDate);
+
+    // Get all sessions for this course
+    const sessionsSnapshot = await db
+      .collection("sessions")
+      .where("courseId", "==", courseId)
+      .get();
+
+    // Filter sessions to only count those after enrollment date
+    let totalSessions = 0;
+    let sessionsAfterEnrollment: string[] = [];
+
+    sessionsSnapshot.forEach((sessionDoc: any) => {
+      const sessionData = sessionDoc.data();
+      const sessionDate = sessionData.createdAt?.toDate();
+
+      // If no enrollment date found, count all sessions (backward compatibility)
+      // If enrollment date exists, only count sessions after enrollment
+      if (!enrollmentDate || !sessionDate || sessionDate >= enrollmentDate) {
+        totalSessions++;
+        sessionsAfterEnrollment.push(sessionData.sessionId);
+      }
+    });
+
+    console.log(`📊 Total sessions after enrollment: ${totalSessions} (out of ${sessionsSnapshot.size} total)`);
+
+    // Get attendance records for sessions after enrollment
+    const attendanceSnapshot = await db
+      .collection("attendance")
+      .where("courseId", "==", courseId)
+      .where("studentId", "==", studentId)
+      .get();
+
+    let attendedSessions = 0;
+
+    // Count only attendance for sessions after enrollment
+    attendanceSnapshot.forEach((attendanceDoc: any) => {
+      const attendanceData = attendanceDoc.data();
+      if (sessionsAfterEnrollment.includes(attendanceData.sessionId)) {
+        attendedSessions++;
+      }
+    });
+
+    console.log(`✅ Attended sessions after enrollment: ${attendedSessions}`);
+
+    const attendanceRate = totalSessions > 0 ? (attendedSessions / totalSessions) * 100 : 100;
+    const absenceRate = 100 - attendanceRate;
+    const missedSessions = totalSessions - attendedSessions;
+
+    return {
+      attendanceRate,
+      absenceRate,
+      attendedSessions,
+      totalSessions,
+      missedSessions,
+      enrollmentDate,
+      sessionsBeforeEnrollment: sessionsSnapshot.size - totalSessions
+    };
+  } catch (error) {
+    console.error("Error calculating attendance from enrollment:", error);
+    return null;
+  }
+};
 
 export const recordAttendance = async (
   scannedQRValue: string,
@@ -120,6 +214,24 @@ export const recordAttendance = async (
       professorId: sessionData.professorId,
       recordedAt: new Date(),
     });
+
+    // Trigger email alert check after recording attendance
+    try {
+      // Import the email service function
+      const { checkAndSendAbsenceAlertDirect } = await import("../services/email-direct.service.js");
+      const alertResult = await checkAndSendAbsenceAlertDirect(studentId, sessionData.courseId);
+      
+      if (alertResult.emailSent) {
+        console.log(`📧 Automatic email alert sent: ${alertResult.alertLevel} to ${alertResult.recipient}`);
+      } else if (alertResult.success) {
+        console.log(`✅ Attendance check completed: ${alertResult.message}`);
+      } else {
+        console.error(`⚠️ Email alert check failed: ${alertResult.error}`);
+      }
+    } catch (error) {
+      console.error("Error triggering automatic email alert:", error);
+      // Don't fail attendance recording if email trigger fails
+    }
 
     return { success: true, message: "Attendance Successful" };
 

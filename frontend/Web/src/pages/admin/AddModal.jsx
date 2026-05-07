@@ -5,9 +5,19 @@ const AddModal = ({ type, onClose, onAdd, professors = [], onShowWarning }) => {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [room, setRoom] = useState("");
-  const [time, setTime] = useState("");
+  const [hour, setHour] = useState("09");
+  const [minute, setMinute] = useState("00");
+  const [ampm, setAmpm] = useState("AM");
   const [duration, setDuration] = useState("");
   const [professorId, setProfessorId] = useState("");
+
+  // Generate time options
+  const hours = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
+  const minutes = ['00', '15', '30', '45'];
+
+  const getFormattedTime = () => {
+    return `${hour}:${minute} ${ampm}`;
+  };
 
   const validateEmail = (email) => {
     if (type === "professors") {
@@ -33,10 +43,6 @@ const AddModal = ({ type, onClose, onAdd, professors = [], onShowWarning }) => {
         if (onShowWarning) onShowWarning("Please enter a room");
         return;
       }
-      if (!time.trim()) {
-        if (onShowWarning) onShowWarning("Please enter a time");
-        return;
-      }
       if (!duration.trim()) {
         if (onShowWarning) onShowWarning("Please enter a duration");
         return;
@@ -47,11 +53,13 @@ const AddModal = ({ type, onClose, onAdd, professors = [], onShowWarning }) => {
       }
 
       const selectedProf = professors.find(p => p.id === professorId);
+      const formattedTime = getFormattedTime();
+      
       const newCourse = {
         name: name.trim(),
         code: code.trim(),
         room: room.trim(),
-        time: time.trim(),
+        time: formattedTime,
         duration: duration.trim(),
         professorId: professorId,
         professorEmail: selectedProf?.email || "",
@@ -124,12 +132,40 @@ const AddModal = ({ type, onClose, onAdd, professors = [], onShowWarning }) => {
               onChange={e => setRoom(e.target.value)}
               style={styles.input} 
             />
-            <input 
-              placeholder="Time (e.g., 09:00 AM - 11:00 AM)" 
-              value={time}
-              onChange={e => setTime(e.target.value)}
-              style={styles.input} 
-            />
+            {/* Time Picker with Dropdowns */}
+            <div style={styles.timePickerContainer}>
+              <label style={styles.timeLabel}>Class Time:</label>
+              <div style={styles.timePickerRow}>
+                <select 
+                  value={hour}
+                  onChange={e => setHour(e.target.value)}
+                  style={styles.timeSelect}
+                >
+                  {hours.map(h => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+                <span style={styles.timeSeparator}>:</span>
+                <select 
+                  value={minute}
+                  onChange={e => setMinute(e.target.value)}
+                  style={styles.timeSelect}
+                >
+                  {minutes.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+                <select 
+                  value={ampm}
+                  onChange={e => setAmpm(e.target.value)}
+                  style={styles.timeSelect}
+                >
+                  <option value="AM">AM</option>
+                  <option value="PM">PM</option>
+                </select>
+              </div>
+
+            </div>
             <input 
               placeholder="Duration (e.g., 2 hours)" 
               value={duration}
@@ -217,7 +253,40 @@ const styles = {
     borderRadius: "8px",
     fontSize: "14px",
     boxSizing: "border-box"
-  }, 
+  },
+  
+  // Time Picker Styles
+  timePickerContainer: {
+    marginBottom: "15px"
+  },
+  timeLabel: {
+    display: "block",
+    marginBottom: "8px",
+    color: "#173B66",
+    fontSize: "14px",
+    fontWeight: "600"
+  },
+  timePickerRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    marginBottom: "8px"
+  },
+  timeSelect: {
+    padding: "8px 12px",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    fontSize: "14px",
+    backgroundColor: "white",
+    cursor: "pointer",
+    minWidth: "60px"
+  },
+  timeSeparator: {
+    fontSize: "18px",
+    fontWeight: "bold",
+    color: "#173B66"
+  },
+  
   saveBtn: { 
     flex: 1,
     background: "#173B66", 

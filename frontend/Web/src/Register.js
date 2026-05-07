@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { validateRegister } from "./utils/validation";
-import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { useNavigate } from "react-router-dom";
 import Modal from "./components/Modal";
 import { useModal } from "./hooks/useModal";
+import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+
+;
 
 function Register() {
   const [name, setName] = useState("");
@@ -64,6 +66,8 @@ function Register() {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
 
+       await sendEmailVerification(cred.user);
+
       // Save to users collection
       await setDoc(doc(db, "users", cred.user.uid), {
         name,
@@ -92,15 +96,13 @@ function Register() {
         });
       }
 
-      showSuccess("Registration successful!", "Success", () => {
-        if (role === "professor") {
-          window.location.replace("/professor");
-        } else if (role === "student") { 
-          window.location.replace("/student");
-        } else if (role === "admin") {
-          window.location.replace("/admin");
-        }
-      });
+      showSuccess(
+  "Registration successful! Please verify your email before logging in.",
+  "Success",
+  () => {
+    window.location.replace("/login");
+  }
+);
 
     } catch (err) {
       showError("Error: " + err.message);

@@ -16,7 +16,7 @@ const CourseDetails = () => {
   useEffect(() => {
     const fetchDetails = async () => {
       try {
-        const collectionName = type === "prof" ? "professors" : "students";
+        const collectionName = type === "prof" ? "professors" : "users";
         const userDoc = await getDoc(doc(db, collectionName, id));
         
         if (userDoc.exists()) {
@@ -88,10 +88,25 @@ const CourseDetails = () => {
             setCourses(coursesWithStudents);
           } else {
             // Get courses student is enrolled in
+            const studentUid = userDataFromDoc.uid || id;
             const studentCourses = allCourses.filter(course => 
-              (course.enrolledStudents || []).includes(id)
+              (course.enrolledStudents || []).includes(studentUid)
             );
-            setCourses(studentCourses);
+            
+            // Calculate attendance for each course
+            const coursesWithAttendance = await Promise.all(
+              studentCourses.map(async (course) => {
+                const result = await calculateStudentAttendance(course.id, studentUid);
+                return {
+                  ...course,
+                  attendanceRate: result.success ? `${result.data.percentage}%` : "0%",
+                  attendedSessions: result.success ? result.data.attendedSessions : 0,
+                  totalSessions: result.success ? result.data.totalSessions : 0
+                };
+              })
+            );
+            
+            setCourses(coursesWithAttendance);
           }
         } else {
           console.error("User not found");
@@ -183,7 +198,26 @@ const CourseDetails = () => {
               <div key={course.id} style={styles.courseItem}>
                 <div style={styles.courseHeader}>
                   <h4 style={styles.courseName}>{course.name}</h4>
-                  <span style={styles.courseCode}>{course.code}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <span style={styles.courseCode}>{course.code}</span>
+                    {type === "std" && (
+                      <span style={{
+                        ...styles.attendanceBadge,
+                        backgroundColor: parseFloat(course.attendanceRate) >= 75 
+                          ? "#dcfce7" 
+                          : parseFloat(course.attendanceRate) >= 50 
+                            ? "#fef3c7" 
+                            : "#fee2e2",
+                        color: parseFloat(course.attendanceRate) >= 75 
+                          ? "#166534" 
+                          : parseFloat(course.attendanceRate) >= 50 
+                            ? "#92400e" 
+                            : "#dc2626"
+                      }}>
+                        {course.attendanceRate || "0%"}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 
                 <div style={styles.courseStats}>
@@ -206,10 +240,20 @@ const CourseDetails = () => {
                     </div>
                   )}
                   {type === "std" && (
-                    <div style={styles.statItem}>
-                      <FaUsers style={{ marginRight: "5px", color: "#173B66" }} />
-                      <span>Professor: {course.professorName}</span>
-                    </div>
+                    <>
+                      <div style={styles.statItem}>
+                        <FaUsers style={{ marginRight: "5px", color: "#173B66" }} />
+                        <span>Professor: {course.professorName}</span>
+                      </div>
+                      <div style={styles.statItem}>
+                        <FaChartBar style={{ marginRight: "5px", color: "#173B66" }} />
+                        <span>Attendance: {course.attendanceRate || "0%"}</span>
+                      </div>
+                      <div style={styles.statItem}>
+                        <FaChartBar style={{ marginRight: "5px", color: "#173B66" }} />
+                        <span>Sessions: {course.attendedSessions || 0}/{course.totalSessions || 0}</span>
+                      </div>
+                    </>
                   )}
                 </div>
 
@@ -391,6 +435,13 @@ const styles = {
     color: "#173B66",
     fontSize: "14px",
     fontWeight: "600"
+  },
+  attendanceBadge: {
+    padding: "4px 8px",
+    borderRadius: "8px",
+    fontSize: "12px",
+    fontWeight: "bold",
+    display: "inline-block"
   }
 };
 

@@ -1,19 +1,21 @@
 import React, { useState, useEffect } from "react";
-import {
-  TextInput,
-  TouchableOpacity,
-  Text,
-  StyleSheet,
-} from "react-native";
+import { TextInput, TouchableOpacity, Text, StyleSheet } from "react-native";
 import AuthLayout from "../components/AuthInput";
 import { COLORS } from "../theme/color";
 
-import { signInWithEmailAndPassword } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  sendEmailVerification,
+  getAuth,
+  signOut,
+} from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import emailjs from "@emailjs/browser";
 
 import { useAuth } from "../context/AuthContext";
-type Props = { navigation: any; };
+type Props = { navigation: any };
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 export default function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState("");
@@ -28,27 +30,31 @@ export default function LoginScreen({ navigation }: Props) {
       setPassword("");
       setError("");
     };
-    
+
     clearFields();
 
-    const unsubscribe = navigation.addListener('focus', () => {
+    const unsubscribe = navigation.addListener("focus", () => {
       clearFields();
     });
-    
+
     return unsubscribe;
   }, [navigation]);
 
-  const detectRoleFromEmail =(email: string): "student" | "professor" | null => {
+  const detectRoleFromEmail = (
+    email: string,
+  ): "student" | "professor" | null => {
     const cleanEmail = email.trim().toLowerCase();
-    
+
     if (cleanEmail.endsWith("@std.sci.cu.edu.eg")) {
       return "student";
     } else if (cleanEmail.endsWith("@sci.cu.edu.eg")) {
       return "professor";
     }
-    
+
     return null;
   };
+
+
 
   const handleLogin = async () => {
     setError("");
@@ -62,19 +68,37 @@ export default function LoginScreen({ navigation }: Props) {
     const detectedRole = detectRoleFromEmail(cleanEmail);
 
     if (!detectedRole) {
-      setError("Invalid email domain. Use @std.sci.cu.edu.eg for students or @sci.cu.edu.eg for professors.");
+      setError(
+        "Invalid email domain. Use @std.sci.cu.edu.eg for students or @sci.cu.edu.eg for professors.",
+      );
       return;
     }
 
     try {
-      const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
+      const auth = getAuth();
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+
+      await cred.user.reload();
+
+      if (!cred.user.emailVerified) {
+        try {
+          await sendEmailVerification(cred.user);
+          setError("Your account is not vefified Check your email first");
+        } catch (err) {
+          setError("error sending verifiction email.");
+        }
+        await signOut(auth);
+        return;
+      }
 
       const userRef = doc(db, "users", cred.user.uid);
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
         await auth.signOut();
-        setError("Your account is not fully registered yet. Please register first.");
+        setError(
+          "Your account is not fully registered yet. Please register first.",
+        );
         return;
       }
 
@@ -82,19 +106,43 @@ export default function LoginScreen({ navigation }: Props) {
 
       if (userData.role?.toLowerCase() !== detectedRole) {
         await auth.signOut();
-        setError(`Email indicates you are ${detectedRole}, but account is ${userData.role}.`);
+        setError(
+          `Email indicates you are ${detectedRole}, but account is ${userData.role}.`,
+        );
         return;
       }
 
-      setUser(cred.user);
+      try {
+      await fetch("http://192.168.100.89:5000/api/email/send-login-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: cleanEmail,
+          name: userData.name || "User",
+        }),
+      });
+    } catch (err) {
+      console.log("Mobile login email failed:", err);
+    }
+
+      setUser(auth.currentUser);
       setUserRole(userData.role?.toLowerCase());
 
       setEmail("");
       setPassword("");
-
     } catch (err: any) {
       console.log("LOGIN ERROR:", err);
-      setError(err.message || "Login failed");
+      if (
+        err.code === "auth/wrong-password" ||
+        err.code === "auth/user-not-found" ||
+        err.code === "auth/invalid-credential"
+      ) {
+        setError("Invalid email or password.");
+      } else {
+        setError(err.message || "Login failed.");
+      }
     }
   };
 
@@ -123,7 +171,7 @@ export default function LoginScreen({ navigation }: Props) {
         textContentType="none"
       />
 
-      <TouchableOpacity 
+      <TouchableOpacity
         onPress={() => navigation.navigate("ForgotPassword")}
         style={styles.forgotPasswordContainer}
       >

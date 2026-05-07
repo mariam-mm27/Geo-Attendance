@@ -9,6 +9,102 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
+
+/**
+ * Get enrollment date for a student in a specific course
+ */
+export const getEnrollmentDate = async (studentId: string, courseId: string) => {
+  try {
+    const enrollmentQuery = query(
+      collection(db, "enrollments"),
+      where("studentId", "==", studentId),
+      where("courseId", "==", courseId)
+    );
+    const enrollmentSnapshot = await getDocs(enrollmentQuery);
+
+    if (!enrollmentSnapshot.empty) {
+      const enrollmentData = enrollmentSnapshot.docs[0].data();
+      return enrollmentData.enrolledAt?.toDate?.() || enrollmentData.enrolledAt;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error getting enrollment date:", error);
+    return null;
+  }
+};
+
+/**
+ * Calculate attendance based on enrollment date
+ */
+export const calculateAttendanceFromEnrollment = async (studentId: string, courseId: string) => {
+  try {
+    // Get enrollment date
+    const enrollmentDate = await getEnrollmentDate(studentId, courseId);
+    console.log(`📅 Student ${studentId} enrolled on:`, enrollmentDate);
+
+    // Get all sessions for this course
+    const sessionsQuery = query(
+      collection(db, "sessions"),
+      where("courseId", "==", courseId)
+    );
+    const sessionsSnapshot = await getDocs(sessionsQuery);
+
+    // Filter sessions to only count those after enrollment date
+    let totalSessions = 0;
+    let sessionsAfterEnrollment: string[] = [];
+
+    sessionsSnapshot.forEach((sessionDoc) => {
+      const sessionData = sessionDoc.data();
+      const sessionDate = sessionData.createdAt?.toDate?.() || sessionData.createdAt;
+
+      // If no enrollment date found, count all sessions (backward compatibility)
+      // If enrollment date exists, only count sessions after enrollment
+      if (!enrollmentDate || !sessionDate || sessionDate >= enrollmentDate) {
+        totalSessions++;
+        sessionsAfterEnrollment.push(sessionData.sessionId);
+      }
+    });
+
+    console.log(`📊 Total sessions after enrollment: ${totalSessions} (out of ${sessionsSnapshot.size} total)`);
+
+    // Get attendance records for sessions after enrollment
+    const attendanceQuery = query(
+      collection(db, "attendance"),
+      where("studentId", "==", studentId),
+      where("courseId", "==", courseId)
+    );
+    const attendanceSnapshot = await getDocs(attendanceQuery);
+
+    let attendedSessions = 0;
+
+    // Count only attendance for sessions after enrollment
+    attendanceSnapshot.forEach((attendanceDoc) => {
+      const attendanceData = attendanceDoc.data();
+      if (sessionsAfterEnrollment.includes(attendanceData.sessionId)) {
+        attendedSessions++;
+      }
+    });
+
+    console.log(`✅ Attended sessions after enrollment: ${attendedSessions}`);
+
+    const attendanceRate = totalSessions > 0 ? (attendedSessions / totalSessions) * 100 : 100;
+    const absenceRate = 100 - attendanceRate;
+    const missedSessions = totalSessions - attendedSessions;
+
+    return {
+      attendanceRate,
+      absenceRate,
+      attendedSessions,
+      totalSessions,
+      missedSessions,
+      enrollmentDate,
+      sessionsBeforeEnrollment: sessionsSnapshot.size - totalSessions
+    };
+  } catch (error) {
+    console.error("Error calculating attendance from enrollment:", error);
+    return null;
+  }
+};
 export const isSessionLiveNow = (session: any) => {
   const now = new Date();
 
