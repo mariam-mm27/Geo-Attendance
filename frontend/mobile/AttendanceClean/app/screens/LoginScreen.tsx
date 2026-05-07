@@ -54,23 +54,7 @@ export default function LoginScreen({ navigation }: Props) {
     return null;
   };
 
-  const sendWelcomeEmail = async (toEmail: string, toName: string) => {
-    try {
-      await emailjs.send(
-        "service_27llv96",
-        "template_s4w6wf5",
-        {
-          to_name: toName,
-          to_email: toEmail,
-        },
-        "BQqjidSAaAp7XGeqf",
-      );
 
-      console.log("✅ Email sent");
-    } catch (err) {
-      console.log("❌ Email error:", err);
-    }
-  };
 
   const handleLogin = async () => {
     setError("");
@@ -97,14 +81,14 @@ export default function LoginScreen({ navigation }: Props) {
       await cred.user.reload();
 
       if (!cred.user.emailVerified) {
-        try{
-        await sendEmailVerification(cred.user);
-        setError("Your account is not vefified Check your email first");
-        return;
-        }catch(err){
-            setError("error sending verifiction email.");
+        try {
+          await sendEmailVerification(cred.user);
+          setError("Your account is not vefified Check your email first");
+        } catch (err) {
+          setError("error sending verifiction email.");
         }
-         await signOut(auth);
+        await signOut(auth);
+        return;
       }
 
       const userRef = doc(db, "users", cred.user.uid);
@@ -128,7 +112,20 @@ export default function LoginScreen({ navigation }: Props) {
         return;
       }
 
-      await sendWelcomeEmail(cleanEmail, userData.name || "User");
+      try {
+      await fetch("http://192.168.100.89:5000/api/email/send-login-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: cleanEmail,
+          name: userData.name || "User",
+        }),
+      });
+    } catch (err) {
+      console.log("Mobile login email failed:", err);
+    }
 
       setUser(auth.currentUser);
       setUserRole(userData.role?.toLowerCase());

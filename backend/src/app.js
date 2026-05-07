@@ -22,7 +22,6 @@ app.use("/api/courses", courseRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/email", emailRoutes);
 
-app.listen(3001, () => {
-  console.log("🚀 Server running on port 3001");
-  console.log("📧 Email notification system active");
+app.listen(5000, () => {
+  console.log("Server running");
 });

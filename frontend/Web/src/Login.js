@@ -189,99 +189,78 @@ function Login() {
     }
   };
 
-  const sendWelcomeEmail = async (toEmail, toName) => {
-    try {
-      console.log("📨 sending email...");
+ 
 
-      const res = await emailjs.send(
-        "service_27llv96",
-        "template_s4w6wf5",
-        {
-          to_email: toEmail,
-          to_name: toName,
-        },
-        "BQqjidSAaAp7XGeqf",
-      );
-
-      console.log("✅ email sent:", res);
-    } catch (err) {
-      console.log("❌ EmailJS FULL ERROR:", err);
+  const handleLogin = async () => {
+    const error = validateLogin({ email, password });
+    if (error) {
+      alert(error);
+      return;
     }
-  };
 
- const handleLogin = async () => {
-  const error = validateLogin({ email, password });
-  if (error) {
-    alert(error);
-    return;
-  }
+    const cleanEmail = email.trim().toLowerCase();
 
-  const cleanEmail = email.trim().toLowerCase();
+    const detectedRole = detectRoleFromEmail(cleanEmail);
+    if (!detectedRole) {
+      alert("Invalid email domain.");
+      return;
+    }
 
-  const detectedRole = detectRoleFromEmail(cleanEmail);
-  if (!detectedRole) {
-    alert("Invalid email domain.");
-    return;
-  }
+    try {
+      const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
 
-  try {
-    const cred = await signInWithEmailAndPassword(
-      auth,
-      cleanEmail,
-      password
-    );
+      await cred.user.reload();
 
-    
-    await cred.user.reload();
+      const user = cred.user;
 
-    const user = cred.user;
+      if (!user.emailVerified) {
+        try {
+          await sendEmailVerification(user);
+          alert("Email not verified. Check your inbox.");
+        } catch (err) {
+          console.log("Verification email error:", err);
+          alert("Failed to resend verification email.");
+        }
 
-    
-    if (!user.emailVerified) {
-      try {
-        await sendEmailVerification(user);
-        alert("Email not verified. Check your inbox.");
-      } catch (err) {
-        console.log("Verification email error:", err);
-        alert("Failed to resend verification email.");
+        await signOut(auth);
+        return;
       }
 
-      await signOut(auth);
-      return;
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        alert("Account not found.");
+        await signOut(auth);
+        return;
+      }
+
+      const userData = userSnap.data();
+
+      if (userData.role?.toLowerCase() !== detectedRole) {
+        await signOut(auth);
+        alert("Role mismatch.");
+        return;
+      }
+      fetch("http://localhost:5000/api/email/send-login-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          name: userSnap.data().name || "User",
+        }),
+      }).catch((err) => {
+        console.log("Login email failed:", err);
+      });
+
+      redirectUser(userData, cleanEmail);
+    } catch (err) {
+      console.log("LOGIN ERROR:", err);
+      alert("Invalid email or password.");
     }
-
-    const userRef = doc(db, "users", user.uid);
-    const userSnap = await getDoc(userRef);
-
-    if (!userSnap.exists()) {
-      alert("Account not found.");
-      await signOut(auth);
-      return;
-    }
-
-    const userData = userSnap.data();
-
-    
-    if (userData.role?.toLowerCase() !== detectedRole) {
-      await signOut(auth);
-      alert("Role mismatch.");
-      return;
-    }
-
-     console.log("🔥 BEFORE EMAIL CALL");
-    sendWelcomeEmail(cleanEmail, userData.name || "User").catch((err) => {
-      console.log("Email failed but login continues:", err);
-    });
-    console.log("🔥 AFTER EMAIL CALL");
-
-    
-    redirectUser(userData, cleanEmail);
-
-  } catch (err) {
-    console.log("LOGIN ERROR:", err);
-    alert("Invalid email or password.");
-  }
-};
+  };
 
   const handleForgotPassword = async () => {
     if (!resetEmail.trim()) {
