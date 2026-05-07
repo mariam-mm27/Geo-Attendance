@@ -361,3 +361,51 @@ export const sendBulkAbsenceAlerts = async (courseId) => {
     };
   }
 };
+
+export const sendLoginEmail = async (email, name) => {
+  try {
+    const transporter = await createTransporter();
+
+    const mailOptions = {
+      from: `"Attendance System" <${process.env.BREVO_USER || process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Login Successful 🎉",
+
+      html: `
+        <div style="font-family: Arial; padding:20px;">
+          <h2>Hello ${name} 👋</h2>
+
+          <p>
+            You have successfully logged in to Geo-Attendance.
+          </p>
+
+          <p>
+            If this wasn't you, please change your password immediately.
+          </p>
+
+          <br/>
+
+          <p>
+            Geo-Attendance Team
+          </p>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+
+    console.log("✅ Login email sent:", info.messageId);
+
+    return {
+      success: true,
+      messageId: info.messageId,
+    };
+  } catch (error) {
+    console.error("❌ Login email error:", error);
+
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};

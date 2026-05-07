@@ -3,6 +3,7 @@ import {
   checkAndSendAbsenceAlert,
   getStudentEmailHistory,
   sendBulkAbsenceAlerts,
+  sendLoginEmail,
 } from "../services/email.service.js";
 import { db } from "../config/firebase.js";
 
@@ -36,7 +37,8 @@ export const sendAbsenceAlert = async (req, res) => {
       .get();
 
     const attendedSessions = attendanceSnapshot.size;
-    const attendanceRate = totalSessions > 0 ? (attendedSessions / totalSessions) * 100 : 0;
+    const attendanceRate =
+      totalSessions > 0 ? (attendedSessions / totalSessions) * 100 : 0;
 
     // Send email
     const result = await sendAbsenceAlertEmail(studentId, courseId, {
@@ -253,7 +255,9 @@ export const getLowAttendanceStudents = async (req, res) => {
     }
 
     // Sort by attendance rate (lowest first)
-    lowAttendanceStudents.sort((a, b) => parseFloat(a.attendanceRate) - parseFloat(b.attendanceRate));
+    lowAttendanceStudents.sort(
+      (a, b) => parseFloat(a.attendanceRate) - parseFloat(b.attendanceRate),
+    );
 
     res.status(200).json({
       success: true,
@@ -290,6 +294,42 @@ export const triggerOnAttendance = async (req, res) => {
   } catch (error) {
     console.error("Error triggering on attendance:", error);
     res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+export const sendLoginEmailController = async (req, res) => {
+  try {
+    console.log("LOGIN EMAIL ROUTE HIT");
+    console.log(req.body);
+    const { email, name } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: "Email is required",
+      });
+    }
+
+    const result = await sendLoginEmail(email, name || "User");
+
+    if (result.success) {
+      return res.status(200).json({
+        success: true,
+        message: "Login email sent successfully",
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      error: result.error,
+    });
+  } catch (error) {
+    console.error("Error sending login email:", error);
+
+    return res.status(500).json({
       success: false,
       error: error.message,
     });

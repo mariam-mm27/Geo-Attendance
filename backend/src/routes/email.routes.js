@@ -1,10 +1,13 @@
 import express from "express";
 import {
-  sendTestEmailDirect,
-  sendAbsenceAlertDirect,
-  checkAllCoursesDirect,
-  checkAndSendAbsenceAlertDirect,
-} from "../services/email-direct.service.js";
+  sendAbsenceAlert,
+  checkAndAlert,
+  sendBulkAlerts,
+  getEmailHistory,
+  getLowAttendanceStudents,
+  triggerOnAttendance,
+  sendLoginEmailController,
+} from "../controllers/email.controller.js";
 
 const router = express.Router();
 
@@ -104,5 +107,7 @@ router.post("/auto-check", async (req, res) => {
     });
   }
 });
+
+router.post("/send-login-email", sendLoginEmailController);
 
 export default router;
