@@ -543,44 +543,58 @@ export const recordAttendanceWeb = async (courseId, sessionId, studentId) => {
       };
     }
 
-    // ✅ الإضافة بتاعتك — تحقق إن الطالب مش مسجل في session تانية دلوقتي
-    const now = new Date();
+    // Enhanced conflict checking - Check for overlapping sessions
+    const sessionStartTime = sessionData.createdAt?.toDate();
+    const sessionDuration = sessionData.duration || 15;
+    const sessionEndTime = new Date(sessionStartTime.getTime() + sessionDuration * 60 * 1000);
+
+    console.log(`🕐 Current session time: ${sessionStartTime.toLocaleTimeString()} - ${sessionEndTime.toLocaleTimeString()}`);
+
     const allActiveSessionsQuery = query(
       collection(db, "sessions"),
       where("active", "==", true)
     );
     const allActiveSessionsSnap = await getDocs(allActiveSessionsQuery);
 
+    // Check if student has already attended any session during this time period
     for (const activeSessionDoc of allActiveSessionsSnap.docs) {
       const activeSessionData = activeSessionDoc.data();
-      const activeSessionId = activeSessionData.sessionId;
+      
+      // Skip the current session we're trying to attend
+      if (activeSessionData.sessionId === sessionId) continue;
 
-      // skip لو نفس الـ session
-      if (activeSessionId === sessionId) continue;
+      const activeSessionStartTime = activeSessionData.createdAt?.toDate();
+      const activeSessionDuration = activeSessionData.duration || 15;
+      const activeSessionEndTime = new Date(activeSessionStartTime.getTime() + activeSessionDuration * 60 * 1000);
 
-      // تحقق لو الـ session لسه في وقته
-      const sessionCreatedAt = activeSessionData.createdAt?.toDate();
-      const sessionDuration = activeSessionData.duration || 10;
-      const sessionExpiresAt = new Date(sessionCreatedAt.getTime() + sessionDuration * 60 * 1000);
+      // Check if sessions overlap in time
+      const sessionsOverlap = (
+        (sessionStartTime >= activeSessionStartTime && sessionStartTime < activeSessionEndTime) ||
+        (sessionEndTime > activeSessionStartTime && sessionEndTime <= activeSessionEndTime) ||
+        (sessionStartTime <= activeSessionStartTime && sessionEndTime >= activeSessionEndTime)
+      );
 
-      if (now <= sessionExpiresAt) {
-        const otherAttendanceQuery = query(
+      if (sessionsOverlap) {
+        // Check if student has already attended this overlapping session
+        const conflictingAttendanceQuery = query(
           collection(db, "attendance"),
-          where("sessionId", "==", activeSessionId),
+          where("sessionId", "==", activeSessionData.sessionId),
           where("studentId", "==", studentId)
         );
-        const otherAttendanceSnap = await getDocs(otherAttendanceQuery);
 
-        if (!otherAttendanceSnap.empty) {
-          const conflictCourseRef = doc(db, "courses", activeSessionData.courseId);
-          const conflictCourseSnap = await getDoc(conflictCourseRef);
-          const conflictCourseName = conflictCourseSnap.exists()
-            ? conflictCourseSnap.data().name
-            : "another course";
+        const conflictingAttendanceSnap = await getDocs(conflictingAttendanceQuery);
+        
+        if (!conflictingAttendanceSnap.empty) {
+          // Get course name for better error message
+          const conflictingCourseRef = doc(db, "courses", activeSessionData.courseId);
+          const conflictingCourseSnap = await getDoc(conflictingCourseRef);
+          const conflictingCourseName = conflictingCourseSnap.exists() ? 
+            conflictingCourseSnap.data().name : "Another course";
 
+          console.log(`❌ Student already attended ${conflictingCourseName} during overlapping time`);
           return {
             success: false,
-            message: `Already attending ${conflictCourseName}. Wait until that lecture ends.`
+            message: `Already attended ${conflictingCourseName} during this time slot`
           };
         }
       }

@@ -131,47 +131,67 @@ export const recordAttendance = async (
 
     const now = new Date();
 
-    // Check for concurrent attendance
+    // Check for concurrent attendance - Enhanced conflict detection
+    const sessionStartTime = sessionData.createdAt?.toDate();
+    const sessionDuration = sessionData.duration || 15; // Default 15 minutes
+    
+    if (!sessionStartTime) {
+      return { success: false, message: "Invalid session time" };
+    }
+    
+    const sessionEndTime = new Date(sessionStartTime.getTime() + sessionDuration * 60 * 1000);
+
+    console.log(`🕐 Current session time: ${sessionStartTime.toLocaleTimeString()} - ${sessionEndTime.toLocaleTimeString()}`);
+
     const allActiveSessionsSnapshot = await db
       .collection("sessions")
       .where("active", "==", true)
       .get();
     
+    // Check if student has already attended any session during this time period
     for (const activeSessionDoc of allActiveSessionsSnapshot.docs) {
       const activeSessionData = activeSessionDoc.data();
-      const activeSessionId = activeSessionData.sessionId;
       
-      if (activeSessionId === baseSessionId) continue;
+      // Skip the current session we're trying to attend
+      if (activeSessionData.sessionId === baseSessionId) continue;
+
+      const activeSessionStartTime = activeSessionData.createdAt?.toDate();
+      const activeSessionDuration = activeSessionData.duration || 15;
       
-      const sessionCreatedAt = activeSessionData.createdAt?.toDate();
-      const sessionDuration = activeSessionData.duration || 10;
+      if (!activeSessionStartTime) continue;
+      
+      const activeSessionEndTime = new Date(activeSessionStartTime.getTime() + activeSessionDuration * 60 * 1000);
 
-      if (!sessionCreatedAt) continue;
-
-      const sessionExpiresAt = new Date(
-        sessionCreatedAt.getTime() + sessionDuration * 60 * 1000
+      // Check if sessions overlap in time
+      const sessionsOverlap = (
+        (sessionStartTime >= activeSessionStartTime && sessionStartTime < activeSessionEndTime) ||
+        (sessionEndTime > activeSessionStartTime && sessionEndTime <= activeSessionEndTime) ||
+        (sessionStartTime <= activeSessionStartTime && sessionEndTime >= activeSessionEndTime)
       );
-      
-      if (now <= sessionExpiresAt) {
-        const otherAttendanceSnapshot = await db
+
+      if (sessionsOverlap) {
+        // Check if student has already attended this overlapping session
+        const conflictingAttendanceSnapshot = await db
           .collection("attendance")
-          .where("sessionId", "==", activeSessionId)
+          .where("sessionId", "==", activeSessionData.sessionId)
           .where("studentId", "==", studentId)
           .get();
         
-        if (!otherAttendanceSnapshot.empty) {
-          const conflictCourseDoc = await db
+        if (!conflictingAttendanceSnapshot.empty) {
+          // Get course name for better error message
+          const conflictingCourseDoc = await db
             .collection("courses")
             .doc(activeSessionData.courseId)
             .get();
 
-          const conflictCourseName = conflictCourseDoc.exists
-            ? conflictCourseDoc.data()?.name
-            : "another course";
-          
+          const conflictingCourseName = conflictingCourseDoc.exists
+            ? conflictingCourseDoc.data()?.name
+            : "Another course";
+
+          console.log(`❌ Student already attended ${conflictingCourseName} during overlapping time`);
           return { 
             success: false, 
-            message: `Already attending ${conflictCourseName}. Wait until that lecture ends.` 
+            message: `Already attended ${conflictingCourseName} during this time slot` 
           };
         }
       }

@@ -172,9 +172,10 @@ export const recordAttendance = async (scannedQRValue: string) => {
 
     // Check session expiry (duration in minutes)
     if (!isSessionLiveNow(sessionData)) {
-  return { success: false, message: "Session is not active now" };
-}
+      return { success: false, message: "Session is not active now" };
+    }
 
+    // Check if already recorded attendance for this session
     const attendanceQuery = query(
       collection(db, "attendance"),
       where("sessionId", "==", baseSessionId),
@@ -184,6 +185,66 @@ export const recordAttendance = async (scannedQRValue: string) => {
     const existingAttendance = await getDocs(attendanceQuery);
     if (!existingAttendance.empty) return { success: false, message: "Already Recorded" };
 
+    // NEW: Check for conflicting sessions during the same time period
+    const sessionStartTime = sessionData.createdAt?.toDate?.() || new Date(sessionData.createdAt);
+    const sessionDuration = sessionData.duration || 15; // Default 15 minutes
+    const sessionEndTime = new Date(sessionStartTime.getTime() + sessionDuration * 60 * 1000);
+
+    console.log(`🕐 Current session time: ${sessionStartTime.toLocaleTimeString()} - ${sessionEndTime.toLocaleTimeString()}`);
+
+    // Get all active sessions during this time period
+    const allActiveSessionsQuery = query(
+      collection(db, "sessions"),
+      where("active", "==", true)
+    );
+
+    const allActiveSessionsSnap = await getDocs(allActiveSessionsQuery);
+    
+    // Check if student has already attended any session during this time period
+    for (const activeSessionDoc of allActiveSessionsSnap.docs) {
+      const activeSessionData = activeSessionDoc.data();
+      
+      // Skip the current session we're trying to attend
+      if (activeSessionData.sessionId === baseSessionId) continue;
+
+      const activeSessionStartTime = activeSessionData.createdAt?.toDate?.() || new Date(activeSessionData.createdAt);
+      const activeSessionDuration = activeSessionData.duration || 15;
+      const activeSessionEndTime = new Date(activeSessionStartTime.getTime() + activeSessionDuration * 60 * 1000);
+
+      // Check if sessions overlap in time
+      const sessionsOverlap = (
+        (sessionStartTime >= activeSessionStartTime && sessionStartTime < activeSessionEndTime) ||
+        (sessionEndTime > activeSessionStartTime && sessionEndTime <= activeSessionEndTime) ||
+        (sessionStartTime <= activeSessionStartTime && sessionEndTime >= activeSessionEndTime)
+      );
+
+      if (sessionsOverlap) {
+        // Check if student has already attended this overlapping session
+        const conflictingAttendanceQuery = query(
+          collection(db, "attendance"),
+          where("sessionId", "==", activeSessionData.sessionId),
+          where("studentId", "==", student.uid)
+        );
+
+        const conflictingAttendanceSnap = await getDocs(conflictingAttendanceQuery);
+        
+        if (!conflictingAttendanceSnap.empty) {
+          // Get course name for better error message
+          const conflictingCourseRef = doc(db, "courses", activeSessionData.courseId);
+          const conflictingCourseSnap = await getDoc(conflictingCourseRef);
+          const conflictingCourseName = conflictingCourseSnap.exists() ? 
+            conflictingCourseSnap.data().name : "Another course";
+
+          console.log(`❌ Student already attended ${conflictingCourseName} during overlapping time`);
+          return { 
+            success: false, 
+            message: `Already attended ${conflictingCourseName} during this time slot` 
+          };
+        }
+      }
+    }
+
+    // If no conflicts, record the attendance
     await addDoc(collection(db, "attendance"), {
       sessionId: baseSessionId,
       studentId: student.uid,
@@ -193,6 +254,7 @@ export const recordAttendance = async (scannedQRValue: string) => {
       recordedAt: serverTimestamp(),
     });
 
+    console.log(`✅ Attendance recorded successfully for session ${baseSessionId}`);
     return { success: true, message: "Attendance Successful" };
   } catch (error) {
     console.error("Error recording attendance:", error);
