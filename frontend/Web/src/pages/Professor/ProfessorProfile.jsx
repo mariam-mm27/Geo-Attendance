@@ -48,23 +48,52 @@ const ProfessorProfile = () => {
           const professorCourses = [];
           const userEmail = user.email?.toLowerCase();
 
+          console.log("🔍 Professor login debug:");
+          console.log("- User UID:", user.uid);
+          console.log("- User Email:", user.email);
+          console.log("- User Email (lowercase):", userEmail);
+          console.log("- Total courses in database:", coursesSnapshot.size);
+
           coursesSnapshot.forEach((docSnap) => {
             const courseData = docSnap.data();
             const courseProfEmail = courseData.professorEmail?.toLowerCase();
+            const courseProfName = courseData.professorName?.toLowerCase();
+            const userNameLower = userData.name?.toLowerCase();
 
-            if (
-              courseData.professorId === user.uid ||
-              courseProfEmail === userEmail ||
-              courseData.professorEmail === user.email
-            ) {
+            console.log(`📚 Course: ${courseData.name}`);
+            console.log(`  - professorId: ${courseData.professorId}`);
+            console.log(`  - professorEmail: ${courseData.professorEmail}`);
+            console.log(`  - professorName: ${courseData.professorName}`);
+            console.log(`  - courseProfEmail (lowercase): ${courseProfEmail}`);
+            console.log(`  - courseProfName (lowercase): ${courseProfName}`);
+            console.log(`  - userNameLower: ${userNameLower}`);
+
+            const matchesUID = courseData.professorId === user.uid;
+            const matchesEmailLower = courseProfEmail === userEmail;
+            const matchesEmailExact = courseData.professorEmail === user.email;
+            const matchesNameLower = courseProfName === userNameLower;
+            const matchesNamePartial = courseProfName && userNameLower && 
+              (courseProfName.includes(userNameLower) || userNameLower.includes(courseProfName));
+
+            console.log(`  - Matches UID: ${matchesUID}`);
+            console.log(`  - Matches Email (lowercase): ${matchesEmailLower}`);
+            console.log(`  - Matches Email (exact): ${matchesEmailExact}`);
+            console.log(`  - Matches Name (exact): ${matchesNameLower}`);
+            console.log(`  - Matches Name (partial): ${matchesNamePartial}`);
+
+            if (matchesUID || matchesEmailLower || matchesEmailExact || matchesNameLower || matchesNamePartial) {
+              console.log(`✅ MATCH FOUND for course: ${courseData.name}`);
               professorCourses.push({
                 id: docSnap.id,
                 ...courseData,
                 count: (courseData.enrolledStudents || []).length
               });
+            } else {
+              console.log(`❌ NO MATCH for course: ${courseData.name}`);
             }
           });
 
+          console.log(`📊 Total matching courses: ${professorCourses.length}`);
           setCourses(professorCourses);
         }
         setLoading(false);
@@ -225,6 +254,7 @@ const ProfessorProfile = () => {
               <div style={styles.courseDetails}>
                 <p>📍 Location: <strong>{course.room}</strong></p>
                 <p>🕒 Time: <strong>{course.time}</strong></p>
+                <p>⏱️ Duration: <strong>{course.duration ? `${course.duration / 60} hour${course.duration / 60 !== 1 ? 's' : ''}` : 'Not set'}</strong></p>
                 <p>👥 Enrolled: <strong style={{ color: "#173B66" }}>{course.count} Students</strong></p>
 
                 {course.attendanceData && (

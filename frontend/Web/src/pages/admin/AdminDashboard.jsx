@@ -34,6 +34,13 @@ const AdminDashboard = () => {
   const [overallStudentAttendance, setOverallStudentAttendance] = useState(0);
   const { modalState, closeModal, showSuccess, showError, showWarning } = useModal();
   const [confirmAction, setConfirmAction] = useState(null);
+  
+  // New state for comprehensive monitoring
+  const [systemActivity, setSystemActivity] = useState([]);
+  const [allNotifications, setAllNotifications] = useState([]);
+  
+  // Search states
+  const [systemActivitySearch, setSystemActivitySearch] = useState("");
 
   useEffect(() => {
     // Aggressive back button prevention
@@ -141,20 +148,319 @@ const AdminDashboard = () => {
     return () => unsubscribe();
   }, [navigate]);
 
+  // Fetch all notifications for admin monitoring
+  useEffect(() => {
+    const fetchAllNotifications = async () => {
+      try {
+        const notificationsSnapshot = await getDocs(collection(db, "notifications"));
+        const notifications = [];
+        
+        for (const notifDoc of notificationsSnapshot.docs) {
+          const notifData = notifDoc.data();
+          
+          // Get user info
+          const userDoc = await getDoc(doc(db, "users", notifData.userId));
+          const userData = userDoc.exists() ? userDoc.data() : {};
+          
+          notifications.push({
+            id: notifDoc.id,
+            userName: userData.name || userData.Name || "Unknown User",
+            userEmail: userData.email || userData.Email || "Unknown",
+            userRole: userData.role || userData.Role || "Unknown",
+            ...notifData
+          });
+        }
+        
+        // Sort by creation date (newest first)
+        notifications.sort((a, b) => {
+          const dateA = a.createdAt?.toDate?.() || a.createdAt || new Date(0);
+          const dateB = b.createdAt?.toDate?.() || b.createdAt || new Date(0);
+          return dateB - dateA;
+        });
+        
+        setAllNotifications(notifications.slice(0, 200)); // Last 200 notifications
+      } catch (error) {
+        console.error("Error fetching notifications:", error);
+      }
+    };
+
+    fetchAllNotifications();
+  }, []);
+
+  // Fetch comprehensive system activity (all activities in one place)
+  useEffect(() => {
+    const fetchSystemActivity = async () => {
+      try {
+        console.log("Fetching system activity...");
+        const activities = [];
+        
+        // Get recent registrations
+        console.log("Fetching registrations...");
+        const usersSnapshot = await getDocs(collection(db, "users"));
+        let registrationCount = 0;
+        usersSnapshot.forEach((doc) => {
+          const userData = doc.data();
+          // Include all users, not just those with createdAt
+          registrationCount++;
+          activities.push({
+            id: `reg-${doc.id}`,
+            type: "registration",
+            action: "User Registration",
+            userName: userData.name || userData.Name || "Unknown",
+            userEmail: userData.email || userData.Email || "Unknown",
+            userRole: userData.role || userData.Role || "Unknown",
+            timestamp: userData.createdAt?.toDate?.() || userData.registeredAt?.toDate?.() || new Date(2024, 0, 1), // Default date if no timestamp
+            details: `${userData.name || userData.Name || "User"} registered as ${userData.role || userData.Role || "user"}`,
+            searchText: `${userData.name || userData.Name || ""} ${userData.email || userData.Email || ""} ${userData.role || userData.Role || ""} registration`
+          });
+        });
+        console.log("Registrations found:", registrationCount);
+
+        // Get recent enrollments
+        console.log("Fetching enrollments...");
+        const enrollmentsSnapshot = await getDocs(collection(db, "enrollments"));
+        let enrollmentCount = 0;
+        for (const enrollDoc of enrollmentsSnapshot.docs) {
+          const enrollData = enrollDoc.data();
+          enrollmentCount++;
+          
+          // Get student and course info
+          let studentData = {};
+          let courseData = {};
+          
+          try {
+            const studentDoc = await getDoc(doc(db, "users", enrollData.studentId));
+            studentData = studentDoc.exists() ? studentDoc.data() : {};
+          } catch (e) {
+            console.log("Could not fetch student data for enrollment:", enrollData.studentId);
+          }
+          
+          try {
+            const courseDoc = await getDoc(doc(db, "courses", enrollData.courseId));
+            courseData = courseDoc.exists() ? courseDoc.data() : {};
+          } catch (e) {
+            console.log("Could not fetch course data for enrollment:", enrollData.courseId);
+          }
+          
+          activities.push({
+            id: `enroll-${enrollDoc.id}`,
+            type: "enrollment",
+            action: "Course Enrollment",
+            studentName: studentData.name || studentData.Name || "Unknown Student",
+            studentEmail: studentData.email || studentData.Email || "Unknown",
+            courseName: courseData.name || "Unknown Course",
+            courseCode: courseData.code || "Unknown",
+            timestamp: enrollData.enrolledAt?.toDate?.() || enrollData.enrolledAt || new Date(2024, 0, 1),
+            details: `${studentData.name || studentData.Name || "Student"} enrolled in ${courseData.name || "course"}`,
+            searchText: `${studentData.name || studentData.Name || ""} ${studentData.email || studentData.Email || ""} ${courseData.name || ""} ${courseData.code || ""} enrollment`
+          });
+        }
+        console.log("Enrollments found:", enrollmentCount);
+        
+        // Get recent attendance records
+        console.log("Fetching attendance records...");
+        const attendanceSnapshot = await getDocs(collection(db, "attendance"));
+        let attendanceCount = 0;
+        for (const attendDoc of attendanceSnapshot.docs) {
+          const attendData = attendDoc.data();
+          attendanceCount++;
+          
+          // Get student and course info
+          let studentData = {};
+          let courseData = {};
+          
+          try {
+            const studentDoc = await getDoc(doc(db, "users", attendData.studentId));
+            studentData = studentDoc.exists() ? studentDoc.data() : {};
+          } catch (e) {
+            console.log("Could not fetch student data for attendance:", attendData.studentId);
+          }
+          
+          try {
+            const courseDoc = await getDoc(doc(db, "courses", attendData.courseId));
+            courseData = courseDoc.exists() ? courseDoc.data() : {};
+          } catch (e) {
+            console.log("Could not fetch course data for attendance:", attendData.courseId);
+          }
+          
+          activities.push({
+            id: `attend-${attendDoc.id}`,
+            type: "attendance",
+            action: "Attendance Recorded",
+            studentName: studentData.name || studentData.Name || "Unknown",
+            studentEmail: studentData.email || studentData.Email || "",
+            courseName: courseData.name || "Unknown Course",
+            courseCode: courseData.code || "N/A",
+            sessionId: attendData.sessionId,
+            timestamp: attendData.recordedAt?.toDate?.() || attendData.recordedAt || new Date(2024, 0, 1),
+            details: `${studentData.name || studentData.Name || "Student"} attended ${courseData.name || "course"}`,
+            searchText: `${studentData.name || studentData.Name || ""} ${studentData.email || studentData.Email || ""} ${courseData.name || ""} ${courseData.code || ""} ${attendData.sessionId || ""} attendance`
+          });
+        }
+        console.log("Attendance records found:", attendanceCount);
+        
+        // Get recent sessions (both active and inactive)
+        console.log("Fetching sessions...");
+        const sessionsSnapshot = await getDocs(collection(db, "sessions"));
+        let sessionCount = 0;
+        for (const sessionDoc of sessionsSnapshot.docs) {
+          const sessionData = sessionDoc.data();
+          sessionCount++;
+          
+          let courseData = {};
+          try {
+            const courseDoc = await getDoc(doc(db, "courses", sessionData.courseId));
+            courseData = courseDoc.exists() ? courseDoc.data() : {};
+          } catch (e) {
+            console.log("Could not fetch course data for session:", sessionData.courseId);
+          }
+          
+          // Get professor info
+          let professorName = "Unknown Professor";
+          if (sessionData.professorId) {
+            try {
+              const professorDoc = await getDoc(doc(db, "users", sessionData.professorId));
+              if (professorDoc.exists()) {
+                const professorData = professorDoc.data();
+                professorName = professorData.name || professorData.Name || "Unknown Professor";
+              }
+            } catch (e) {
+              console.log("Could not fetch professor data for session:", sessionData.professorId);
+            }
+          }
+
+          // Check if session is currently active
+          const now = new Date();
+          const createdAt = sessionData.createdAt?.toDate?.() || sessionData.createdAt || new Date(2024, 0, 1);
+          const duration = sessionData.duration || 10;
+          const expiresAt = new Date(createdAt.getTime() + duration * 60 * 1000);
+          const isCurrentlyActive = sessionData.active && now <= expiresAt;
+          
+          // Get attendance count for this session
+          let attendanceCount = 0;
+          try {
+            const sessionAttendanceSnapshot = await getDocs(
+              query(collection(db, "attendance"), where("sessionId", "==", sessionData.sessionId))
+            );
+            attendanceCount = sessionAttendanceSnapshot.size;
+          } catch (e) {
+            console.log("Could not fetch attendance count for session:", sessionData.sessionId);
+          }
+          
+          activities.push({
+            id: `session-${sessionDoc.id}`,
+            type: isCurrentlyActive ? "active-session" : "session",
+            action: isCurrentlyActive ? "Active Session" : "Session Created",
+            courseName: courseData.name || "Unknown Course",
+            courseCode: courseData.code || "N/A",
+            professorName: professorName,
+            sessionId: sessionData.sessionId,
+            lectureNumber: sessionData.lectureNumber || "N/A",
+            duration: duration,
+            active: isCurrentlyActive,
+            attendanceCount: attendanceCount,
+            enrolledStudents: courseData.enrolledStudents?.length || 0,
+            timeRemaining: isCurrentlyActive ? Math.max(0, Math.floor((expiresAt - now) / (1000 * 60))) : 0,
+            timestamp: createdAt,
+            details: isCurrentlyActive 
+              ? `Active session for ${courseData.name || "course"} by ${professorName} (${Math.max(0, Math.floor((expiresAt - now) / (1000 * 60)))}min left)`
+              : `Session ${sessionData.lectureNumber || "N/A"} created for ${courseData.name || "course"} by ${professorName}`,
+            searchText: `${courseData.name || ""} ${courseData.code || ""} ${professorName} ${sessionData.sessionId || ""} ${sessionData.lectureNumber || ""} session`
+          });
+        }
+        console.log("Sessions found:", sessionCount);
+        
+        // Sort by timestamp (newest first)
+        activities.sort((a, b) => b.timestamp - a.timestamp);
+        console.log("Total activities:", activities.length);
+        console.log("Activities sample:", activities.slice(0, 3));
+        
+        setSystemActivity(activities);
+      } catch (error) {
+        console.error("Error fetching system activity:", error);
+        setSystemActivity([]); // Set empty array on error
+      }
+    };
+
+    fetchSystemActivity();
+    
+    // Refresh every 30 seconds to keep active sessions updated
+    const interval = setInterval(fetchSystemActivity, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     const fetchProfessors = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "professors"));
-        const professorsData = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
+        // Fetch from both professors collection and users collection with professor role
+        const professorsData = [];
+        
+        // Get from professors collection
+        console.log("Fetching from professors collection...");
+        const professorsSnapshot = await getDocs(collection(db, "professors"));
+        console.log("Professors collection size:", professorsSnapshot.size);
+        professorsSnapshot.docs.forEach(doc => {
+          const profData = doc.data();
+          console.log("Professor from collection:", profData.name || profData.Name, profData.email || profData.Email);
+          professorsData.push({
+            id: doc.id,
+            source: "professors",
+            ...profData
+          });
+        });
+        
+        // Get from users collection with professor role
+        const usersSnapshot = await getDocs(collection(db, "users"));
+        console.log("Checking users collection for professors...");
+        usersSnapshot.docs.forEach(doc => {
+          const userData = doc.data();
+          const userRole = (userData.role || userData.Role || "").toLowerCase();
+          const userName = userData.name || userData.Name || "Unknown";
+          const userEmail = userData.email || userData.Email || "Unknown";
+          
+          console.log("Checking user:", userName, "Role:", userRole, "Email:", userEmail);
+          
+          if (userRole === "professor" || userRole === "prof") {
+            console.log("Found professor in users:", userName, userEmail);
+            
+            // Check if this professor is not already in the professors collection
+            const existingProf = professorsData.find(p => {
+              const pEmail = (p.email || p.Email || "").toLowerCase();
+              const uEmail = userEmail.toLowerCase();
+              return pEmail === uEmail;
+            });
+            
+            if (!existingProf) {
+              console.log("Adding professor from users collection:", userName);
+              professorsData.push({
+                id: doc.id,
+                uid: userData.uid || doc.id,
+                source: "users",
+                name: userName,
+                email: userEmail,
+                // Map user fields to professor fields for consistency
+                Name: userName,
+                Email: userEmail,
+                ...userData
+              });
+            } else {
+              console.log("Professor already exists in professors collection:", userName);
+            }
+          }
+        });
+        
+        console.log("Total professors found:", professorsData.length);
+        console.log("Professors data:", professorsData.map(p => ({ name: p.name || p.Name, email: p.email || p.Email, source: p.source })));
+        
         setProfs(professorsData);
         
         // Calculate stats for each professor
         const profsWithCalculatedStats = await Promise.all(
           professorsData.map(async (prof) => {
-            const stats = await calculateProfessorStats(prof.id, prof.email);
+            // Use appropriate ID and email based on source
+            const profId = prof.source === "users" ? prof.uid || prof.id : prof.id;
+            const profEmail = prof.email || prof.Email;
+            const stats = await calculateProfessorStats(profId, profEmail);
             return {
               ...prof,
               ...stats
@@ -176,13 +482,18 @@ const AdminDashboard = () => {
   // Function to calculate professor statistics
   const calculateProfessorStats = async (professorId, professorEmail) => {
     try {
-      // Get all courses assigned to this professor
+      // Get all courses assigned to this professor using the same logic as professor profile
       const coursesSnapshot = await getDocs(collection(db, "courses"));
       const professorCourses = [];
       
       coursesSnapshot.docs.forEach(doc => {
         const courseData = doc.data();
+        const courseProfEmail = courseData.professorEmail?.toLowerCase();
+        const userEmail = professorEmail?.toLowerCase();
+        
+        // Use the same matching logic as professor profile
         if (courseData.professorId === professorId || 
+            courseProfEmail === userEmail ||
             courseData.professorEmail === professorEmail) {
           professorCourses.push({
             id: doc.id,
@@ -597,6 +908,9 @@ const AdminDashboard = () => {
         <div onClick={() => setActiveTab("alerts")} style={styles.navItem(activeTab === "alerts")}>
           <FaBell style={{ marginRight: "8px" }} /> Alerts
         </div>
+        <div onClick={() => setActiveTab("system-activity")} style={styles.navItem(activeTab === "system-activity")}>
+          🔍 System Activity
+        </div>
         <button onClick={handleLogout} style={styles.logoutBtn}>
           <FaSignOutAlt style={{ marginRight: "8px" }} /> Log Out
         </button>
@@ -862,15 +1176,17 @@ const AdminDashboard = () => {
         <div style={styles.header}>
           <h1 style={{ color: "#173B66", margin: 0, fontSize: "28px" }}>
             {activeTab === "alerts"
-              ? "Student Alerts"
+              ? "Student Alerts & Notifications"
               : activeTab === "logs"
                 ? "Attendance Logs"
-                : `Manage ${activeTab === "professors"
-                  ? "Professors"
-                  : activeTab === "students"
-                    ? "Students"
-                    : "Courses"
-                }`}
+                : activeTab === "system-activity"
+                  ? "System Activity Monitor"
+                  : `Manage ${activeTab === "professors"
+                    ? "Professors"
+                    : activeTab === "students"
+                      ? "Students"
+                      : "Courses"
+                  }`}
           </h1>
           
           {/* Add Button */}
@@ -888,9 +1204,162 @@ const AdminDashboard = () => {
         </div>
 
         {activeTab === "alerts" ? (
-          <AlertsSection courses={courses} students={students} showSuccess={showSuccess} showError={showError} />
+          <AlertsSection 
+            courses={courses} 
+            students={students} 
+            showSuccess={showSuccess} 
+            showError={showError}
+            allNotifications={allNotifications}
+          />
         ) : activeTab === "logs" ? (
           <AttendanceLogs allCourses={courses} />
+        ) : activeTab === "system-activity" ? (
+          <div style={styles.monitoringContainer}>
+            <div style={styles.monitoringHeader}>
+              <h3 style={styles.monitoringTitle}>System Activity Monitor</h3>
+              <span style={styles.monitoringCount}>{systemActivity.length} recent activities</span>
+            </div>
+            
+            {/* Activity Type Tabs */}
+            <div style={styles.activityTabs}>
+              <button 
+                style={styles.activityTab(systemActivitySearch === "")}
+                className="activity-tab"
+                onClick={() => setSystemActivitySearch("")}
+              >
+                All Activities ({systemActivity.length})
+              </button>
+              <button 
+                style={styles.activityTab(systemActivitySearch === "active-session")}
+                className="activity-tab"
+                onClick={() => setSystemActivitySearch("active-session")}
+              >
+                Active Sessions ({systemActivity.filter(a => a.type === "active-session").length})
+              </button>
+              <button 
+                style={styles.activityTab(systemActivitySearch === "session")}
+                className="activity-tab"
+                onClick={() => setSystemActivitySearch("session")}
+              >
+                Sessions ({systemActivity.filter(a => a.type === "session").length})
+              </button>
+              <button 
+                style={styles.activityTab(systemActivitySearch === "attendance")}
+                className="activity-tab"
+                onClick={() => setSystemActivitySearch("attendance")}
+              >
+                Attendance ({systemActivity.filter(a => a.type === "attendance").length})
+              </button>
+              <button 
+                style={styles.activityTab(systemActivitySearch === "enrollment")}
+                className="activity-tab"
+                onClick={() => setSystemActivitySearch("enrollment")}
+              >
+                Enrollments ({systemActivity.filter(a => a.type === "enrollment").length})
+              </button>
+              <button 
+                style={styles.activityTab(systemActivitySearch === "registration")}
+                className="activity-tab"
+                onClick={() => setSystemActivitySearch("registration")}
+              >
+                Registrations ({systemActivity.filter(a => a.type === "registration").length})
+              </button>
+            </div>
+
+            {/* Search Field */}
+            <div style={styles.searchContainer}>
+              <input
+                type="text"
+                placeholder="Search all activities by student, course, professor, session ID, or user..."
+                value={["active-session", "session", "attendance", "enrollment", "registration"].includes(systemActivitySearch) ? "" : systemActivitySearch}
+                onChange={(e) => setSystemActivitySearch(e.target.value)}
+                style={styles.searchInput}
+                className="search-input"
+                disabled={["active-session", "session", "attendance", "enrollment", "registration"].includes(systemActivitySearch)}
+              />
+            </div>
+            
+            <div style={styles.activityFeed}>
+              {systemActivity
+                .filter(activity => {
+                  // Filter by type if specific type is selected
+                  if (["active-session", "session", "attendance", "enrollment", "registration"].includes(systemActivitySearch)) {
+                    return activity.type === systemActivitySearch;
+                  }
+                  
+                  // Filter by search text if searching
+                  if (systemActivitySearch && !["active-session", "session", "attendance", "enrollment", "registration"].includes(systemActivitySearch)) {
+                    return activity.searchText.toLowerCase().includes(systemActivitySearch.toLowerCase());
+                  }
+                  
+                  return true;
+                })
+                .map((activity) => (
+                <div key={activity.id} style={styles.activityItem} className="activity-item">
+                  <div style={styles.activityIcon(activity.type)}>
+                    {activity.type === "attendance" ? "✅" : 
+                     activity.type === "session" ? "📚" : 
+                     activity.type === "active-session" ? "🔴" :
+                     activity.type === "enrollment" ? "📝" :
+                     activity.type === "registration" ? "👤" : "🔔"}
+                  </div>
+                  <div style={styles.activityContent}>
+                    <div style={styles.activityTitle}>
+                      {activity.action}
+                      {activity.type === "active-session" && (
+                        <span style={styles.activeIndicator}>
+                          • {activity.timeRemaining}min left
+                        </span>
+                      )}
+                    </div>
+                    <div style={styles.activityDetails}>{activity.details}</div>
+                    {activity.type === "active-session" && (
+                      <div style={styles.sessionStats}>
+                        <span style={styles.statBadge}>
+                          {activity.attendanceCount}/{activity.enrolledStudents} Present
+                        </span>
+                        <span style={styles.statBadge}>
+                          {activity.enrolledStudents > 0 ? Math.round((activity.attendanceCount / activity.enrolledStudents) * 100) : 0}% Rate
+                        </span>
+                      </div>
+                    )}
+                    <div style={styles.activityTime}>
+                      {activity.timestamp.toLocaleDateString()} at {activity.timestamp.toLocaleTimeString()}
+                    </div>
+                  </div>
+                  <div style={styles.activityType}>
+                    <span style={styles.typeBadge(activity.type)}>
+                      {activity.type === "active-session" ? "Active" :
+                       activity.type === "session" ? "Session" :
+                       activity.type === "attendance" ? "Attendance" :
+                       activity.type === "enrollment" ? "Enrollment" :
+                       activity.type === "registration" ? "Registration" : activity.type}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {systemActivity
+                .filter(activity => {
+                  if (["active-session", "session", "attendance", "enrollment", "registration"].includes(systemActivitySearch)) {
+                    return activity.type === systemActivitySearch;
+                  }
+                  if (systemActivitySearch && !["active-session", "session", "attendance", "enrollment", "registration"].includes(systemActivitySearch)) {
+                    return activity.searchText.toLowerCase().includes(systemActivitySearch.toLowerCase());
+                  }
+                  return true;
+                }).length === 0 && (
+                <div style={styles.emptyState}>
+                  <div style={styles.emptyIcon}>🔍</div>
+                  <div style={styles.emptyTitle}>No activities found</div>
+                  <div style={styles.emptyText}>
+                    {systemActivitySearch && !["active-session", "session", "attendance", "enrollment", "registration"].includes(systemActivitySearch)
+                      ? "Try adjusting your search terms" 
+                      : "No activities of this type yet"}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         ) : activeTab === "professors" ? (
           <UsersTable
             data={profsWithStats}
@@ -1040,6 +1509,282 @@ const styles = {
     justifyContent: "center",
     fontWeight: "bold"
   },
-  card: { background: "white", padding: "20px", borderRadius: "12px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }
+  card: { background: "white", padding: "20px", borderRadius: "12px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" },
+  
+  // New monitoring styles
+  monitoringContainer: {
+    background: "white",
+    borderRadius: "15px",
+    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.05), 0 10px 15px rgba(0, 0, 0, 0.1)",
+    overflow: "hidden"
+  },
+  monitoringHeader: {
+    padding: "24px 30px",
+    borderBottom: "1px solid #E2E8F0",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    background: "#F8FAFC"
+  },
+  monitoringTitle: {
+    fontSize: "20px",
+    fontWeight: "700",
+    color: "#173B66",
+    margin: 0
+  },
+  monitoringCount: {
+    fontSize: "14px",
+    color: "#64748B",
+    fontWeight: "500"
+  },
+  monitoringTable: {
+    overflowX: "auto"
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse"
+  },
+  tableHeaderRow: {
+    backgroundColor: "#F8FAFC"
+  },
+  tableHeaderCell: {
+    padding: "16px 24px",
+    textAlign: "left",
+    fontWeight: "600",
+    color: "#374151",
+    fontSize: "14px",
+    borderBottom: "1px solid #E2E8F0"
+  },
+  tableRow: {
+    borderBottom: "1px solid #F1F5F9",
+    transition: "background-color 0.2s ease"
+  },
+  tableCell: {
+    padding: "16px 24px",
+    verticalAlign: "middle"
+  },
+  userInfo: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px"
+  },
+  avatar: {
+    width: "40px",
+    height: "40px",
+    borderRadius: "50%",
+    backgroundColor: "#173B66",
+    color: "white",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "16px",
+    fontWeight: "600",
+    flexShrink: 0
+  },
+  subText: {
+    fontSize: "12px",
+    color: "#64748B",
+    marginTop: "2px"
+  },
+  roleBadge: (role) => ({
+    padding: "4px 8px",
+    borderRadius: "12px",
+    fontSize: "12px",
+    fontWeight: "600",
+    backgroundColor: role === "student" ? "#DCFCE7" : role === "professor" ? "#FEF3C7" : "#F3F4F6",
+    color: role === "student" ? "#16A34A" : role === "professor" ? "#D97706" : "#374151"
+  }),
+  statusBadge: {
+    padding: "4px 8px",
+    borderRadius: "12px",
+    fontSize: "12px",
+    fontWeight: "600",
+    backgroundColor: "#DCFCE7",
+    color: "#16A34A"
+  },
+  courseBadge: {
+    padding: "4px 8px",
+    borderRadius: "12px",
+    fontSize: "12px",
+    fontWeight: "600",
+    backgroundColor: "#EEF2FF",
+    color: "#3730A3"
+  },
+  
+  // Activity feed styles
+  activityFeed: {
+    maxHeight: "600px",
+    overflowY: "auto",
+    padding: "0 24px 24px"
+  },
+  activityItem: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "16px",
+    padding: "16px",
+    borderBottom: "1px solid #F1F5F9",
+    transition: "background-color 0.2s ease"
+  },
+  activityIcon: (type) => ({
+    width: "40px",
+    height: "40px",
+    borderRadius: "50%",
+    backgroundColor: type === "attendance" ? "#DCFCE7" : 
+                     type === "session" ? "#FEF3C7" : 
+                     type === "active-session" ? "#FEE2E2" :
+                     type === "enrollment" ? "#EEF2FF" :
+                     type === "registration" ? "#F0FDF4" : "#F3F4F6",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "18px",
+    flexShrink: 0
+  }),
+  activityContent: {
+    flex: 1
+  },
+  activityTitle: {
+    fontSize: "16px",
+    fontWeight: "600",
+    color: "#173B66",
+    marginBottom: "4px"
+  },
+  activityDetails: {
+    fontSize: "14px",
+    color: "#64748B",
+    marginBottom: "8px"
+  },
+  activityTime: {
+    fontSize: "12px",
+    color: "#94A3B8"
+  },
+  activityType: {
+    flexShrink: 0
+  },
+  typeBadge: (type) => ({
+    padding: "4px 8px",
+    borderRadius: "12px",
+    fontSize: "12px",
+    fontWeight: "600",
+    backgroundColor: type === "attendance" ? "#DCFCE7" : 
+                     type === "session" ? "#FEF3C7" : 
+                     type === "active-session" ? "#FEE2E2" :
+                     type === "enrollment" ? "#EEF2FF" :
+                     type === "registration" ? "#F0FDF4" : "#F3F4F6",
+    color: type === "attendance" ? "#16A34A" : 
+           type === "session" ? "#D97706" : 
+           type === "active-session" ? "#DC2626" :
+           type === "enrollment" ? "#3730A3" :
+           type === "registration" ? "#15803D" : "#374151"
+  }),
+  
+  // Activity tabs styles
+  activityTabs: {
+    display: "flex",
+    borderBottom: "1px solid #E2E8F0",
+    padding: "0 24px"
+  },
+  activityTab: (active) => ({
+    padding: "12px 16px",
+    border: "none",
+    background: "transparent",
+    color: active ? "#173B66" : "#64748B",
+    fontWeight: active ? "600" : "500",
+    fontSize: "14px",
+    cursor: "pointer",
+    borderBottom: active ? "2px solid #173B66" : "2px solid transparent",
+    transition: "all 0.2s ease"
+  }),
+  
+  // Search container styles
+  searchContainer: {
+    padding: "16px 24px",
+    borderBottom: "1px solid #F1F5F9"
+  },
+  searchInput: {
+    width: "100%",
+    padding: "12px 16px",
+    border: "1px solid #E2E8F0",
+    borderRadius: "8px",
+    fontSize: "14px",
+    outline: "none",
+    transition: "border-color 0.2s ease"
+  },
+  
+  // Empty state styles
+  emptyState: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "60px 20px",
+    textAlign: "center"
+  },
+  emptyIcon: {
+    fontSize: "48px",
+    marginBottom: "16px",
+    opacity: 0.5
+  },
+  emptyTitle: {
+    fontSize: "18px",
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: "8px"
+  },
+  emptyText: {
+    fontSize: "14px",
+    color: "#64748B"
+  },
+  
+  // Active session specific styles
+  activeIndicator: {
+    color: "#DC2626",
+    fontSize: "14px",
+    fontWeight: "600",
+    marginLeft: "8px"
+  },
+  sessionStats: {
+    display: "flex",
+    gap: "8px",
+    marginTop: "8px",
+    marginBottom: "4px"
+  },
+  statBadge: {
+    padding: "2px 6px",
+    borderRadius: "8px",
+    fontSize: "11px",
+    fontWeight: "600",
+    backgroundColor: "#F1F5F9",
+    color: "#64748B"
+  }
 };
+
+// Add CSS for hover effects
+const styleSheet = document.createElement("style");
+styleSheet.type = "text/css";
+styleSheet.innerText = `
+  tr:hover {
+    background-color: #F8FAFC !important;
+  }
+  
+  .activity-item:hover {
+    background-color: #F8FAFC !important;
+  }
+  
+  .active-session-card:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
+  }
+  
+  .search-input:focus {
+    border-color: #173B66 !important;
+    box-shadow: 0 0 0 3px rgba(23, 59, 102, 0.1) !important;
+  }
+  
+  .activity-tab:hover {
+    color: #173B66 !important;
+  }
+`;
+document.head.appendChild(styleSheet);
+
 export default AdminDashboard;

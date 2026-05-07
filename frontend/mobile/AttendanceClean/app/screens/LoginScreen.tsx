@@ -81,7 +81,10 @@ export default function LoginScreen({ navigation }: Props) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    console.log("🔍 Attempting login with email:", cleanEmail);
+    
     const detectedRole = detectRoleFromEmail(cleanEmail);
+    console.log("🎭 Detected role:", detectedRole);
 
     if (!detectedRole) {
       setError(
@@ -92,7 +95,10 @@ export default function LoginScreen({ navigation }: Props) {
 
     try {
       const auth = getAuth();
-      const cred = await signInWithEmailAndPassword(auth, email, password);
+      console.log("🔥 Firebase auth instance:", auth);
+      console.log("📧 Signing in with email:", cleanEmail);
+      
+      const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
 
       await cred.user.reload();
 

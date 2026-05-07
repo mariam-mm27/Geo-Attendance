@@ -48,11 +48,15 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     
-    // Courses collection - public read, admin/professor write
+    // Courses collection - public read, admin/professor write, students can enroll
     match /courses/{courseId} {
       allow read: if true; // Public read for enrollment checks
       allow create: if isAdmin();
-      allow update: if isAdmin() || (isProfessor() && resource.data.professorId == request.auth.uid);
+      allow update: if isAdmin() || 
+                      (isProfessor() && resource.data.professorId == request.auth.uid) ||
+                      (isStudent() && 
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['enrolledStudents']) &&
+                       request.resource.data.enrolledStudents.hasAll(resource.data.enrolledStudents));
       allow delete: if isAdmin();
     }
     
@@ -91,7 +95,8 @@ service cloud.firestore {
     // Enrollments collection
     match /enrollments/{enrollmentId} {
       allow read: if isAuthenticated();
-      allow create: if isAdmin() || isProfessor();
+      allow create: if isAdmin() || isProfessor() || 
+                      (isStudent() && request.resource.data.studentId == request.auth.uid);
       allow update: if isAdmin() || isProfessor();
       allow delete: if isAdmin();
     }

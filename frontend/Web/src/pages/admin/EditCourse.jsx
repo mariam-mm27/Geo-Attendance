@@ -42,12 +42,52 @@ const EditCourse = () => {
           }
         }
 
+        // Fetch professors from both professors collection and users collection
+        const professorsData = [];
+        
+        // Get from professors collection
         const profsSnapshot = await getDocs(collection(db, "professors"));
-        const profsData = profsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setProfessors(profsData);
+        profsSnapshot.docs.forEach(doc => {
+          professorsData.push({
+            id: doc.id,
+            source: "professors",
+            ...doc.data()
+          });
+        });
+        
+        // Get from users collection with professor role
+        const usersSnapshot = await getDocs(collection(db, "users"));
+        usersSnapshot.docs.forEach(doc => {
+          const userData = doc.data();
+          const userRole = (userData.role || userData.Role || "").toLowerCase();
+          const userName = userData.name || userData.Name || "Unknown";
+          const userEmail = userData.email || userData.Email || "Unknown";
+          
+          if (userRole === "professor" || userRole === "prof") {
+            // Check if this professor is not already in the professors collection
+            const existingProf = professorsData.find(p => {
+              const pEmail = (p.email || p.Email || "").toLowerCase();
+              const uEmail = userEmail.toLowerCase();
+              return pEmail === uEmail;
+            });
+            
+            if (!existingProf) {
+              professorsData.push({
+                id: doc.id,
+                uid: userData.uid || doc.id,
+                source: "users",
+                name: userName,
+                email: userEmail,
+                // Map user fields to professor fields for consistency
+                Name: userName,
+                Email: userEmail,
+                ...userData
+              });
+            }
+          }
+        });
+        
+        setProfessors(professorsData);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -73,8 +113,8 @@ const EditCourse = () => {
       showWarning("Please enter a room");
       return;
     }
-    if (!duration.trim()) {
-      showWarning("Please enter a duration");
+    if (!duration) {
+      showWarning("Please select a duration");
       return;
     }
     if (!professorId) {
@@ -90,11 +130,11 @@ const EditCourse = () => {
         name: name.trim(),
         code: code.trim(),
         room: room.trim(),
-        time: `${timeHour}:${timeMinute} ${timePeriod}`,
-        duration: duration.trim(),
+        time: `${timeHour}:${timeMinute} ${timePeriod}`, // Start time only
+        duration: parseInt(duration), // Duration in minutes
         professorId: professorId,
-        professorEmail: selectedProf?.email || "",
-        professorName: selectedProf?.name || "",
+        professorEmail: selectedProf?.email || selectedProf?.Email || "",
+        professorName: selectedProf?.name || selectedProf?.Name || "",
         updatedAt: new Date().toISOString()
       });
 
@@ -158,7 +198,7 @@ const EditCourse = () => {
 
           {/* Time Picker */}
           <div style={styles.formGroup}>
-            <label style={styles.label}>Time</label>
+            <label style={styles.label}>Start Time</label>
             <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
 
               {/* Hour */}
@@ -212,19 +252,29 @@ const EditCourse = () => {
 
             {/* Preview */}
             <div style={styles.timePreview}>
-              🕒 Selected time: <strong>{timeHour}:{timeMinute} {timePeriod}</strong>
+              🕒 Start time: <strong>{timeHour}:{timeMinute} {timePeriod}</strong>
             </div>
           </div>
 
           <div style={styles.formGroup}>
             <label style={styles.label}>Duration</label>
-            <input
-              type="text"
-              placeholder="Duration (e.g., 2 hours)"
+            <select
               value={duration}
               onChange={e => setDuration(e.target.value)}
               style={styles.input}
-            />
+            >
+              <option value="">Select Duration</option>
+              <option value="60">1 hour</option>
+              <option value="120">2 hours</option>
+              <option value="180">3 hours</option>
+              <option value="240">4 hours</option>
+              <option value="300">5 hours</option>
+            </select>
+            {duration && (
+              <div style={styles.durationPreview}>
+                ⏱️ Duration: <strong>{duration / 60} hour{duration / 60 !== 1 ? 's' : ''}</strong>
+              </div>
+            )}
           </div>
 
           <div style={styles.formGroup}>
@@ -237,7 +287,7 @@ const EditCourse = () => {
               <option value="">Select Professor</option>
               {professors.map(prof => (
                 <option key={prof.id} value={prof.id}>
-                  {prof.name} ({prof.email})
+                  {prof.name || prof.Name || 'Unknown'} ({prof.email || prof.Email || 'No email'})
                 </option>
               ))}
             </select>
@@ -336,6 +386,15 @@ const styles = {
     borderRadius: "8px",
     fontSize: "14px",
     color: "#173B66"
+  },
+  durationPreview: {
+    marginTop: "8px",
+    padding: "8px 12px",
+    backgroundColor: "#F0FDF4",
+    border: "1px solid #DCFCE7",
+    borderRadius: "6px",
+    fontSize: "13px",
+    color: "#166534"
   },
   buttonGroup: {
     display: "flex",

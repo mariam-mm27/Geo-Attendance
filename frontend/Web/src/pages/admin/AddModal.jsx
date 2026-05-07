@@ -43,8 +43,8 @@ const AddModal = ({ type, onClose, onAdd, professors = [], onShowWarning }) => {
         if (onShowWarning) onShowWarning("Please enter a room");
         return;
       }
-      if (!duration.trim()) {
-        if (onShowWarning) onShowWarning("Please enter a duration");
+      if (!duration) {
+        if (onShowWarning) onShowWarning("Please select a duration");
         return;
       }
       if (!professorId) {
@@ -59,11 +59,11 @@ const AddModal = ({ type, onClose, onAdd, professors = [], onShowWarning }) => {
         name: name.trim(),
         code: code.trim(),
         room: room.trim(),
-        time: formattedTime,
-        duration: duration.trim(),
+        time: formattedTime, // Start time only
+        duration: parseInt(duration), // Duration in minutes
         professorId: professorId,
-        professorEmail: selectedProf?.email || "",
-        professorName: selectedProf?.name || "",
+        professorEmail: selectedProf?.email || selectedProf?.Email || "",
+        professorName: selectedProf?.name || selectedProf?.Name || "",
         enrolledStudents: [],
         createdAt: new Date().toISOString()
       };
@@ -134,7 +134,7 @@ const AddModal = ({ type, onClose, onAdd, professors = [], onShowWarning }) => {
             />
             {/* Time Picker with Dropdowns */}
             <div style={styles.timePickerContainer}>
-              <label style={styles.timeLabel}>Class Time:</label>
+              <label style={styles.timeLabel}>Start Time:</label>
               <div style={styles.timePickerRow}>
                 <select 
                   value={hour}
@@ -164,14 +164,27 @@ const AddModal = ({ type, onClose, onAdd, professors = [], onShowWarning }) => {
                   <option value="PM">PM</option>
                 </select>
               </div>
-
+              <div style={styles.timePreview}>
+                🕒 Start time: <strong>{getFormattedTime()}</strong>
+              </div>
             </div>
-            <input 
-              placeholder="Duration (e.g., 2 hours)" 
+            <select 
               value={duration}
               onChange={e => setDuration(e.target.value)}
-              style={styles.input} 
-            />
+              style={styles.input}
+            >
+              <option value="">Select Duration</option>
+              <option value="60">1 hour</option>
+              <option value="120">2 hours</option>
+              <option value="180">3 hours</option>
+              <option value="240">4 hours</option>
+              <option value="300">5 hours</option>
+            </select>
+            {duration && (
+              <div style={styles.durationPreview}>
+                ⏱️ Duration: <strong>{duration / 60} hour{duration / 60 !== 1 ? 's' : ''}</strong>
+              </div>
+            )}
             <select 
               value={professorId}
               onChange={e => setProfessorId(e.target.value)}
@@ -180,7 +193,7 @@ const AddModal = ({ type, onClose, onAdd, professors = [], onShowWarning }) => {
               <option value="">Select Professor</option>
               {professors.map(prof => (
                 <option key={prof.id} value={prof.id}>
-                  {prof.name} ({prof.email})
+                  {prof.name || prof.Name || 'Unknown'} ({prof.email || prof.Email || 'No email'})
                 </option>
               ))}
             </select>
@@ -285,6 +298,24 @@ const styles = {
     fontSize: "18px",
     fontWeight: "bold",
     color: "#173B66"
+  },
+  timePreview: {
+    marginTop: "8px",
+    padding: "8px 12px",
+    backgroundColor: "#F0F9FF",
+    border: "1px solid #E0F2FE",
+    borderRadius: "6px",
+    fontSize: "13px",
+    color: "#173B66"
+  },
+  durationPreview: {
+    marginTop: "8px",
+    padding: "8px 12px",
+    backgroundColor: "#F0FDF4",
+    border: "1px solid #DCFCE7",
+    borderRadius: "6px",
+    fontSize: "13px",
+    color: "#166534"
   },
   
   saveBtn: { 

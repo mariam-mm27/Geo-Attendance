@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../../firebase";
-import { collection, getDocs, doc, updateDoc, arrayUnion, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, arrayUnion, getDoc, addDoc, arrayRemove, query, where, deleteDoc } from "firebase/firestore";
 import Modal from "../../components/Modal";
 import { useModal } from "../../hooks/useModal";
 const MAX_COURSES = 6;
@@ -45,31 +45,39 @@ const StudentEnroll = () => {
   }, [navigate]);
 
   const handleEnroll = async (courseId) => {
+    try {
+      const user = auth.currentUser;
+      
+      if (enrolledCourseIds.length >= 6) {
+        showError("You cannot enroll in more than 6 courses");
+        return;
+      }
 
-  try {
-    const user = auth.currentUser;
+      const courseRef = doc(db, "courses", courseId);
 
-   
-    if (enrolledCourseIds.length >= 6) {
-      showError("You cannot enroll in more than 6 courses");
-      return;
+      // Create enrollment record with timestamp (same pattern as admin enrollment)
+      const enrollmentData = {
+        studentId: user.uid,
+        enrolledAt: new Date(),
+        courseId: courseId
+      };
 
+      // Add to enrolledStudents array and create enrollment record
+      await updateDoc(courseRef, {
+        enrolledStudents: arrayUnion(user.uid)
+      });
+
+      // Create enrollment record in separate collection for tracking dates
+      await addDoc(collection(db, "enrollments"), enrollmentData);
+
+      setEnrolledCourseIds([...enrolledCourseIds, courseId]);
+      showSuccess("Successfully enrolled in course with enrollment date tracked!");
+
+    } catch (error) {
+      console.error("Error enrolling:", error);
+      showError("Failed to enroll in course");
     }
-
-    const courseRef = doc(db, "courses", courseId);
-
-    await updateDoc(courseRef, {
-      enrolledStudents: arrayUnion(user.uid)
-    });
-
-    setEnrolledCourseIds([...enrolledCourseIds, courseId]);
-    showSuccess("Successfully enrolled in course!");
-
-  } catch (error) {
-    console.error("Error enrolling:", error);
-    showError("Failed to enroll in course");
-  }
-};
+  };
 
   if (loading) {
     return <div style={styles.loader}>Loading courses...</div>;

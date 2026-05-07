@@ -23,8 +23,13 @@ interface Course {
   id: string;
   name: string;
   code: string;
-  schedule?: { startTime: string; endTime: string }[];
+  room?: string;
   time?: string;
+  duration?: number;
+  professorName?: string;
+  enrolledStudents?: string[];
+  count?: number;
+  schedule?: { startTime: string; endTime: string }[];
 }
 
 
@@ -47,8 +52,8 @@ export default function ProfessorSessionScreen({ navigation }: any) {
   const [lectureCounters, setLectureCounters] = useState<Record<string, number>>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [courseReport, setCourseReport] = useState<any>(null);
-const [activeSessionsList, setActiveSessionsList] = useState<any[]>([]);
-const [showTimeModal, setShowTimeModal] = useState(false);
+  const [activeSessionsList, setActiveSessionsList] = useState<any[]>([]);
+  const [showTimeModal, setShowTimeModal] = useState(false);
   const authContext = useContext(AuthContext);
   if (!authContext) return null;
   const { setUser, setRole } = authContext;
@@ -65,31 +70,69 @@ const [showTimeModal, setShowTimeModal] = useState(false);
           const data = userDoc.data();
           setUserData({ name: data.name, id: user.uid, email: data.email });
 
+          console.log("🔍 Mobile Professor login debug:");
+          console.log("- User UID:", user.uid);
+          console.log("- User Email:", user.email);
+
           const coursesSnapshot = await getDocs(collection(db, "courses"));
           const professorCourses: Course[] = [];
           const userEmail = user.email?.toLowerCase();
 
+          console.log("- Total courses in database:", coursesSnapshot.size);
+
           coursesSnapshot.forEach((docSnap) => {
             const courseData = docSnap.data();
             const courseProfEmail = courseData.professorEmail?.toLowerCase();
-            if (
-              courseData.professorId === user.uid ||
-              courseProfEmail === userEmail
-            ) {
-              professorCourses.push({
-              id: docSnap.id,
-              name: courseData.name,
-              code: courseData.code,
-              schedule: courseData.schedule || [],
-});
-            
+            const courseProfName = courseData.professorName?.toLowerCase();
+            const userNameLower = data.name?.toLowerCase();
 
+            console.log(`📚 Course: ${courseData.name}`);
+            console.log(`  - professorId: ${courseData.professorId}`);
+            console.log(`  - professorEmail: ${courseData.professorEmail}`);
+            console.log(`  - professorName: ${courseData.professorName}`);
+            console.log(`  - courseProfEmail (lowercase): ${courseProfEmail}`);
+            console.log(`  - courseProfName (lowercase): ${courseProfName}`);
+            console.log(`  - userNameLower: ${userNameLower}`);
+
+            const matchesUID = courseData.professorId === user.uid;
+            const matchesEmailLower = courseProfEmail === userEmail;
+            const matchesEmailExact = courseData.professorEmail === user.email;
+            const matchesNameLower = courseProfName === userNameLower;
+            const matchesNamePartial = courseProfName && userNameLower && 
+              (courseProfName.includes(userNameLower) || userNameLower.includes(courseProfName));
+
+            console.log(`  - Matches UID: ${matchesUID}`);
+            console.log(`  - Matches Email (lowercase): ${matchesEmailLower}`);
+            console.log(`  - Matches Email (exact): ${matchesEmailExact}`);
+            console.log(`  - Matches Name (exact): ${matchesNameLower}`);
+            console.log(`  - Matches Name (partial): ${matchesNamePartial}`);
+
+            if (matchesUID || matchesEmailLower || matchesEmailExact || matchesNameLower || matchesNamePartial) {
+              console.log(`✅ MATCH FOUND for course: ${courseData.name}`);
+              professorCourses.push({
+                id: docSnap.id,
+                name: courseData.name,
+                code: courseData.code,
+                room: courseData.room,
+                time: courseData.time,
+                duration: courseData.duration,
+                professorName: courseData.professorName,
+                enrolledStudents: courseData.enrolledStudents || [],
+                count: (courseData.enrolledStudents || []).length,
+                schedule: courseData.schedule || [],
+              });
+            } else {
+              console.log(`❌ NO MATCH for course: ${courseData.name}`);
             }
           });
 
-          const filteredCourses = filterCoursesByCurrentTime(professorCourses);
-          setCourses(filteredCourses);
+          console.log(`📊 Total matching courses: ${professorCourses.length}`);
 
+          // Filter courses by current time - only show courses that are currently active
+          const filteredCourses = filterCoursesByCurrentTime(professorCourses);
+          console.log(`⏰ Courses active right now: ${filteredCourses.length}`);
+          
+          setCourses(filteredCourses); // Only store active courses for session creation
         }
       } catch (error) {
         console.error(error);
@@ -312,45 +355,45 @@ let timer: ReturnType<typeof setInterval>;
                 <Text style={styles.infoText}>Email: {userData.email}</Text>
               </View>
 
-             {courses.length > 0 ? (
-  <>
-    {/* Create Session Card */}
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>Create Attendance Session</Text>
+              {courses.length > 0 ? (
+                <View style={styles.card}>
+                  <Text style={styles.cardTitle}>Create Attendance Session</Text>
+                  <Text style={styles.sessionNote}>
+                    Only courses with current active time slots are available for session creation.
+                  </Text>
 
-      <Picker
-        selectedValue={selectedCourseId}
-        onValueChange={(v) => setSelectedCourseId(v)}
-        style={styles.picker}
-      >
-        <Picker.Item label="Select a Course..." value={null} />
-        {courses.map((c) => (
-          <Picker.Item
-            key={c.id}
-            label={`${c.code} - ${c.name}`}
-            value={c.id}
-          />
-        ))}
-      </Picker>
+                  <Picker
+                    selectedValue={selectedCourseId}
+                    onValueChange={(v) => setSelectedCourseId(v)}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="Select a Course..." value={null} />
+                    {courses.map((c) => (
+                      <Picker.Item
+                        key={c.id}
+                        label={`${c.code} - ${c.name} (${c.time || 'No time set'})`}
+                        value={c.id}
+                      />
+                    ))}
+                  </Picker>
 
-      <TouchableOpacity
-        style={styles.createButton}
-        onPress={handleCreateSession}
-      >
-        <Text style={styles.buttonText}>Create Session</Text>
-      </TouchableOpacity>
-    </View>
-
-
-   
-  </>
-) : (
-  <View style={styles.card}>
-    <Text style={styles.noCoursesText}>
-      No courses assigned yet.
-    </Text>
-  </View>
-)}
+                  <TouchableOpacity
+                    style={styles.createButton}
+                    onPress={handleCreateSession}
+                  >
+                    <Text style={styles.buttonText}>Create Session</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.card}>
+                  <Text style={styles.noCoursesText}>
+                    No courses are currently active for session creation.
+                  </Text>
+                  <Text style={styles.noCoursesSubtext}>
+                    Sessions can only be created during scheduled lecture times.
+                  </Text>
+                </View>
+              )}
 
               {activeSession && (
                 <View style={styles.card}>
@@ -415,10 +458,29 @@ const styles = StyleSheet.create({
   card:{backgroundColor:"#fff",padding:25,borderRadius:20,marginBottom:20,shadowColor:"#000",shadowOpacity:0.1,shadowRadius:15,shadowOffset:{width:0,height:5},elevation:6,borderWidth:1,borderColor:"#E2E8F0"},
   cardTitle:{fontSize:20,fontWeight:"700",color:"#173B66",marginBottom:18,borderBottomWidth:2,borderBottomColor:"#E2E8F0",paddingBottom:10},
   infoText:{fontSize:15,color:"#1E293B",marginBottom:8,lineHeight:22},
+  
+  sessionNote: {
+    fontSize: 13,
+    color: "#64748B",
+    marginBottom: 15,
+    fontStyle: "italic",
+    textAlign: "center",
+    backgroundColor: "#F8FAFC",
+    padding: 10,
+    borderRadius: 8,
+  },
+  
   picker:{height:50,marginBottom:15},
   createButton:{backgroundColor:"#173B66",paddingVertical:14,paddingHorizontal:28,borderRadius:12,alignSelf:"flex-start",shadowColor:"#173B66",shadowOpacity:0.4,shadowRadius:10,shadowOffset:{width:0,height:6},elevation:8,marginTop:10},
   buttonText:{color:"#fff",fontWeight:"700",fontSize:15},
   noCoursesText:{fontSize:15,color:"#64748B",textAlign:"center",paddingVertical:10},
+  noCoursesSubtext: {
+    fontSize: 13,
+    color: "#94A3B8",
+    textAlign: "center",
+    marginTop: 8,
+    fontStyle: "italic",
+  },
   qrContainer:{alignItems:"center",marginTop:20,marginBottom:15},
   qrRefreshText:{fontSize:13,color:"#F59E0B",textAlign:"center",marginTop:10,fontWeight:"600"},
   sessionIdText:{fontSize:12,color:"#64748B",textAlign:"center",marginTop:10},

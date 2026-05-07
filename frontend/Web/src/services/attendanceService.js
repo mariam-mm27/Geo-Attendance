@@ -35,6 +35,8 @@ export const calculateStudentAttendance = async (courseId, studentId) => {
       const enrollmentData = enrollmentSnap.docs[0].data();
       enrollmentDate = enrollmentData.enrolledAt?.toDate?.() || enrollmentData.enrolledAt;
       console.log(`📅 Student ${studentId} enrolled on:`, enrollmentDate);
+    } else {
+      console.log(`⚠️ No enrollment record found for student ${studentId} in course ${courseId}`);
     }
     
     // Get all sessions for this course
@@ -52,15 +54,38 @@ export const calculateStudentAttendance = async (courseId, studentId) => {
       const sessionData = sessionDoc.data();
       const sessionDate = sessionData.createdAt?.toDate?.() || sessionData.createdAt;
       
+      console.log(`🎓 Session ${sessionData.sessionId}: created on ${sessionDate}, enrollment: ${enrollmentDate}`);
+      
       // If no enrollment date found, count all sessions (backward compatibility)
       // If enrollment date exists, only count sessions after enrollment
       if (!enrollmentDate || sessionDate >= enrollmentDate) {
         totalSessions++;
         sessionsAfterEnrollment.push(sessionData.sessionId);
+        console.log(`✅ Session ${sessionData.sessionId} counted (after enrollment)`);
+      } else {
+        console.log(`❌ Session ${sessionData.sessionId} excluded (before enrollment)`);
       }
     });
     
     console.log(`📊 Total sessions after enrollment: ${totalSessions} (out of ${sessionsSnap.size} total)`);
+    
+    // If no sessions after enrollment, student should have 100% attendance
+    if (totalSessions === 0) {
+      console.log(`✅ No sessions after enrollment - student has perfect attendance`);
+      return {
+        success: true,
+        data: {
+          studentId,
+          studentName: studentData.name || "Unknown",
+          attendedSessions: 0,
+          totalSessions: 0,
+          percentage: "100.00", // Perfect attendance if no sessions to attend
+          status: "Good",
+          enrollmentDate: enrollmentDate,
+          sessionsBeforeEnrollment: sessionsSnap.size
+        }
+      };
+    }
     
     // Get attendance records for sessions after enrollment
     const attendanceQuery = query(

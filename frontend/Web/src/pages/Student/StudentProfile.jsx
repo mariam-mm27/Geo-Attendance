@@ -285,7 +285,9 @@ const StudentProfile = () => {
 
       const updatedCourses = await Promise.all(
         courses.map(async (course) => {
+          console.log(`🔍 Calculating attendance for course: ${course.name} (${course.id})`);
           const result = await calculateStudentAttendance(course.id, auth.currentUser.uid);
+          console.log(`📊 Attendance result for ${course.name}:`, result);
           return {
             ...course,
             attendance: result.success ? result.data.percentage : "0",
@@ -862,7 +864,12 @@ const StudentProfile = () => {
                     }}>
                       <span style={{ marginRight: "8px" }}>⏱️</span>
                       <strong style={{ fontWeight: "600", marginRight: "5px" }}>Duration:</strong>
-                      {course.duration || "Not specified"}
+                      {course.duration ? (
+                        typeof course.duration === 'number' ? 
+                          `${course.duration / 60} hour${course.duration / 60 !== 1 ? 's' : ''}` :
+                          // Handle legacy text formats
+                          course.duration.includes('hour') ? course.duration : `${course.duration} minutes`
+                      ) : "Not specified"}
                     </p>
                     <p style={{
                       margin: "8px 0",

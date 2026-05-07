@@ -59,7 +59,14 @@ const UsersTable = ({ data, onDelete, type = "students", allCourses = [], onConf
                       <span style={{ color: "#94a3b8", fontSize: "12px" }}>Not set</span>
                     )}
                   </td>
-                  <td style={{ ...styles.td, textAlign: "center" }}>{item.duration || "-"}</td>
+                  <td style={{ ...styles.td, textAlign: "center" }}>
+                    {item.duration ? (
+                      typeof item.duration === 'number' ? 
+                        `${item.duration / 60} hour${item.duration / 60 !== 1 ? 's' : ''}` :
+                        // Handle legacy text formats
+                        item.duration.includes('hour') ? item.duration : `${item.duration} minutes`
+                    ) : "-"}
+                  </td>
                   <td style={styles.td}>{item.professorName}</td>
                   <td style={{ ...styles.td, textAlign: "center" }}>
                     <button 

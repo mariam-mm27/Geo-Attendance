@@ -55,12 +55,15 @@ const EnrollStudents = () => {
           setEnrolledStudents(data.enrolledStudents || []);
         }
 
-        const snap = await getDocs(collection(db, "students"));
-
-        const students = snap.docs.map(d => ({
-          id: d.id,
-          ...d.data()
-        }));
+        // Fetch students from users collection with student role
+        const usersSnap = await getDocs(collection(db, "users"));
+        const students = usersSnap.docs
+          .map(d => ({
+            id: d.id,
+            uid: d.data().uid || d.id,
+            ...d.data()
+          }))
+          .filter(user => user.role === "student" || user.Role === "student");
 
         setAllStudents(students);
       } catch (err) {
@@ -81,21 +84,28 @@ const EnrollStudents = () => {
 
     setSearchLoading(true);
     try {
-      const snap = await getDocs(collection(db, "students"));
+      // Search in users collection for students
+      const usersSnap = await getDocs(collection(db, "users"));
 
       let found = null;
 
-      snap.forEach((d) => {
+      usersSnap.forEach((d) => {
         const data = d.data();
+        
+        // Only search among students
+        if (data.role !== "student" && data.Role !== "student") return;
 
         if (
           d.id === search ||        
           data.code === search ||   
           data.name?.toLowerCase().includes(search.toLowerCase()) ||   
-          data.email?.toLowerCase().includes(search.toLowerCase())     
+          data.Name?.toLowerCase().includes(search.toLowerCase()) ||   
+          data.email?.toLowerCase().includes(search.toLowerCase()) ||
+          data.Email?.toLowerCase().includes(search.toLowerCase())     
         ) {
           found = {
             id: d.id,
+            uid: data.uid || d.id,
             ...data
           };
         }
@@ -119,26 +129,30 @@ const EnrollStudents = () => {
   const handleEnroll = async (studentId) => {
     try {
       const ref = doc(db, "courses", courseId);
+      
+      // Use the student's UID for enrollment (not document ID)
+      const student = allStudents.find(s => s.id === studentId);
+      const studentUid = student?.uid || studentId;
 
       // Create enrollment record with timestamp
       const enrollmentData = {
-        studentId: studentId,
+        studentId: studentUid,
         enrolledAt: new Date(),
         courseId: courseId
       };
 
       // Add to enrolledStudents array and create enrollment record
       await updateDoc(ref, {
-        enrolledStudents: arrayUnion(studentId)
+        enrolledStudents: arrayUnion(studentUid)
       });
 
       // Create enrollment record in separate collection for tracking dates
       await addDoc(collection(db, "enrollments"), enrollmentData);
 
-      setEnrolledStudents(prev => [...prev, studentId]);
+      setEnrolledStudents(prev => [...prev, studentUid]);
       showSuccess("Student enrolled successfully with enrollment date tracked");
     } catch (err) {
-      console.error(err);
+      console.error("Enrollment error:", err);
       showError("Failed to enroll student");
     }
   };
@@ -146,18 +160,22 @@ const EnrollStudents = () => {
   const handleUnenroll = async (studentId) => {
     try {
       const ref = doc(db, "courses", courseId);
+      
+      // Use the student's UID for unenrollment
+      const student = allStudents.find(s => s.id === studentId);
+      const studentUid = student?.uid || studentId;
 
       await updateDoc(ref, {
-        enrolledStudents: arrayRemove(studentId)
+        enrolledStudents: arrayRemove(studentUid)
       });
 
       setEnrolledStudents(prev =>
-        prev.filter(id => id !== studentId)
+        prev.filter(id => id !== studentUid)
       );
 
       showSuccess("Student unenrolled successfully");
     } catch (err) {
-      console.error(err);
+      console.error("Unenrollment error:", err);
       showError("Failed to unenroll student");
     }
   };
@@ -283,12 +301,12 @@ const EnrollStudents = () => {
                 <div style={styles.infoItem}>
                   <FaIdCard style={styles.infoIcon} />
                   <span style={styles.infoLabel}>Name:</span>
-                  <span style={styles.infoValue}>{searchedStudent.name}</span>
+                  <span style={styles.infoValue}>{searchedStudent.name || searchedStudent.Name}</span>
                 </div>
                 <div style={styles.infoItem}>
                   <FaEnvelope style={styles.infoIcon} />
                   <span style={styles.infoLabel}>Email:</span>
-                  <span style={styles.infoValue}>{searchedStudent.email}</span>
+                  <span style={styles.infoValue}>{searchedStudent.email || searchedStudent.Email}</span>
                 </div>
                 <div style={styles.infoItem}>
                   <FaIdCard style={styles.infoIcon} />
@@ -297,7 +315,7 @@ const EnrollStudents = () => {
                 </div>
               </div>
               <div style={styles.resultActions}>
-                {enrolledStudents.includes(searchedStudent.id) ? (
+                {enrolledStudents.includes(searchedStudent.uid || searchedStudent.id) ? (
                   <button
                     onClick={() => handleUnenroll(searchedStudent.id)}
                     style={styles.unenrollBtn}
@@ -367,7 +385,7 @@ const EnrollStudents = () => {
             </thead>
             <tbody>
               {allStudents.map((student, index) => {
-                const isEnrolled = enrolledStudents.includes(student.id);
+                const isEnrolled = enrolledStudents.includes(student.uid || student.id);
                 return (
                   <tr 
                     key={student.id} 
@@ -379,13 +397,13 @@ const EnrollStudents = () => {
                     <td style={styles.tableCell}>
                       <div style={styles.nameCell}>
                         <div style={styles.avatar}>
-                          {student.name?.charAt(0)?.toUpperCase() || 'S'}
+                          {(student.name || student.Name)?.charAt(0)?.toUpperCase() || 'S'}
                         </div>
-                        <span style={styles.studentName}>{student.name}</span>
+                        <span style={styles.studentName}>{student.name || student.Name}</span>
                       </div>
                     </td>
                     <td style={styles.tableCell}>
-                      <span style={styles.emailText}>{student.email}</span>
+                      <span style={styles.emailText}>{student.email || student.Email}</span>
                     </td>
                     <td style={styles.tableCell}>
                       <span style={styles.codeText}>{student.code}</span>

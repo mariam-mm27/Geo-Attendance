@@ -402,27 +402,88 @@ export const filterCoursesByCurrentTime = (courses: any[]) => {
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
+  console.log(`⏰ Current time: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')} (${currentMinutes} minutes)`);
+
   return courses.filter((course: any) => {
-    if (!course.schedule || !Array.isArray(course.schedule)) return false;
+    console.log(`🔍 Checking course: ${course.name}`);
+    console.log(`  - time: ${course.time}`);
+    console.log(`  - duration: ${course.duration}`);
+    console.log(`  - schedule: ${JSON.stringify(course.schedule)}`);
 
-    return course.schedule.some((slot: any) => {
-      const parseTime = (t: string) => {
-        const clean = t.replace(/"/g, "").trim();
-        const [h, m] = clean.split(":").map(Number);
-        return h * 60 + m;
-      };
+    // Handle new format: time + duration
+    if (course.time && course.duration) {
+      try {
+        // Parse time like "02:00 PM" or "14:00"
+        const timeStr = course.time.toString().trim();
+        let startHour, startMinute;
 
-      const start = parseTime(slot.startTime);
-      const end = parseTime(slot.endTime);
+        if (timeStr.includes('AM') || timeStr.includes('PM')) {
+          // 12-hour format: "02:00 PM"
+          const [time, period] = timeStr.split(' ');
+          const [hourStr, minuteStr] = time.split(':');
+          startHour = parseInt(hourStr);
+          startMinute = parseInt(minuteStr) || 0;
 
-      // حالة عادية: 10:00 - 12:00
-      if (end > start) {
-        return currentMinutes >= start && currentMinutes <= end;
+          if (period.toUpperCase() === 'PM' && startHour !== 12) {
+            startHour += 12;
+          } else if (period.toUpperCase() === 'AM' && startHour === 12) {
+            startHour = 0;
+          }
+        } else {
+          // 24-hour format: "14:00"
+          const [hourStr, minuteStr] = timeStr.split(':');
+          startHour = parseInt(hourStr);
+          startMinute = parseInt(minuteStr) || 0;
+        }
+
+        const startMinutes = startHour * 60 + startMinute;
+        const durationMinutes = course.duration; // duration is already in minutes
+        const endMinutes = startMinutes + durationMinutes;
+
+        console.log(`  - Parsed start: ${startHour}:${startMinute.toString().padStart(2, '0')} (${startMinutes} minutes)`);
+        console.log(`  - Duration: ${course.duration / 60} hours (${course.duration} minutes)`);
+        console.log(`  - End time: ${Math.floor(endMinutes / 60)}:${(endMinutes % 60).toString().padStart(2, '0')} (${endMinutes} minutes)`);
+
+        const isActive = currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+        console.log(`  - Is active: ${isActive}`);
+
+        return isActive;
+      } catch (error) {
+        console.error(`Error parsing time for course ${course.name}:`, error);
+        return false;
       }
+    }
 
-      // حالة midnight: 22:00 - 00:00
-      // end بيبقى 0 أو أصغر من start
-      return currentMinutes >= start || currentMinutes <= end;
-    });
+    // Handle old format: schedule array
+    if (course.schedule && Array.isArray(course.schedule)) {
+      return course.schedule.some((slot: any) => {
+        const parseTime = (t: string) => {
+          const clean = t.replace(/"/g, "").trim();
+          const [h, m] = clean.split(":").map(Number);
+          return h * 60 + m;
+        };
+
+        const start = parseTime(slot.startTime);
+        const end = parseTime(slot.endTime);
+
+        console.log(`  - Schedule slot: ${slot.startTime} - ${slot.endTime}`);
+        console.log(`  - Start: ${start} minutes, End: ${end} minutes`);
+
+        // Normal case: 10:00 - 12:00
+        if (end > start) {
+          const isActive = currentMinutes >= start && currentMinutes <= end;
+          console.log(`  - Is active (normal): ${isActive}`);
+          return isActive;
+        }
+
+        // Midnight case: 22:00 - 00:00
+        const isActive = currentMinutes >= start || currentMinutes <= end;
+        console.log(`  - Is active (midnight): ${isActive}`);
+        return isActive;
+      });
+    }
+
+    console.log(`  - No valid time format found`);
+    return false;
   });
 };
