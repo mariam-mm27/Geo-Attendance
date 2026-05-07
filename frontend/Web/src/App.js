@@ -22,8 +22,6 @@ import SessionAttendance from "./pages/Professor/SessionAttendance";
 
 import NotificationsPage from './pages/NotificationsPage';
 
-import UploadProfileImage from "./components/UploadProfileImage";
-
 import LectureReview from "./pages/Student/LectureReview";
 
 function App() {
@@ -39,16 +37,8 @@ function App() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/professor" element={<ProfessorProfile />} />
           
-        {/* ✅ هنا ضفنا upload مؤقتًا */}
-        <Route 
-          path="/student" 
-          element={
-            <div>
-              <StudentProfile />
-              <UploadProfileImage />
-            </div>
-          } 
-        />
+        {/* Student Dashboard */}
+        <Route path="/student" element={<StudentProfile />} />
 
         {/* Student Routes */}
         <Route path="/student-enroll" element={<StudentEnroll />} />

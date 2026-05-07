@@ -11,7 +11,7 @@ import {
 } from "firebase/firestore";
 
 /* =========================
-   calculateStudentAttendance
+   calculateStudentAttendance (Updated with Enrollment Date)
 ========================= */
 export const calculateStudentAttendance = async (courseId, studentId) => {
   try {
@@ -22,17 +22,47 @@ export const calculateStudentAttendance = async (courseId, studentId) => {
       throw new Error("Course not found");
     }
     
-    let totalSessions = courseSnap.data().totalSessions;
+    // Get enrollment date for this student in this course
+    const enrollmentQuery = query(
+      collection(db, "enrollments"),
+      where("studentId", "==", studentId),
+      where("courseId", "==", courseId)
+    );
+    const enrollmentSnap = await getDocs(enrollmentQuery);
     
-    if (!totalSessions) {
-      const sessionsQuery = query(
-        collection(db, "sessions"),
-        where("courseId", "==", courseId)
-      );
-      const sessionsSnap = await getDocs(sessionsQuery);
-      totalSessions = sessionsSnap.size;
+    let enrollmentDate = null;
+    if (!enrollmentSnap.empty) {
+      const enrollmentData = enrollmentSnap.docs[0].data();
+      enrollmentDate = enrollmentData.enrolledAt?.toDate?.() || enrollmentData.enrolledAt;
+      console.log(`📅 Student ${studentId} enrolled on:`, enrollmentDate);
     }
     
+    // Get all sessions for this course
+    const sessionsQuery = query(
+      collection(db, "sessions"),
+      where("courseId", "==", courseId)
+    );
+    const sessionsSnap = await getDocs(sessionsQuery);
+    
+    // Filter sessions to only count those after enrollment date
+    let totalSessions = 0;
+    let sessionsAfterEnrollment = [];
+    
+    sessionsSnap.forEach((sessionDoc) => {
+      const sessionData = sessionDoc.data();
+      const sessionDate = sessionData.createdAt?.toDate?.() || sessionData.createdAt;
+      
+      // If no enrollment date found, count all sessions (backward compatibility)
+      // If enrollment date exists, only count sessions after enrollment
+      if (!enrollmentDate || sessionDate >= enrollmentDate) {
+        totalSessions++;
+        sessionsAfterEnrollment.push(sessionData.sessionId);
+      }
+    });
+    
+    console.log(`📊 Total sessions after enrollment: ${totalSessions} (out of ${sessionsSnap.size} total)`);
+    
+    // Get attendance records for sessions after enrollment
     const attendanceQuery = query(
       collection(db, "attendance"),
       where("courseId", "==", courseId),
@@ -40,7 +70,17 @@ export const calculateStudentAttendance = async (courseId, studentId) => {
     );
     
     const attendanceSnap = await getDocs(attendanceQuery);
-    const attendedSessions = attendanceSnap.size;
+    let attendedSessions = 0;
+    
+    // Count only attendance for sessions after enrollment
+    attendanceSnap.forEach((attendanceDoc) => {
+      const attendanceData = attendanceDoc.data();
+      if (sessionsAfterEnrollment.includes(attendanceData.sessionId)) {
+        attendedSessions++;
+      }
+    });
+    
+    console.log(`✅ Attended sessions after enrollment: ${attendedSessions}`);
     
     const percentage = totalSessions > 0 
       ? (attendedSessions / totalSessions) * 100 
@@ -58,7 +98,9 @@ export const calculateStudentAttendance = async (courseId, studentId) => {
         attendedSessions,
         totalSessions,
         percentage: percentage.toFixed(2),
-        status: percentage >= 75 ? "Good" : percentage >= 50 ? "Warning" : "Low"
+        status: percentage >= 75 ? "Good" : percentage >= 50 ? "Warning" : "Low",
+        enrollmentDate: enrollmentDate,
+        sessionsBeforeEnrollment: sessionsSnap.size - totalSessions
       }
     };
     

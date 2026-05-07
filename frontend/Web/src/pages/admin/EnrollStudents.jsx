@@ -8,7 +8,8 @@ import {
   getDocs,
   updateDoc,
   arrayUnion,
-  arrayRemove
+  arrayRemove,
+  addDoc
 } from "firebase/firestore";
 import { 
   FaArrowLeft, 
@@ -119,12 +120,23 @@ const EnrollStudents = () => {
     try {
       const ref = doc(db, "courses", courseId);
 
+      // Create enrollment record with timestamp
+      const enrollmentData = {
+        studentId: studentId,
+        enrolledAt: new Date(),
+        courseId: courseId
+      };
+
+      // Add to enrolledStudents array and create enrollment record
       await updateDoc(ref, {
         enrolledStudents: arrayUnion(studentId)
       });
 
+      // Create enrollment record in separate collection for tracking dates
+      await addDoc(collection(db, "enrollments"), enrollmentData);
+
       setEnrolledStudents(prev => [...prev, studentId]);
-      showSuccess("Student enrolled successfully");
+      showSuccess("Student enrolled successfully with enrollment date tracked");
     } catch (err) {
       console.error(err);
       showError("Failed to enroll student");

@@ -6,6 +6,102 @@ import { collection, doc, getDoc, getDocs, query, where, addDoc } from "firebase
 dotenv.config();
 
 /**
+ * Get enrollment date for a student in a specific course
+ */
+const getEnrollmentDate = async (studentId, courseId) => {
+  try {
+    const enrollmentQuery = query(
+      collection(db, "enrollments"),
+      where("studentId", "==", studentId),
+      where("courseId", "==", courseId)
+    );
+    const enrollmentSnapshot = await getDocs(enrollmentQuery);
+
+    if (!enrollmentSnapshot.empty) {
+      const enrollmentData = enrollmentSnapshot.docs[0].data();
+      return enrollmentData.enrolledAt?.toDate?.() || enrollmentData.enrolledAt;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error getting enrollment date:", error);
+    return null;
+  }
+};
+
+/**
+ * Calculate attendance based on enrollment date
+ */
+const calculateAttendanceFromEnrollment = async (studentId, courseId) => {
+  try {
+    // Get enrollment date
+    const enrollmentDate = await getEnrollmentDate(studentId, courseId);
+    console.log(`📅 Student ${studentId} enrolled on:`, enrollmentDate);
+
+    // Get all sessions for this course
+    const sessionsQuery = query(
+      collection(db, "sessions"),
+      where("courseId", "==", courseId)
+    );
+    const sessionsSnapshot = await getDocs(sessionsQuery);
+
+    // Filter sessions to only count those after enrollment date
+    let totalSessions = 0;
+    let sessionsAfterEnrollment = [];
+
+    sessionsSnapshot.forEach((sessionDoc) => {
+      const sessionData = sessionDoc.data();
+      const sessionDate = sessionData.createdAt?.toDate?.() || sessionData.createdAt;
+
+      // If no enrollment date found, count all sessions (backward compatibility)
+      // If enrollment date exists, only count sessions after enrollment
+      if (!enrollmentDate || !sessionDate || sessionDate >= enrollmentDate) {
+        totalSessions++;
+        sessionsAfterEnrollment.push(sessionData.sessionId);
+      }
+    });
+
+    console.log(`📊 Total sessions after enrollment: ${totalSessions} (out of ${sessionsSnapshot.size} total)`);
+
+    // Get attendance records for sessions after enrollment
+    const attendanceQuery = query(
+      collection(db, "attendance"),
+      where("studentId", "==", studentId),
+      where("courseId", "==", courseId)
+    );
+    const attendanceSnapshot = await getDocs(attendanceQuery);
+
+    let attendedSessions = 0;
+
+    // Count only attendance for sessions after enrollment
+    attendanceSnapshot.forEach((attendanceDoc) => {
+      const attendanceData = attendanceDoc.data();
+      if (sessionsAfterEnrollment.includes(attendanceData.sessionId)) {
+        attendedSessions++;
+      }
+    });
+
+    console.log(`✅ Attended sessions after enrollment: ${attendedSessions}`);
+
+    const attendanceRate = totalSessions > 0 ? (attendedSessions / totalSessions) * 100 : 100;
+    const absenceRate = 100 - attendanceRate;
+    const missedSessions = totalSessions - attendedSessions;
+
+    return {
+      attendanceRate,
+      absenceRate,
+      attendedSessions,
+      totalSessions,
+      missedSessions,
+      enrollmentDate,
+      sessionsBeforeEnrollment: sessionsSnapshot.size - totalSessions
+    };
+  } catch (error) {
+    console.error("Error calculating attendance from enrollment:", error);
+    return null;
+  }
+};
+
+/**
  * Create email transporter with Brevo SMTP priority
  */
 const createTransporter = async () => {
@@ -224,26 +320,19 @@ export const sendAbsenceAlertDirect = async (req, res) => {
 
     const courseData = courseDoc.data();
 
-    // Calculate attendance using Client SDK - match frontend logic
-    const sessionsQuery = query(
-      collection(db, "sessions"),
-      where("courseId", "==", courseId)
-      // Remove active=false filter to match frontend behavior
-    );
-    const sessionsSnapshot = await getDocs(sessionsQuery);
-    const totalSessions = sessionsSnapshot.size;
+    // Calculate attendance using enrollment-based logic
+    const attendanceData = await calculateAttendanceFromEnrollment(studentId, courseId);
+    
+    if (!attendanceData) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to calculate attendance data",
+      });
+    }
 
-    const attendanceQuery = query(
-      collection(db, "attendance"),
-      where("studentId", "==", studentId),
-      where("courseId", "==", courseId)
-    );
-    const attendanceSnapshot = await getDocs(attendanceQuery);
-    const attendedSessions = attendanceSnapshot.size;
+    const { attendanceRate, absenceRate, attendedSessions, totalSessions, missedSessions, enrollmentDate, sessionsBeforeEnrollment } = attendanceData;
 
-    const attendanceRate = totalSessions > 0 ? (attendedSessions / totalSessions) * 100 : 100;
-    const absenceRate = 100 - attendanceRate;
-    const missedSessions = totalSessions - attendedSessions;
+    console.log(`📊 Enrollment-based calculation: ${attendedSessions}/${totalSessions} = ${attendanceRate.toFixed(2)}% (${sessionsBeforeEnrollment} sessions before enrollment excluded)`);
 
     // Check if absence exceeds any threshold (10%, 20%, or 25%)
     if (absenceRate < 10) {
@@ -254,6 +343,8 @@ export const sendAbsenceAlertDirect = async (req, res) => {
           attendanceRate: attendanceRate.toFixed(2),
           absenceRate: absenceRate.toFixed(2),
           threshold: "10%",
+          enrollmentDate: enrollmentDate,
+          sessionsBeforeEnrollment: sessionsBeforeEnrollment
         },
       });
     }
@@ -486,10 +577,11 @@ export const sendAbsenceAlertDirect = async (req, res) => {
 /**
  * Check attendance and automatically send alert if thresholds are exceeded
  * Called automatically when attendance is recorded
+ * Uses enrollment-based calculation
  */
 export const checkAndSendAbsenceAlertDirect = async (studentId, courseId) => {
   try {
-    console.log(`🔍 Checking attendance for student ${studentId} in course ${courseId}`);
+    console.log(`🔍 Checking enrollment-based attendance for student ${studentId} in course ${courseId}`);
     
     // Get student data using Client SDK
     const studentDocRef = doc(db, "users", studentId);
@@ -513,32 +605,22 @@ export const checkAndSendAbsenceAlertDirect = async (studentId, courseId) => {
 
     const courseData = courseDoc.data();
 
-    // Calculate attendance using Client SDK - match frontend logic
-    const sessionsQuery = query(
-      collection(db, "sessions"),
-      where("courseId", "==", courseId)
-    );
-    const sessionsSnapshot = await getDocs(sessionsQuery);
-    const totalSessions = sessionsSnapshot.size;
-
-    if (totalSessions === 0) {
-      console.log(`⚠️ No sessions found for course ${courseId}`);
-      return { success: true, emailSent: false, message: "No sessions recorded yet" };
+    // Calculate attendance using enrollment-based logic
+    const attendanceData = await calculateAttendanceFromEnrollment(studentId, courseId);
+    
+    if (!attendanceData) {
+      console.log(`❌ Failed to calculate enrollment-based attendance for student ${studentId}`);
+      return { success: false, message: "Failed to calculate attendance data" };
     }
 
-    const attendanceQuery = query(
-      collection(db, "attendance"),
-      where("studentId", "==", studentId),
-      where("courseId", "==", courseId)
-    );
-    const attendanceSnapshot = await getDocs(attendanceQuery);
-    const attendedSessions = attendanceSnapshot.size;
+    const { attendanceRate, absenceRate, attendedSessions, totalSessions, missedSessions, enrollmentDate, sessionsBeforeEnrollment } = attendanceData;
 
-    const attendanceRate = (attendedSessions / totalSessions) * 100;
-    const absenceRate = 100 - attendanceRate;
-    const missedSessions = totalSessions - attendedSessions;
+    console.log(`📊 Enrollment-based calculation: ${attendedSessions}/${totalSessions} = ${attendanceRate.toFixed(2)}% (${sessionsBeforeEnrollment} sessions before enrollment excluded)`);
 
-    console.log(`📊 Student ${studentData.name}: ${attendanceRate.toFixed(2)}% attendance, ${absenceRate.toFixed(2)}% absence`);
+    if (totalSessions === 0) {
+      console.log(`⚠️ No sessions found after enrollment date for course ${courseId}`);
+      return { success: true, emailSent: false, message: "No sessions recorded after enrollment" };
+    }
 
     // Check if absence exceeds any threshold (10%, 20%, or 25%)
     if (absenceRate < 10) {
@@ -741,7 +823,8 @@ export const checkAndSendAbsenceAlertDirect = async (studentId, courseId) => {
             <div style="background: #E0F2FE; padding: 15px; border-radius: 8px; margin: 20px 0;">
               <p style="margin: 0; color: #0369A1; font-size: 14px;">
                 📧 This email was automatically sent when your attendance was recorded.<br>
-                📱 You can also view this alert in your student dashboard.
+                📱 You can also view this alert in your student dashboard.<br>
+                📅 Calculation based on sessions after enrollment date: ${enrollmentDate ? enrollmentDate.toLocaleDateString() : 'N/A'}
               </p>
             </div>
           </div>

@@ -8,6 +8,7 @@ import {
   Alert,
   Image,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { signOut } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { doc, getDoc, getDocs } from "firebase/firestore";
@@ -72,21 +73,77 @@ export default function StudentHomeScreen({ navigation }: any) {
     getStudentData();
   }, []);
 
-  // ✅ load unread notifications
+  // ✅ load unread notifications (including calculated alerts)
   useEffect(() => {
-    const fetchUnread = async () => {
+    const fetchUnreadCount = async () => {
       const user = auth.currentUser;
       if (!user) return;
-      const q = query(
-        collection(db, "notifications"),
-        where("userId", "==", user.uid),
-        where("read", "==", false)
-      );
-      const snap = await getDocs(q);
-      setUnreadCount(snap.size);
+
+      try {
+        // Get database notifications
+        const notifQuery = query(
+          collection(db, "notifications"),
+          where("userId", "==", user.uid),
+          where("read", "==", false)
+        );
+        const snapshot = await getDocs(notifQuery);
+        let dbUnreadCount = snapshot.size;
+
+        // Get calculated alerts from course attendance data - always generate all 3 types
+        const coursesSnapshot = await getDocs(collection(db, "courses"));
+        let calculatedAlertsCount = 0;
+
+        // Get read calculated alerts from AsyncStorage (mobile equivalent of localStorage)
+        const readCalculatedAlerts = JSON.parse(
+          await AsyncStorage.getItem(`readCalculatedAlerts_${user.uid}`) || '[]'
+        );
+
+        for (const courseDoc of coursesSnapshot.docs) {
+          const courseData = courseDoc.data();
+          if ((courseData.enrolledStudents || []).includes(user.uid)) {
+            // Always count all 3 types of alerts for each course
+            const firstAlertId = `calc-${courseDoc.id}-first`;
+            const secondAlertId = `calc-${courseDoc.id}-second`;
+            const deniedAlertId = `calc-${courseDoc.id}-denied`;
+
+            if (!readCalculatedAlerts.includes(firstAlertId)) {
+              calculatedAlertsCount++;
+            }
+            if (!readCalculatedAlerts.includes(secondAlertId)) {
+              calculatedAlertsCount++;
+            }
+            if (!readCalculatedAlerts.includes(deniedAlertId)) {
+              calculatedAlertsCount++;
+            }
+          }
+        }
+
+        const totalUnreadCount = dbUnreadCount + calculatedAlertsCount;
+        
+        // Debug logging
+        console.log('🔔 Mobile Notification Count Debug:', {
+          dbUnreadCount,
+          calculatedAlertsCount,
+          totalUnreadCount,
+          readCalculatedAlerts: readCalculatedAlerts.length,
+          coursesCount: coursesSnapshot.size
+        });
+
+        setUnreadCount(totalUnreadCount);
+      } catch (error) {
+        console.error("Error fetching unread count:", error);
+      }
     };
-    fetchUnread();
-  }, []);
+
+    fetchUnreadCount();
+
+    // Add focus listener to refresh count when user returns to this screen
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchUnreadCount();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const handleLogout = async () => {
     try {
