@@ -8,35 +8,19 @@ import {
   Alert,
   Image,
   ScrollView,
-  ActivityIndicator,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { signOut } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { doc, getDoc, getDocs } from "firebase/firestore";
 import { AuthContext } from "../context/AuthContext";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { Ionicons } from "@expo/vector-icons";
-import { getUnreadCount } from "../services/notificationService";
-import { calculateAttendanceFromEnrollment } from "../services/attendanceService";
+import { collection, query, where } from "firebase/firestore";
 
 type Student = {
   name: string;
   id: string;
   email: string;
   photoURL: string;
-};
-
-type Course = {
-  id: string;
-  name: string;
-  code: string;
-  room: string;
-  time: string;
-  duration: number;
-  professorName: string;
-  attendance: string;
-  attendanceDetails?: any;
 };
 
 export default function StudentHomeScreen({ navigation }: any) {
@@ -47,39 +31,12 @@ export default function StudentHomeScreen({ navigation }: any) {
     photoURL: "",
   });
 
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loadingCourses, setLoadingCourses] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
   const authContext = useContext(AuthContext);
   if (!authContext) return null;
   const { setUser, setRole } = authContext;
-
-  // Helper functions for attendance styling
-  const getAttendanceColor = (attendance: string) => {
-    const absence = 100 - parseFloat(attendance);
-    if (absence >= 25) return "#EF4444"; // Red - Denied
-    if (absence >= 20) return "#F59E0B"; // Orange - Second Warning
-    if (absence >= 10) return "#EAB308"; // Yellow - First Warning
-    return "#10B981"; // Green - Good
-  };
-
-  const getAttendanceStyle = (attendance: string) => {
-    const absence = 100 - parseFloat(attendance);
-    if (absence >= 25) return { backgroundColor: "#FEE2E2", borderColor: "#FECACA" };
-    if (absence >= 20) return { backgroundColor: "#FEF3C7", borderColor: "#FCD34D" };
-    if (absence >= 10) return { backgroundColor: "#FEF9C3", borderColor: "#FDE047" };
-    return { backgroundColor: "#F0F9FF", borderColor: "#E0F2FE" };
-  };
-
-  const getAttendanceStatusText = (attendance: string) => {
-    const absence = 100 - parseFloat(attendance);
-    if (absence >= 25) return `🚫 Denied from Final Exam — absence ${absence.toFixed(1)}%`;
-    if (absence >= 20) return `⚠️ Second Warning — absence ${absence.toFixed(1)}%`;
-    if (absence >= 10) return `⚠️ First Warning — absence ${absence.toFixed(1)}%`;
-    return "✅ Good standing";
-  };
 
   useEffect(() => {
     const getStudentData = async () => {
@@ -104,9 +61,6 @@ export default function StudentHomeScreen({ navigation }: any) {
             email: data.email,
             photoURL: data.photoURL || "",
           });
-
-          // Fetch courses after getting student data
-          await fetchStudentCourses(user.uid);
         }
       } catch (error) {
         console.log("Error fetching student data:", error);
@@ -116,58 +70,6 @@ export default function StudentHomeScreen({ navigation }: any) {
 
     getStudentData();
   }, []);
-
-  const fetchStudentCourses = async (studentUid: string) => {
-    setLoadingCourses(true);
-    try {
-      console.log("🔍 Fetching courses for student:", studentUid);
-      
-      // Get all courses where student is enrolled
-      const coursesSnapshot = await getDocs(collection(db, "courses"));
-      console.log("📚 Total courses in database:", coursesSnapshot.size);
-      
-      const enrolledCourses: Course[] = [];
-
-      for (const courseDoc of coursesSnapshot.docs) {
-        const courseData = courseDoc.data();
-        console.log(`📖 Course: ${courseData.name}, enrolledStudents:`, courseData.enrolledStudents);
-        
-        if ((courseData.enrolledStudents || []).includes(studentUid)) {
-          console.log(`✅ Student enrolled in: ${courseData.name}`);
-          
-          // Calculate attendance for this course
-          console.log(`📊 Calculating attendance for ${courseData.name}...`);
-          const attendanceResult = await calculateAttendanceFromEnrollment(studentUid, courseDoc.id);
-          console.log(`📈 Attendance result:`, attendanceResult);
-          
-          enrolledCourses.push({
-            id: courseDoc.id,
-            name: courseData.name,
-            code: courseData.code,
-            room: courseData.room,
-            time: courseData.time,
-            duration: courseData.duration,
-            professorName: courseData.professorName,
-            attendance: attendanceResult ? attendanceResult.attendanceRate.toFixed(2) : "0",
-            attendanceDetails: attendanceResult ? {
-              attendedSessions: attendanceResult.attendedSessions,
-              totalSessions: attendanceResult.totalSessions
-            } : null
-          });
-        } else {
-          console.log(`❌ Student NOT enrolled in: ${courseData.name}`);
-        }
-      }
-
-      console.log(`📊 Found ${enrolledCourses.length} enrolled courses:`, enrolledCourses);
-      setCourses(enrolledCourses);
-    } catch (error) {
-      console.error("❌ Error fetching courses:", error);
-      Alert.alert("Error", "Failed to load courses");
-    } finally {
-      setLoadingCourses(false);
-    }
-  };
 
   // ✅ load unread notifications (including calculated alerts)
   useEffect(() => {
@@ -244,7 +146,6 @@ export default function StudentHomeScreen({ navigation }: any) {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      setStudent({ name: "", id: "", email: "", photoURL: "" });
       setUser(null);
       setRole(null);
       navigation.reset({ index: 0, routes: [{ name: "Login" }] });
@@ -352,81 +253,6 @@ export default function StudentHomeScreen({ navigation }: any) {
             <Text style={styles.label}>Email</Text>
             <Text style={styles.value}>{student.email}</Text>
           </View>
-        </View>
-
-        {/* My Courses Section */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>My Courses</Text>
-          
-          {loadingCourses ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#173B66" />
-              <Text style={styles.loadingText}>Loading courses...</Text>
-            </View>
-          ) : courses.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>
-                You are not enrolled in any courses yet.
-              </Text>
-            </View>
-          ) : (
-            courses.map((course) => (
-              <View key={course.id} style={styles.courseCard}>
-                <View style={styles.courseHeader}>
-                  <Text style={styles.courseName}>{course.name}</Text>
-                  <Text style={styles.courseCode}>{course.code}</Text>
-                </View>
-                
-                <View style={styles.courseDetails}>
-                  <Text style={styles.courseDetailText}>📍 Room: {course.room}</Text>
-                  <Text style={styles.courseDetailText}>🕒 Time: {course.time}</Text>
-                  <Text style={styles.courseDetailText}>
-                    ⏱️ Duration: {course.duration ? 
-                      (typeof course.duration === 'number' ? 
-                        `${course.duration / 60} hour${course.duration / 60 !== 1 ? 's' : ''}` :
-                        course.duration
-                      ) : "Not specified"}
-                  </Text>
-                  <Text style={styles.courseDetailText}>👨‍🏫 Professor: {course.professorName || "Not assigned"}</Text>
-                </View>
-
-                {/* Attendance Section */}
-                <View style={[styles.attendanceSection, getAttendanceStyle(course.attendance)]}>
-                  <View style={styles.attendanceHeader}>
-                    <Text style={styles.attendanceLabel}>Attendance Rate</Text>
-                    <Text style={styles.attendancePercentage}>{course.attendance}%</Text>
-                  </View>
-                  
-                  <View style={styles.attendanceBar}>
-                    <View 
-                      style={[
-                        styles.attendanceProgress, 
-                        { 
-                          width: `${course.attendance}%`,
-                          backgroundColor: getAttendanceColor(course.attendance)
-                        }
-                      ]} 
-                    />
-                  </View>
-
-                  <Text style={[styles.attendanceStatus, { color: getAttendanceColor(course.attendance) }]}>
-                    {getAttendanceStatusText(course.attendance)}
-                  </Text>
-
-                  {course.attendanceDetails && (
-                    <View style={styles.attendanceStats}>
-                      <Text style={styles.attendanceStatText}>
-                        ✅ {course.attendanceDetails.attendedSessions} attended
-                      </Text>
-                      <Text style={styles.attendanceStatText}>
-                        📚 {course.attendanceDetails.totalSessions} total
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            ))
-          )}
         </View>
 
         <TouchableOpacity
@@ -601,124 +427,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#1E293B",
-  },
-
-  loadingContainer: {
-    alignItems: "center",
-    padding: 20,
-  },
-
-  loadingText: {
-    marginTop: 10,
-    color: "#64748B",
-    fontSize: 16,
-  },
-
-  emptyContainer: {
-    alignItems: "center",
-    padding: 20,
-  },
-
-  emptyText: {
-    color: "#64748B",
-    fontSize: 16,
-    textAlign: "center",
-  },
-
-  courseCard: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-
-  courseHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-
-  courseName: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#173B66",
-    flex: 1,
-  },
-
-  courseCode: {
-    backgroundColor: "#E0F2FE",
-    color: "#173B66",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-
-  courseDetails: {
-    marginBottom: 15,
-  },
-
-  courseDetailText: {
-    fontSize: 14,
-    color: "#64748B",
-    marginBottom: 4,
-  },
-
-  attendanceSection: {
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-
-  attendanceHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-
-  attendanceLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-  },
-
-  attendancePercentage: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#374151",
-  },
-
-  attendanceBar: {
-    height: 6,
-    backgroundColor: "#E5E7EB",
-    borderRadius: 3,
-    marginBottom: 8,
-  },
-
-  attendanceProgress: {
-    height: "100%",
-    borderRadius: 3,
-  },
-
-  attendanceStatus: {
-    fontSize: 12,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-
-  attendanceStats: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-
-  attendanceStatText: {
-    fontSize: 12,
-    color: "#6B7280",
   },
 
   scanButton: {
