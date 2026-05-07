@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { auth } from "../../firebase";
 import { getStudentAttendanceHistory } from '../../services/attendanceService';
+import { analyzeAttendance } from "../../utils/attendanceAI";
+import AttendanceCard from "../../components/AttendanceCard";
 
 const AttendanceHistory = () => {
   const { courseId } = useParams();
@@ -9,6 +11,7 @@ const AttendanceHistory = () => {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [analysis, setAnalysis] = useState(null);
   const [courseName, setCourseName] = useState(location.state?.courseName || "Course");
 
   useEffect(() => {
@@ -16,9 +19,12 @@ const AttendanceHistory = () => {
       setLoading(true);
       const result = await getStudentAttendanceHistory(courseId, auth.currentUser.uid);
 
-      if (result.success) {
-        setSessions(result.data);
-      }
+   if (result.success) {
+  setSessions(result.data);
+
+  const analysisResult = analyzeAttendance(result.data);
+  setAnalysis(analysisResult);
+}
       setLoading(false);
     };
 
@@ -68,6 +74,10 @@ const AttendanceHistory = () => {
         <p style={{ color: "#64748B", fontSize: "16px", marginBottom: "40px" }}>
           View all attendance sessions and your status
         </p>
+
+        {analysis && (
+  <AttendanceCard analysis={analysis} />
+)}
 
         {loading ? (
           <div style={{ textAlign: "center", padding: "60px" }}>

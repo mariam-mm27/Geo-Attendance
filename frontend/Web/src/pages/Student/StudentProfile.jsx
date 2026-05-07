@@ -54,9 +54,9 @@ const getAttendanceStatus = (attendance) => {
   const absence = 100 - parseFloat(attendance);
 
   if (absence >= 25) return "danger";
-  if (absence >= 20) return "second warning";
-  if (absence >= 10) return "first warning";
-  return "good";
+  if (absence >= 10) return "warning";
+
+  return "ok";
 };
 
 const StudentProfile = () => {
