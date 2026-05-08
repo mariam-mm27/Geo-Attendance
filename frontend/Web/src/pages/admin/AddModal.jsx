@@ -3,6 +3,7 @@ import { useState } from "react";
 const AddModal = ({ type, onClose, onAdd, professors = [], onShowWarning }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [room, setRoom] = useState("");
   const [hour, setHour] = useState("09");
@@ -59,8 +60,8 @@ const AddModal = ({ type, onClose, onAdd, professors = [], onShowWarning }) => {
         name: name.trim(),
         code: code.trim(),
         room: room.trim(),
-        time: formattedTime, // Start time only
-        duration: parseInt(duration), // Duration in minutes
+        time: formattedTime,
+        duration: parseInt(duration),
         professorId: professorId,
         professorEmail: selectedProf?.email || selectedProf?.Email || "",
         professorName: selectedProf?.name || selectedProf?.Name || "",
@@ -85,6 +86,18 @@ const AddModal = ({ type, onClose, onAdd, professors = [], onShowWarning }) => {
       return;
     }
 
+    // ✅ التحقق من الباسورد للدكتور
+    if (type === "professors") {
+      if (!password.trim()) {
+        if (onShowWarning) onShowWarning("Please enter a password");
+        return;
+      }
+      if (password.trim().length < 6) {
+        if (onShowWarning) onShowWarning("Password must be at least 6 characters");
+        return;
+      }
+    }
+
     if (type === "students" && !code.trim()) {
       if (onShowWarning) onShowWarning("Please enter a student ID");
       return;
@@ -97,6 +110,11 @@ const AddModal = ({ type, onClose, onAdd, professors = [], onShowWarning }) => {
       attendance: "0%",
       createdAt: new Date().toISOString()
     };
+
+    // ✅ ضيف الباسورد للدكتور
+    if (type === "professors") {
+      newRecord.password = password.trim();
+    }
 
     if (type === "students") {
       newRecord.code = code.trim();
@@ -214,6 +232,17 @@ const AddModal = ({ type, onClose, onAdd, professors = [], onShowWarning }) => {
               style={styles.input} 
               type="email"
             />
+
+            {/* ✅ Password field للدكتور بس */}
+            {type === "professors" && (
+              <input 
+                placeholder="Password (min 6 characters)" 
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                style={styles.input} 
+                type="password"
+              />
+            )}
             
             {type === "students" && (
               <input 
@@ -238,6 +267,7 @@ const AddModal = ({ type, onClose, onAdd, professors = [], onShowWarning }) => {
     </div>
   );
 };
+
 const styles = {
   overlay: { 
     position: "fixed", 
@@ -341,4 +371,5 @@ const styles = {
     fontSize: "14px"
   }
 };
+
 export default AddModal;
