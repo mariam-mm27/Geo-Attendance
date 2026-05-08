@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { auth, db } from "../../firebase";
+import { auth, db, firebaseConfig } from "../../firebase";
 import { signOut } from "firebase/auth";
-import { collection, getDocs, addDoc, deleteDoc, doc, getDoc, onSnapshot, query, where ,updateDoc} from "firebase/firestore";
+import { collection, getDocs, addDoc, deleteDoc, doc, getDoc, onSnapshot, query, where, updateDoc } from "firebase/firestore";
 import { FaUserGraduate, FaChalkboardTeacher, FaSignOutAlt, FaPlus, FaUserShield, FaBell } from "react-icons/fa";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import UsersTable from "./UsersTable";
@@ -13,7 +13,8 @@ import AttendanceLogs from "./AttendanceLogs";
 import AlertsSection from "./AlertsSection";
 import { calculateOverallStudentAttendance } from '../../services/attendanceService';
 import { createUserWithEmailAndPassword } from "firebase/auth";
-
+import { initializeApp,deleteApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -35,6 +36,7 @@ const AdminDashboard = () => {
   const [overallStudentAttendance, setOverallStudentAttendance] = useState(0);
   const { modalState, closeModal, showSuccess, showError, showWarning } = useModal();
   const [confirmAction, setConfirmAction] = useState(null);
+
 
   // New state for comprehensive monitoring
   const [systemActivity, setSystemActivity] = useState([]);
@@ -330,7 +332,7 @@ const AdminDashboard = () => {
         let sessionCount = 0;
         for (const sessionDoc of sessionsSnapshot.docs) {
           const sessionData = sessionDoc.data();
-          if(!sessionData)
+          if (!sessionData)
             continue;
           sessionCount++;
 
@@ -833,12 +835,43 @@ const AdminDashboard = () => {
     }
   };
 
+
   const handleAddProfessor = async (newProf) => {
     try {
-      const docRef = await addDoc(collection(db, "professors"), newProf);
-      setProfs([...profs, { id: docRef.id, ...newProf }]);
+      
+      const secondaryApp = initializeApp(firebaseConfig, `Secondary-${Date.now()}`);
+      const secondaryAuth = getAuth(secondaryApp);
+
+      const userCredential = await createUserWithEmailAndPassword(
+        secondaryAuth,
+        newProf.email,
+        newProf.password
+      );
+      const uid = userCredential.user.uid;
+
+
+      const { password, ...profData } = newProf;
+      await addDoc(collection(db, "users"), {
+        ...profData,
+        uid: uid,
+        role: "professor",
+        Name: newProf.name,
+        Email: newProf.email,
+      });
+
+      
+      await secondaryAuth.signOut();
+      await deleteApp(secondaryApp);
+
+      setProfs([...profs, { id: uid, uid, source: "users", ...profData }]);
+      showSuccess("Professor added successfully!");
     } catch (error) {
       console.error("Error adding professor:", error);
+      if (error.code === "auth/email-already-in-use") {
+        showError("This email already has an account!");
+      } else {
+        showError("Failed to add professor: " + error.message);
+      }
     }
   };
 
@@ -854,26 +887,26 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteProfessor = async (id) => {
-  try {
-    const prof = profs.find(p => p.id === id);
-    
-    if (prof?.source === "users") {
-      // امسحه من users collection
-      await deleteDoc(doc(db, "users", id));
-    } else {
-      // امسحه من professors collection
-      await deleteDoc(doc(db, "professors", id));
+    try {
+      const prof = profs.find(p => p.id === id);
+
+      if (prof?.source === "users") {
+        // امسحه من users collection
+        await deleteDoc(doc(db, "users", id));
+      } else {
+        // امسحه من professors collection
+        await deleteDoc(doc(db, "professors", id));
+      }
+
+      setProfs(profs.filter(prof => prof.id !== id));
+      showSuccess("Professor deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting professor:", error);
+      showError("Failed to delete professor");
     }
-    
-    setProfs(profs.filter(prof => prof.id !== id));
-    showSuccess("Professor deleted successfully!");
-  } catch (error) {
-    console.error("Error deleting professor:", error);
-    showError("Failed to delete professor");
-  }
-};
-    
- 
+  };
+
+
 
   const handleDeleteStudent = async (id) => {
     try {

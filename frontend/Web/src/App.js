@@ -22,7 +22,7 @@ import CourseSessions from "./pages/Professor/CourseSessions";
 import SessionAttendance from "./pages/Professor/SessionAttendance";
 
 import NotificationsPage from './pages/NotificationsPage';
-import FloatingChatBot from './components/FloatingChatBot';
+
 
 import LectureReview from "./pages/Student/LectureReview";
 
@@ -81,8 +81,7 @@ const AppWithChat = () => {
         <Route path="/notifications" element={<NotificationsPage />} />
       </Routes>
 
-      {/* Floating AI Chat Assistant */}
-      {showChat && <FloatingChatBot />}
+    
     </>
   );
 };
