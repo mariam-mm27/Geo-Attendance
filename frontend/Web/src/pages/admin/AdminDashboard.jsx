@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { auth, db } from "../../firebase";
 import { signOut } from "firebase/auth";
-import { collection, getDocs, addDoc, deleteDoc, doc, getDoc, onSnapshot, query, where } from "firebase/firestore";
+import { collection, getDocs, addDoc, deleteDoc, doc, getDoc, onSnapshot, query, where ,updateDoc} from "firebase/firestore";
 import { FaUserGraduate, FaChalkboardTeacher, FaSignOutAlt, FaPlus, FaUserShield, FaBell } from "react-icons/fa";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import UsersTable from "./UsersTable";
@@ -12,6 +12,7 @@ import { useModal } from "../../hooks/useModal";
 import AttendanceLogs from "./AttendanceLogs";
 import AlertsSection from "./AlertsSection";
 import { calculateOverallStudentAttendance } from '../../services/attendanceService';
+import { createUserWithEmailAndPassword } from "firebase/auth";
 
 
 const AdminDashboard = () => {
