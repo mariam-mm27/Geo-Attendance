@@ -12,7 +12,7 @@ export class BackgroundJobService {
   constructor() {
     this.isProcessing = false;
     this.retryQueue = [];
-    this.processingInterval = 30000; // 30 seconds
+    this.processingInterval = 600000; // 10 min
     this.maxRetries = 3;
     this.startBackgroundProcessor();
   }
@@ -21,9 +21,13 @@ export class BackgroundJobService {
    * Start the background processor
    */
   startBackgroundProcessor() {
+  // Start after 5 minutes delay, then every 10 minutes
+  setTimeout(() => {
+    this.processPendingJobs();
     setInterval(() => {
       this.processPendingJobs();
     }, this.processingInterval);
+  }, 300000); // 5 minutes initial delay
 
     console.log('🔄 Background job processor started');
   }
