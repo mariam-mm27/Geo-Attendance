@@ -452,6 +452,7 @@ const AdminDashboard = () => {
           });
         });
 
+
         // Get from users collection with professor role
         const usersSnapshot = await getDocs(collection(db, "users"));
         console.log("Checking users collection for professors...");
@@ -852,15 +853,26 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteProfessor = async (id) => {
-    try {
+  try {
+    const prof = profs.find(p => p.id === id);
+    
+    if (prof?.source === "users") {
+      // امسحه من users collection
+      await deleteDoc(doc(db, "users", id));
+    } else {
+      // امسحه من professors collection
       await deleteDoc(doc(db, "professors", id));
-      setProfs(profs.filter(prof => prof.id !== id));
-      showSuccess("Professor deleted successfully!");
-    } catch (error) {
-      console.error("Error deleting professor:", error);
-      showError("Failed to delete professor");
     }
-  };
+    
+    setProfs(profs.filter(prof => prof.id !== id));
+    showSuccess("Professor deleted successfully!");
+  } catch (error) {
+    console.error("Error deleting professor:", error);
+    showError("Failed to delete professor");
+  }
+};
+    
+ 
 
   const handleDeleteStudent = async (id) => {
     try {
