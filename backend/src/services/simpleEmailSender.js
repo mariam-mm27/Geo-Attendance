@@ -4,8 +4,10 @@
  * This WILL work or fail loudly
  */
 
-const nodemailer = require('nodemailer');
-require('dotenv').config();
+import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 let transporter = null;
 
@@ -86,19 +88,19 @@ async function sendWarningEmail(studentEmail, studentName, courseName, metrics, 
   const colors = {
     FIRST_WARNING: '#FFC107',
     SECOND_WARNING: '#FF9800',
-    DEPRIVATION: '#F44336'
+    FINAL_EXAM_DENIED: '#F44336'
   };
 
   const titles = {
     FIRST_WARNING: '⚠️ First Warning',
     SECOND_WARNING: '⚠️⚠️ Second Warning',
-    DEPRIVATION: '🚫 Course Denial'
+    FINAL_EXAM_DENIED: '🚫 Course Denial'
   };
 
   const messages = {
     FIRST_WARNING: 'You have reached 10% absence rate.',
     SECOND_WARNING: 'You have reached 20% absence rate.',
-    DEPRIVATION: 'You have exceeded 25% absence. You are denied from the final exam.'
+    FINAL_EXAM_DENIED: 'You have exceeded 25% absence. You are denied from the final exam.'
   };
 
   const color = colors[warningLevel] || '#FFC107';
@@ -150,7 +152,7 @@ async function sendWarningEmail(studentEmail, studentName, courseName, metrics, 
   return sendEmail(studentEmail, `${title} - ${courseName}`, html);
 }
 
-module.exports = {
+export {
   sendEmail,
   sendWarningEmail,
   initTransporter

@@ -6,6 +6,7 @@ import courseRoutes from "./routes/course.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import emailRoutes from "./routes/email.routes.js";
 import chatRoutes from "./routes/chat.routes.js";
+import chatbotRoutes from "./routes/chatbot.routes.js";
 import realtimeWarningRoutes from "./routes/realtimeWarning.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 
@@ -25,6 +26,7 @@ app.use("/api/courses", courseRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/email", emailRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/realtime", realtimeWarningRoutes);
 app.use("/api/admin", adminRoutes);
 

@@ -1,4 +1,4 @@
-  import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { AuthContext } from "../context/AuthContext";
 import { getCourseReport } from "../services/attendanceService";
 import { getActiveSessionsForProfessor , isSessionLiveNow } from "../services/attendanceService";
 import { filterCoursesByCurrentTime } from "../services/attendanceService";
+import FloatingChatButton from "../components/FloatingChatButton";
  
 interface Course {
   id: string;
@@ -330,6 +331,9 @@ let timer: ReturnType<typeof setInterval>;
           </View>
         </>
       )}
+
+      {/* Floating Chat Button */}
+      <FloatingChatButton onPress={() => navigation.navigate("Chat")} />
 
       <View style={styles.headerBar}>
         <TouchableOpacity onPress={() => setIsSidebarOpen(true)} style={styles.menuButton}>

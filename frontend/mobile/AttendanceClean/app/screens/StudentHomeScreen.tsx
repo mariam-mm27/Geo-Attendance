@@ -15,6 +15,7 @@ import { auth, db } from "../firebase";
 import { doc, getDoc, getDocs } from "firebase/firestore";
 import { AuthContext } from "../context/AuthContext";
 import { collection, query, where } from "firebase/firestore";
+import FloatingChatButton from "../components/FloatingChatButton";
 
 type Student = {
   name: string;
@@ -187,6 +188,9 @@ export default function StudentHomeScreen({ navigation }: any) {
         </>
       )}
 
+      {/* Floating Chat Button */}
+      <FloatingChatButton onPress={() => navigation.navigate("Chat")} />
+
       {/* ✅ HEADER */}
       <View style={styles.headerBar}>
         <TouchableOpacity
@@ -262,13 +266,7 @@ export default function StudentHomeScreen({ navigation }: any) {
           <Text style={styles.buttonText}>Scan QR</Text>
         </TouchableOpacity>
 
-        {/* Chat Button */}
-        <TouchableOpacity
-          style={styles.chatButton}
-          onPress={() => navigation.navigate("Chat")}
-        >
-          <Text style={styles.buttonText}>💬 Chat with AI Assistant</Text>
-        </TouchableOpacity>
+        {/* Removed Chat Button - Use floating icon instead */}
       </ScrollView>
     </SafeAreaView>
   );
