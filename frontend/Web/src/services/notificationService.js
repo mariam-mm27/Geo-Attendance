@@ -1,7 +1,7 @@
 import { db } from '../firebase';
-import { collection, query, where, orderBy, limit, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
-const API_BASE_URL = 'http://YOUR_BACKEND_URL:3000/api/notifications';
+const API_BASE_URL = 'http://localhost:5000/api/notifications';
 
 /**
  * Check if student's absence exceeds threshold
@@ -113,5 +113,59 @@ export const checkCourseAbsences = async (courseId) => {
   } catch (error) {
     console.error('Error checking course absences:', error);
     return null;
+  }
+};
+
+/**
+ * Delete a single notification
+ */
+export const deleteNotification = async (notificationId) => {
+  try {
+    const notificationRef = doc(db, 'notifications', notificationId);
+    await deleteDoc(notificationRef);
+    return true;
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    return false;
+  }
+};
+
+/**
+ * Delete all notifications for a user
+ */
+export const deleteAllNotifications = async (userId) => {
+  try {
+    const notificationsRef = collection(db, 'notifications');
+    const q = query(notificationsRef, where('userId', '==', userId));
+    const snapshot = await getDocs(q);
+    await Promise.all(snapshot.docs.map(d => deleteDoc(doc(db, 'notifications', d.id))));
+    return true;
+  } catch (error) {
+    console.error('Error deleting all notifications:', error);
+    return false;
+  }
+};
+
+/**
+ * Mark all notifications as read for a user
+ */
+export const markAllAsRead = async (userId) => {
+  try {
+    const notificationsRef = collection(db, 'notifications');
+    const q = query(
+      notificationsRef,
+      where('userId', '==', userId),
+      where('read', '==', false)
+    );
+    const snapshot = await getDocs(q);
+    await Promise.all(
+      snapshot.docs.map(d =>
+        updateDoc(doc(db, 'notifications', d.id), { read: true, readAt: new Date() })
+      )
+    );
+    return true;
+  } catch (error) {
+    console.error('Error marking all as read:', error);
+    return false;
   }
 };

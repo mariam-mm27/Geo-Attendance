@@ -5,9 +5,12 @@ import enrollmentRouter from "./routes/enrollment.routes.js";
 import courseRoutes from "./routes/course.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import emailRoutes from "./routes/email.routes.js";
+import chatRoutes from "./routes/chat.routes.js";
+import realtimeWarningRoutes from "./routes/realtimeWarning.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
 
-import { attendanceController } from "./controllers/attendanceController.js";
-
+// Initialize background services
+import "./services/backgroundJob.service.js";
 
 const app = express();
 
@@ -21,6 +24,9 @@ app.use("/api/enrollment", enrollmentRouter);
 app.use("/api/courses", courseRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/email", emailRoutes);
+app.use("/api/chat", chatRoutes);
+app.use("/api/realtime", realtimeWarningRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.listen(5000, () => {
   console.log("Server running");

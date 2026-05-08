@@ -411,6 +411,14 @@ let timer: ReturnType<typeof setInterval>;
               )}
             </>
           )}
+
+          {/* Chat Button */}
+          <TouchableOpacity
+            style={styles.chatButton}
+            onPress={() => navigation.navigate("Chat")}
+          >
+            <Text style={styles.buttonText}>💬 Chat with AI Assistant</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
 
@@ -472,6 +480,7 @@ const styles = StyleSheet.create({
   
   picker:{height:50,marginBottom:15},
   createButton:{backgroundColor:"#173B66",paddingVertical:14,paddingHorizontal:28,borderRadius:12,alignSelf:"flex-start",shadowColor:"#173B66",shadowOpacity:0.4,shadowRadius:10,shadowOffset:{width:0,height:6},elevation:8,marginTop:10},
+  chatButton:{backgroundColor:"#667eea",paddingVertical:14,paddingHorizontal:28,borderRadius:12,alignSelf:"center",shadowColor:"#667eea",shadowOpacity:0.4,shadowRadius:10,shadowOffset:{width:0,height:6},elevation:8,marginTop:20,width:"100%"},
   buttonText:{color:"#fff",fontWeight:"700",fontSize:15},
   noCoursesText:{fontSize:15,color:"#64748B",textAlign:"center",paddingVertical:10},
   noCoursesSubtext: {

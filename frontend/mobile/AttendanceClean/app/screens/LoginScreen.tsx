@@ -119,7 +119,7 @@ export default function LoginScreen({ navigation }: Props) {
       }
 
       try {
-      await fetch("http://192.168.100.89:5000/api/email/send-login-email", {
+      await fetch("http://192.168.1.2:5000/api/email/send-login-email", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

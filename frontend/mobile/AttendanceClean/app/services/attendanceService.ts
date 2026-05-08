@@ -255,6 +255,29 @@ export const recordAttendance = async (scannedQRValue: string) => {
     });
 
     console.log(`✅ Attendance recorded successfully for session ${baseSessionId}`);
+
+    // Trigger automatic email alert check after recording attendance
+    try {
+      const BACKEND_URL = "http://192.168.1.2:5000";
+      const alertResponse = await fetch(`${BACKEND_URL}/api/email/auto-check`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentId: student.uid,
+          courseId: sessionData.courseId,
+        }),
+      });
+      const alertResult = await alertResponse.json();
+      if (alertResult.emailSent) {
+        console.log(`📧 Alert email sent: ${alertResult.alertLevel} — absence ${alertResult.absenceRate}%`);
+      } else {
+        console.log(`✅ Alert check done: ${alertResult.message}`);
+      }
+    } catch (alertError) {
+      // Don't fail attendance recording if email trigger fails
+      console.log("⚠️ Could not trigger email alert (backend may be offline):", alertError.message);
+    }
+
     return { success: true, message: "Attendance Successful" };
   } catch (error) {
     console.error("Error recording attendance:", error);

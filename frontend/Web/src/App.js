@@ -1,5 +1,6 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
 import Login from "./Login";
 import Register from "./Register";
@@ -21,14 +22,31 @@ import CourseSessions from "./pages/Professor/CourseSessions";
 import SessionAttendance from "./pages/Professor/SessionAttendance";
 
 import NotificationsPage from './pages/NotificationsPage';
+import FloatingChatBot from './components/FloatingChatBot';
 
 import LectureReview from "./pages/Student/LectureReview";
 
-function App() {
-  return (
-    <Router>
-      <Routes>
+// Component to handle chat functionality
+const AppWithChat = () => {
+  const [user, setUser] = useState(null);
+  const location = useLocation();
+  const auth = getAuth();
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+
+    return () => unsubscribe();
+  }, [auth]);
+
+  // Don't show chat on login/register pages
+  const isAuthPage = ['/login', '/register', '/forgot-password', '/reset-password', '/'].includes(location.pathname);
+  const showChat = user && !isAuthPage;
+
+  return (
+    <>
+      <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -61,8 +79,18 @@ function App() {
 
         {/* Notifications */}
         <Route path="/notifications" element={<NotificationsPage />} />
-
       </Routes>
+
+      {/* Floating AI Chat Assistant */}
+      {showChat && <FloatingChatBot />}
+    </>
+  );
+};
+
+function App() {
+  return (
+    <Router>
+      <AppWithChat />
     </Router>
   );
 }

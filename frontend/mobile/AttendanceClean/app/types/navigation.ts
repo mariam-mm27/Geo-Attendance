@@ -3,4 +3,9 @@ export type RootStackParamList = {
   Register: undefined
   StudentHome: undefined
   ProfessorHome: undefined
+  Chat: undefined
+  Notifications: undefined
+  ScanQR: undefined
+  ForgotPassword: undefined
+  ResetPassword: undefined
 }

@@ -261,6 +261,14 @@ export default function StudentHomeScreen({ navigation }: any) {
         >
           <Text style={styles.buttonText}>Scan QR</Text>
         </TouchableOpacity>
+
+        {/* Chat Button */}
+        <TouchableOpacity
+          style={styles.chatButton}
+          onPress={() => navigation.navigate("Chat")}
+        >
+          <Text style={styles.buttonText}>💬 Chat with AI Assistant</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -432,6 +440,14 @@ const styles = StyleSheet.create({
   scanButton: {
     marginTop: 20,
     backgroundColor: "#173B66",
+    padding: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  chatButton: {
+    marginTop: 15,
+    backgroundColor: "#667eea",
     padding: 14,
     borderRadius: 10,
     alignItems: "center",

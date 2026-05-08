@@ -1,7 +1,7 @@
 import { db, auth } from '../firebase';
 import { collection, query, where, orderBy, limit, getDocs, doc, updateDoc, Timestamp } from 'firebase/firestore';
 
-const API_BASE_URL = 'http://YOUR_BACKEND_URL:3000/api/notifications';
+const API_BASE_URL = 'http://192.168.1.2:5000/api/notifications';
 
 export interface Notification {
   id: string;
