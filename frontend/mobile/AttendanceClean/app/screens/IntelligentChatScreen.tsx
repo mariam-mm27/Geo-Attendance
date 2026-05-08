@@ -16,7 +16,7 @@ import { getAuth } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
-const API_BASE_URL = "http://localhost:5000/api/chatbot";
+const API_BASE_URL = "http://172.28.16.1:5000/api/chatbot";
 
 interface Message {
   id: string;

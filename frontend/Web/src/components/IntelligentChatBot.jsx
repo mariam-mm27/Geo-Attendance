@@ -60,16 +60,34 @@ const IntelligentChatBot = ({ isOpen, onClose }) => {
               text: welcomeData.message,
               timestamp: new Date()
             }]);
+          } else {
+            // Show error from backend
+            setMessages([{
+              id: 'welcome',
+              sender: 'ai_assistant',
+              senderName: 'AI Assistant',
+              text: welcomeData.message || '👋 **Welcome!**\n\nI\'m your university assistant. How can I help you today?',
+              timestamp: new Date()
+            }]);
           }
+        } else {
+          // Show error from backend
+          setMessages([{
+            id: 'welcome',
+            sender: 'ai_assistant',
+            senderName: 'AI Assistant',
+            text: data.message || '❌ **Unable to start conversation**\n\nPlease try again or contact support.',
+            timestamp: new Date()
+          }]);
         }
       } catch (error) {
         console.error('Error initializing chat:', error);
-        // Fallback welcome message
+        // Show connection error
         setMessages([{
           id: 'welcome',
           sender: 'ai_assistant',
           senderName: 'AI Assistant',
-          text: 'Welcome! How can I help you today?',
+          text: '❌ **Connection Error**\n\nUnable to connect to the chat service. Please check your internet connection and try again.',
           timestamp: new Date()
         }]);
       }
@@ -106,7 +124,7 @@ const IntelligentChatBot = ({ isOpen, onClose }) => {
           convId = data.conversationId;
           setConversationId(convId);
         } else {
-          throw new Error('Failed to create conversation');
+          throw new Error(data.message || 'Failed to create conversation');
         }
       }
 
@@ -131,15 +149,25 @@ const IntelligentChatBot = ({ isOpen, onClose }) => {
           timestamp: new Date(data.message.timestamp)
         }]);
       } else {
-        throw new Error(data.message || 'Failed to send message');
+        // Show the actual error message from backend
+        const errorMessage = data.message || 'Unable to process your message. Please try again.';
+        setMessages(prev => [...prev, {
+          id: `error-${Date.now()}`,
+          sender: 'ai_assistant',
+          senderName: 'AI Assistant',
+          text: errorMessage,
+          timestamp: new Date()
+        }]);
       }
     } catch (error) {
       console.error('Error sending message:', error);
+      // Show a more helpful error message
+      const errorText = error.message || 'Unable to connect to the server. Please check your connection and try again.';
       setMessages(prev => [...prev, {
         id: `error-${Date.now()}`,
         sender: 'ai_assistant',
         senderName: 'AI Assistant',
-        text: 'I encountered an error. Please try again.',
+        text: `❌ **Connection Error**\n\n${errorText}\n\nPlease try again or contact support if the problem persists.`,
         timestamp: new Date()
       }]);
     } finally {
