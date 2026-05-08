@@ -61,76 +61,63 @@ const StudentNotifications = () => {
     }
   }, [selectedType, selectedStatus, userId]);
 
-  // Fetch calculated alerts from course attendance data - generate all warning types
+  // Fetch calculated alerts from course attendance data - ONLY show alerts for exceeded thresholds
   const fetchCalculatedAlerts = async (uid) => {
     try {
       const coursesSnapshot = await getDocs(collection(db, "courses"));
       const alerts = [];
-
-      // Get read calculated alerts from localStorage
       const readCalculatedAlerts = JSON.parse(localStorage.getItem(`readCalculatedAlerts_${uid}`) || '[]');
 
       for (const courseDoc of coursesSnapshot.docs) {
         const courseData = courseDoc.data();
-        if ((courseData.enrolledStudents || []).includes(uid)) {
-          // Calculate attendance
-          const attendanceResult = await calculateStudentAttendance(courseDoc.id, uid);
-          if (attendanceResult.success) {
-            const attendance = parseFloat(attendanceResult.data.percentage);
-            const absence = 100 - attendance;
+        if (!(courseData.enrolledStudents || []).includes(uid)) continue;
 
-            // Always generate all three types of warnings for each course
-            // First Warning (10%)
-            const firstAlertId = `calc-${courseDoc.id}-first`;
-            const isFirstRead = readCalculatedAlerts.includes(firstAlertId);
-            alerts.push({
-              id: firstAlertId,
-              type: "absence_alert",
-              title: "⚠️ First Warning",
-              message: `Your attendance in "${courseData.name}" is ${attendance.toFixed(1)}% (absence: ${absence.toFixed(1)}%). This is your first warning. Please improve your attendance to avoid further warnings.`,
-              courseId: courseDoc.id,
-              courseName: courseData.name,
-              attendanceRate: attendance.toFixed(1),
-              absenceRate: absence.toFixed(1),
-              read: isFirstRead,
-              isCalculated: true,
-              createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-            });
+        // Calculate attendance using enrollment-based logic
+        const attendanceResult = await calculateStudentAttendance(courseDoc.id, uid);
+        if (!attendanceResult.success) continue;
 
-            // Second Warning (20%)
-            const secondAlertId = `calc-${courseDoc.id}-second`;
-            const isSecondRead = readCalculatedAlerts.includes(secondAlertId);
-            alerts.push({
-              id: secondAlertId,
-              type: "absence_warning",
-              title: "⚠️ Second Warning",
-              message: `Your attendance in "${courseData.name}" is ${attendance.toFixed(1)}% (absence: ${absence.toFixed(1)}%). This is your second warning. You received your first warning at 10% absence. Improve your attendance immediately to avoid being denied from the final exam.`,
-              courseId: courseDoc.id,
-              courseName: courseData.name,
-              attendanceRate: attendance.toFixed(1),
-              absenceRate: absence.toFixed(1),
-              read: isSecondRead,
-              isCalculated: true,
-              createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-            });
+        const attendance = parseFloat(attendanceResult.data.percentage);
+        const absence = 100 - attendance;
 
-            // Denied from Final Exam (25%)
-            const deniedAlertId = `calc-${courseDoc.id}-denied`;
-            const isDeniedRead = readCalculatedAlerts.includes(deniedAlertId);
-            alerts.push({
-              id: deniedAlertId,
-              type: "absence_deprivation",
-              title: "🚫 Denied from Final Exam",
-              message: `Your attendance in "${courseData.name}" is ${attendance.toFixed(1)}% (absence: ${absence.toFixed(1)}%). You have been denied from taking the final exam due to excessive absence. You received first warning at 10% and second warning at 20%.`,
-              courseId: courseDoc.id,
-              courseName: courseData.name,
-              attendanceRate: attendance.toFixed(1),
-              absenceRate: absence.toFixed(1),
-              read: isDeniedRead,
-              isCalculated: true,
-              createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
-            });
-          }
+        // Skip if attendance is fine (absence < 10%)
+        if (absence < 10) continue;
+
+        const baseAlert = {
+          courseId: courseDoc.id,
+          courseName: courseData.name,
+          attendanceRate: attendance.toFixed(1),
+          absenceRate: absence.toFixed(1),
+          isCalculated: true,
+          createdAt: new Date(),
+        };
+
+        if (absence >= 25) {
+          const id = `calc-${courseDoc.id}-denied`;
+          alerts.push({
+            ...baseAlert, id,
+            type: "absence_deprivation",
+            title: "🚫 Denied from Final Exam",
+            message: `Your absence in "${courseData.name}" is ${absence.toFixed(1)}% (attendance: ${attendance.toFixed(1)}%). You have been denied from the final exam. First warning was at 10%, second at 20%.`,
+            read: readCalculatedAlerts.includes(id),
+          });
+        } else if (absence >= 20) {
+          const id = `calc-${courseDoc.id}-second`;
+          alerts.push({
+            ...baseAlert, id,
+            type: "absence_warning",
+            title: "⚠️ Second Warning",
+            message: `Your absence in "${courseData.name}" is ${absence.toFixed(1)}% (attendance: ${attendance.toFixed(1)}%). This is your second warning. Improve your attendance immediately to avoid being denied from the final exam.`,
+            read: readCalculatedAlerts.includes(id),
+          });
+        } else if (absence >= 10) {
+          const id = `calc-${courseDoc.id}-first`;
+          alerts.push({
+            ...baseAlert, id,
+            type: "absence_alert",
+            title: "⚡ First Warning",
+            message: `Your absence in "${courseData.name}" is ${absence.toFixed(1)}% (attendance: ${attendance.toFixed(1)}%). Please improve your attendance to avoid further warnings.`,
+            read: readCalculatedAlerts.includes(id),
+          });
         }
       }
 
@@ -283,10 +270,25 @@ const StudentNotifications = () => {
     }
   };
 
-  const getNotificationIcon = (type) => {
+  // Resolve the effective type from either type or alertLevel field
+  const resolveType = (notification) => {
+    // If alertLevel exists, use it to determine the correct type
+    if (notification.alertLevel) {
+      const map = {
+        FIRST_WARNING: "absence_alert",
+        SECOND_WARNING: "absence_warning",
+        FINAL_EXAM_DENIED: "absence_deprivation",
+      };
+      return map[notification.alertLevel] || notification.type;
+    }
+    return notification.type;
+  };
+
+  const getNotificationIcon = (notification) => {
+    const type = resolveType(notification);
     switch (type) {
       case "absence_alert":
-        return <FaExclamationTriangle color="#F59E0B" />;
+        return <FaExclamationTriangle color="#EAB308" />;
       case "absence_warning":
         return <FaExclamationTriangle color="#F59E0B" />;
       case "absence_deprivation":
@@ -296,60 +298,47 @@ const StudentNotifications = () => {
     }
   };
 
-  const getNotificationStyle = (type, read) => {
+  const getNotificationStyle = (notification, read) => {
     if (read) {
-      return {
-        bg: "#F9FAFB",
-        border: "#E5E7EB",
-        text: "#6B7280",
-      };
+      return { bg: "#F9FAFB", border: "#E5E7EB", text: "#6B7280" };
     }
-
+    const type = resolveType(notification);
     switch (type) {
       case "absence_deprivation":
-        return {
-          bg: "#FEE2E2",
-          border: "#FCA5A5",
-          text: "#991B1B",
-        };
+        return { bg: "#FEE2E2", border: "#FCA5A5", text: "#991B1B" };
       case "absence_warning":
-        return {
-          bg: "#FEF3C7",
-          border: "#FCD34D",
-          text: "#92400E",
-        };
+        return { bg: "#FEF3C7", border: "#FCD34D", text: "#92400E" };
       case "absence_alert":
-        return {
-          bg: "#FEF9C3",
-          border: "#FDE047",
-          text: "#854D0E",
-        };
+        return { bg: "#FEF9C3", border: "#FDE047", text: "#854D0E" };
       default:
-        return {
-          bg: "#F0F9FF",
-          border: "#BAE6FD",
-          text: "#173B66",
-        };
+        return { bg: "#F0F9FF", border: "#BAE6FD", text: "#173B66" };
     }
   };
 
-  const getNotificationLabel = (type) => {
+  const getNotificationLabel = (notification) => {
+    const type = resolveType(notification);
     const labels = {
       absence_alert: "First Warning",
-      absence_warning: "Second Warning", 
+      absence_warning: "Second Warning",
       absence_deprivation: "Denied from Final Exam",
-      general: "General",
     };
-    return labels[type] || type.replace(/_/g, " ").toUpperCase();
+    return labels[type] || (notification.alertLevel || type || "").replace(/_/g, " ");
   };
 
   // Combine notifications and calculated alerts with filtering
   const getFilteredNotifications = () => {
     let combined = [...notifications, ...calculatedAlerts];
     
-    // Apply type filter
+    // Apply type filter — match both type field and alertLevel field
     if (selectedType) {
-      combined = combined.filter(n => n.type === selectedType);
+      const levelMap = {
+        "absence_alert": "FIRST_WARNING",
+        "absence_warning": "SECOND_WARNING",
+        "absence_deprivation": "FINAL_EXAM_DENIED",
+      };
+      combined = combined.filter(n => 
+        n.type === selectedType || n.alertLevel === levelMap[selectedType]
+      );
     }
     
     // Apply status filter
@@ -607,7 +596,9 @@ const StudentNotifications = () => {
               }}
             >
               {
-                allNotifications.filter((n) => n.type === "absence_alert").length
+                allNotifications.filter((n) => 
+                  n.type === "absence_alert" || n.alertLevel === "FIRST_WARNING"
+                ).length
               }
             </p>
             <p style={{ margin: 0, color: "#854D0E", fontSize: "14px" }}>
@@ -633,7 +624,9 @@ const StudentNotifications = () => {
               }}
             >
               {
-                allNotifications.filter((n) => n.type === "absence_warning").length
+                allNotifications.filter((n) => 
+                  n.type === "absence_warning" || n.alertLevel === "SECOND_WARNING"
+                ).length
               }
             </p>
             <p style={{ margin: 0, color: "#92400E", fontSize: "14px" }}>
@@ -659,7 +652,9 @@ const StudentNotifications = () => {
               }}
             >
               {
-                allNotifications.filter((n) => n.type === "absence_deprivation").length
+                allNotifications.filter((n) => 
+                  n.type === "absence_deprivation" || n.alertLevel === "FINAL_EXAM_DENIED"
+                ).length
               }
             </p>
             <p style={{ margin: 0, color: "#991B1B", fontSize: "14px" }}>
@@ -843,7 +838,7 @@ const StudentNotifications = () => {
             {/* Notifications */}
             <div style={{ maxHeight: "600px", overflowY: "auto" }}>
               {allNotifications.map((notification) => {
-                const style = getNotificationStyle(notification.type, notification.read);
+                const style = getNotificationStyle(notification, notification.read);
                 const isExpanded = expandedNotification === notification.id;
                 const absenceCat = getAbsenceCategory(notification);
 
@@ -876,7 +871,7 @@ const StudentNotifications = () => {
                           flexShrink: 0,
                         }}
                       >
-                        {getNotificationIcon(notification.type)}
+                        {getNotificationIcon(notification)}
                       </div>
 
                       {/* Content */}
@@ -902,7 +897,7 @@ const StudentNotifications = () => {
                                 color: style.text,
                               }}
                             >
-                              {getNotificationLabel(notification.type)}
+                              {getNotificationLabel(notification)}
                             </span>
                             {absenceCat && (
                               <span

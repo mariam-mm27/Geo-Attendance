@@ -8,106 +8,91 @@ import {
   triggerOnAttendance,
   sendLoginEmailController,
 } from "../controllers/email.controller.js";
+import {
+  sendTestEmailDirect,
+  sendAbsenceAlertDirect,
+  checkAndSendAbsenceAlertDirect,
+  checkAllCoursesDirect,
+} from "../services/email-direct.service.js";
 
 const router = express.Router();
 
-// Test email endpoint
-router.post("/test", sendTestEmailDirect);
+// ─── Test Routes ────────────────────────────────────────────────────────────
 
-// Simple test that works without database
+// Test email with Brevo SMTP (real email)
+router.post("/test-direct", sendTestEmailDirect);
+
+// Simple test with Ethereal (no credentials needed)
 router.post("/test-simple", async (req, res) => {
   try {
     const nodemailer = await import("nodemailer");
-    
-    // Create test account
     const testAccount = await nodemailer.default.createTestAccount();
-    
     const transporter = nodemailer.default.createTransport({
       host: "smtp.ethereal.email",
       port: 587,
       secure: false,
-      auth: {
-        user: testAccount.user,
-        pass: testAccount.pass,
-      },
+      auth: { user: testAccount.user, pass: testAccount.pass },
     });
-    
     const info = await transporter.sendMail({
       from: '"Attendance System" <noreply@attendance.com>',
       to: "student@example.com",
       subject: "⚠️ Test Attendance Warning",
-      html: `
-        <div style="font-family: Arial; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1>⚠️ Attendance Warning</h1>
-          </div>
-          <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
-            <p><strong>This is a test email from your Attendance System!</strong></p>
-            <p>Your attendance notification system is working correctly! ✅</p>
-            <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3>Test Statistics:</h3>
-              <p><strong>Course:</strong> Software Development</p>
-              <p><strong>Attendance Rate:</strong> 70%</p>
-              <p><strong>Absence Rate:</strong> <span style="color: #dc3545;">30%</span></p>
-            </div>
-            <p>✅ Email system is working!</p>
-            <p>✅ Notifications are being created!</p>
-            <p>✅ Everything is functional!</p>
-          </div>
-        </div>
-      `,
+      html: `<p>Email system is working! ✅</p>`,
     });
-    
     const previewUrl = nodemailer.default.getTestMessageUrl(info);
-    
-    console.log("✅ Simple test email sent!");
-    console.log("📧 Preview URL:", previewUrl);
-    
-    res.json({
-      success: true,
-      message: "Test email sent successfully!",
-      previewUrl: previewUrl,
-      messageId: info.messageId,
-    });
+    res.json({ success: true, message: "Test email sent!", previewUrl, messageId: info.messageId });
   } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Send absence alert to specific student
-router.post("/send-alert", sendAbsenceAlertDirect);
+// ─── Alert Routes ────────────────────────────────────────────────────────────
 
-// Check all courses and send alerts
-router.post("/check-all", checkAllCoursesDirect);
+// Send absence alert to specific student (force send, ignores cooldown)
+router.post("/send-alert", sendAbsenceAlert);
+router.post("/send-alert-direct", sendAbsenceAlertDirect);
 
-// Automatic check for single student (called after attendance recording)
+// Check attendance and send alert if threshold exceeded (respects cooldown)
+router.post("/check-all", checkAndAlert);
+router.post("/check-all-direct", checkAllCoursesDirect);
+
+// Manual check for a specific student (respects cooldown)
+router.post("/manual-check", async (req, res) => {
+  try {
+    const { studentId, courseId } = req.body;
+    if (!studentId || !courseId) {
+      return res.status(400).json({ success: false, message: "studentId and courseId are required" });
+    }
+    console.log(`🔍 Manual check triggered for student ${studentId} in course ${courseId}`);
+    const result = await checkAndSendAbsenceAlertDirect(studentId, courseId);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error in manual check:", error);
+    res.status(500).json({ success: false, message: "Failed to perform manual check", error: error.message });
+  }
+});
+
+// Auto-check triggered after attendance recording
 router.post("/auto-check", async (req, res) => {
   try {
     const { studentId, courseId } = req.body;
-    
     if (!studentId || !courseId) {
-      return res.status(400).json({
-        success: false,
-        message: "studentId and courseId are required",
-      });
+      return res.status(400).json({ success: false, message: "studentId and courseId are required" });
     }
-    
     const result = await checkAndSendAbsenceAlertDirect(studentId, courseId);
     res.status(200).json(result);
   } catch (error) {
     console.error("Error in auto-check:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to perform automatic check",
-      error: error.message,
-    });
+    res.status(500).json({ success: false, message: "Failed to perform automatic check", error: error.message });
   }
 });
 
+// ─── History & Reporting ─────────────────────────────────────────────────────
+
+router.get("/history/:studentId", getEmailHistory);
+router.get("/low-attendance/:courseId", getLowAttendanceStudents);
+router.post("/bulk-alerts", sendBulkAlerts);
+router.post("/trigger-on-attendance", triggerOnAttendance);
 router.post("/send-login-email", sendLoginEmailController);
 
 export default router;

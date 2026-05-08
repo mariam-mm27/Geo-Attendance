@@ -9,6 +9,7 @@ import ResetPasswordScreen from "../screens/ResetPasswordScreen";
 import StudentHomeScreen from "../screens/StudentHomeScreen";
 import ProfessorHomeScreen from "../screens/ProfessorHomeScreen";
 import ScanQRScreen from "../screens/ScanQRScreen";
+import SimpleChatScreen from "../screens/SimpleChatScreen";
 import { useAuth } from "../context/AuthContext";
 import NotificationsScreen from '../screens/NotificationsScreen';
 
@@ -37,6 +38,7 @@ function StudentStack() {
     >
       <Stack.Screen name="StudentHome" component={StudentHomeScreen} />
       <Stack.Screen name="ScanQR" component={ScanQRScreen} />
+      <Stack.Screen name="Chat" component={SimpleChatScreen} />
        {/* ✅ Notifications Screen */}
       <Stack.Screen 
         name="Notifications" 
@@ -55,6 +57,7 @@ function ProfessorStack() {
       initialRouteName="ProfessorHome"
     >
       <Stack.Screen name="ProfessorHome" component={ProfessorHomeScreen} />
+      <Stack.Screen name="Chat" component={SimpleChatScreen} />
         {/* ✅ Notifications Screen */}
       <Stack.Screen 
         name="Notifications" 

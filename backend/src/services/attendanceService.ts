@@ -1,5 +1,7 @@
 import { db } from "../config/firebase.js";
 import { checkAndSendAbsenceAlertDirect } from "../services/email-direct.service.js";
+import { processAttendanceRecorded } from "../services/warningSystemBridge.js";
+import { sendWarningEmailNow, calculateMetrics, determineWarningLevel, wasWarningSentRecently } from "../services/instantEmail.service.js";
 
 /**
  * Get enrollment date for a student in a specific course
@@ -226,31 +228,58 @@ export const recordAttendance = async (
     }
 
     // Record attendance
-    await db.collection("attendance").add({
+    const attendanceRef = await db.collection("attendance").add({
       sessionId: baseSessionId,
       studentId,
       studentEmail,
       courseId: sessionData.courseId,
       professorId: sessionData.professorId,
       recordedAt: new Date(),
+      timestamp: new Date(),
     });
 
-    // Trigger email alert check after recording attendance
+    console.log(`✅ Attendance recorded with ID: ${attendanceRef.id}`);
+
+    // Send warning email immediately (synchronous)
     try {
-      // Import the email service function
-      const { checkAndSendAbsenceAlertDirect } = await import("../services/email-direct.service.js");
-      const alertResult = await checkAndSendAbsenceAlertDirect(studentId, sessionData.courseId);
+      console.log(`📧 Checking for warnings to send...`);
       
-      if (alertResult.emailSent) {
-        console.log(`📧 Automatic email alert sent: ${alertResult.alertLevel} to ${alertResult.recipient}`);
-      } else if (alertResult.success) {
-        console.log(`✅ Attendance check completed: ${alertResult.message}`);
-      } else {
-        console.error(`⚠️ Email alert check failed: ${alertResult.error}`);
+      const metrics = await calculateMetrics(studentId, sessionData.courseId);
+      if (metrics) {
+        const warningLevel = determineWarningLevel(metrics.absenceRate);
+        
+        if (warningLevel) {
+          const alreadySent = await wasWarningSentRecently(studentId, sessionData.courseId, warningLevel);
+          
+          if (!alreadySent) {
+            const student = await db.collection('users').doc(studentId).get();
+            const course = await db.collection('courses').doc(sessionData.courseId).get();
+            
+            if (student.exists && course.exists) {
+              const emailResult = await sendWarningEmailNow(
+                student.data().email,
+                student.data().name || student.data().email,
+                course.data().name,
+                metrics,
+                warningLevel
+              );
+              
+              if (emailResult.success) {
+                console.log(`✅ ${warningLevel} email sent to ${student.data().email}`);
+              } else {
+                console.error(`❌ Failed to send email: ${emailResult.error}`);
+              }
+            }
+          } else {
+            console.log(`⏰ ${warningLevel} already sent within 24 hours, skipping`);
+          }
+        } else {
+          console.log(`✅ Attendance OK - no warning needed`);
+        }
       }
     } catch (error) {
-      console.error("Error triggering automatic email alert:", error);
-      // Don't fail attendance recording if email trigger fails
+      console.error("❌ Error sending warning email:", error);
+      // Don't fail attendance recording if email fails
     }
 
     return { success: true, message: "Attendance Successful" };

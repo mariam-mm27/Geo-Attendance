@@ -96,52 +96,56 @@ export default function NotificationsScreen({ navigation }: any) {
           });
 
           const attendanceRate = totalSessions > 0 ? (attendedSessions / totalSessions) * 100 : 100;
+          const absenceRate = 100 - attendanceRate;
           const sessionsBeforeEnrollment = sessionsSnapshot.size - totalSessions;
 
-          console.log(`📊 Mobile: Course ${courseData.name} - ${attendedSessions}/${totalSessions} = ${attendanceRate.toFixed(2)}% (${sessionsBeforeEnrollment} sessions before enrollment excluded)`);
+          console.log(`📊 Mobile: Course ${courseData.name} - ${attendedSessions}/${totalSessions} = ${attendanceRate.toFixed(2)}% absence: ${absenceRate.toFixed(2)}% (${sessionsBeforeEnrollment} sessions before enrollment excluded)`);
 
-          // Always generate all three types of warnings for each course
-          // First Warning (10%)
-          const firstAlertId = `calc-${courseDoc.id}-first`;
-          const isFirstRead = readCalculatedAlerts.includes(firstAlertId);
-          alerts.push({
-            id: firstAlertId,
-            type: "absence_alert",
-            title: "⚠️ First Warning",
-            message: `Your attendance in "${courseData.name}" requires attention. This is your first warning. Please improve your attendance to avoid further warnings. ${enrollmentDate ? `(Calculated from enrollment date: ${enrollmentDate.toLocaleDateString()})` : ''}`,
-            courseName: courseData.name,
-            read: isFirstRead,
-            isCalculated: true,
-            createdAt: { seconds: Date.now() / 1000 - 3 * 24 * 60 * 60 }, // 3 days ago
-          });
+          // Only generate warnings when thresholds are actually exceeded
+          if (totalSessions === 0 || absenceRate < 10) continue;
 
-          // Second Warning (20%)
-          const secondAlertId = `calc-${courseDoc.id}-second`;
-          const isSecondRead = readCalculatedAlerts.includes(secondAlertId);
-          alerts.push({
-            id: secondAlertId,
-            type: "absence_warning",
-            title: "⚠️ Second Warning",
-            message: `Your attendance in "${courseData.name}" requires immediate attention. This is your second warning. You received your first warning at 10% absence. Improve your attendance immediately to avoid being denied from the final exam. ${enrollmentDate ? `(Calculated from enrollment date: ${enrollmentDate.toLocaleDateString()})` : ''}`,
-            courseName: courseData.name,
-            read: isSecondRead,
-            isCalculated: true,
-            createdAt: { seconds: Date.now() / 1000 - 2 * 24 * 60 * 60 }, // 2 days ago
-          });
+          const enrollmentNote = enrollmentDate ? ` (from enrollment date: ${enrollmentDate.toLocaleDateString()})` : '';
 
-          // Denied from Final Exam (25%)
-          const deniedAlertId = `calc-${courseDoc.id}-denied`;
-          const isDeniedRead = readCalculatedAlerts.includes(deniedAlertId);
-          alerts.push({
-            id: deniedAlertId,
-            type: "absence_deprivation",
-            title: "🚫 Denied from Final Exam",
-            message: `You have been denied from taking the final exam in "${courseData.name}" due to excessive absence. You received first warning at 10% and second warning at 20%. ${enrollmentDate ? `(Calculated from enrollment date: ${enrollmentDate.toLocaleDateString()})` : ''}`,
-            courseName: courseData.name,
-            read: isDeniedRead,
-            isCalculated: true,
-            createdAt: { seconds: Date.now() / 1000 - 1 * 24 * 60 * 60 }, // 1 day ago
-          });
+          if (absenceRate >= 25) {
+            // 🚫 FINAL EXAM DENIED
+            const alertId = `calc-${courseDoc.id}-denied`;
+            alerts.push({
+              id: alertId,
+              type: "absence_deprivation",
+              title: "🚫 Denied from Final Exam",
+              message: `Your absence in "${courseData.name}" is ${absenceRate.toFixed(1)}% (attended ${attendedSessions}/${totalSessions} sessions). You have been denied from the final exam. You received first warning at 10% and second warning at 20%.${enrollmentNote}`,
+              courseName: courseData.name,
+              read: readCalculatedAlerts.includes(alertId),
+              isCalculated: true,
+              createdAt: { seconds: Math.floor(Date.now() / 1000) },
+            });
+          } else if (absenceRate >= 20) {
+            // ⚠️ SECOND WARNING
+            const alertId = `calc-${courseDoc.id}-second`;
+            alerts.push({
+              id: alertId,
+              type: "absence_warning",
+              title: "⚠️ Second Warning",
+              message: `Your absence in "${courseData.name}" is ${absenceRate.toFixed(1)}% (attended ${attendedSessions}/${totalSessions} sessions). This is your second warning. Improve your attendance immediately to avoid being denied from the final exam.${enrollmentNote}`,
+              courseName: courseData.name,
+              read: readCalculatedAlerts.includes(alertId),
+              isCalculated: true,
+              createdAt: { seconds: Math.floor(Date.now() / 1000) },
+            });
+          } else if (absenceRate >= 10) {
+            // ⚡ FIRST WARNING
+            const alertId = `calc-${courseDoc.id}-first`;
+            alerts.push({
+              id: alertId,
+              type: "absence_alert",
+              title: "⚡ First Warning",
+              message: `Your absence in "${courseData.name}" is ${absenceRate.toFixed(1)}% (attended ${attendedSessions}/${totalSessions} sessions). Please improve your attendance to avoid further warnings.${enrollmentNote}`,
+              courseName: courseData.name,
+              read: readCalculatedAlerts.includes(alertId),
+              isCalculated: true,
+              createdAt: { seconds: Math.floor(Date.now() / 1000) },
+            });
+          }
         }
       }
 
@@ -250,7 +254,17 @@ export default function NotificationsScreen({ navigation }: any) {
 
   const formatTime = (ts: any) => {
     if (!ts) return "";
-    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    let d: Date;
+    if (ts?.toDate) {
+      d = ts.toDate();
+    } else if (ts?.seconds) {
+      d = new Date(ts.seconds * 1000);
+    } else if (ts instanceof Date) {
+      d = ts;
+    } else {
+      d = new Date(ts);
+    }
+    if (isNaN(d.getTime())) return "";
     const diff = (Date.now() - d.getTime()) / 1000;
     if (diff < 60) return "Just now";
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;

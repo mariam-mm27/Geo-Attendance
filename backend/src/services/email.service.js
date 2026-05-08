@@ -16,7 +16,7 @@ const createTransporter = () => {
   }
   
   // For Gmail - use App Password
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     service: "gmail",
     auth: {
       user: emailUser,
@@ -364,7 +364,11 @@ export const sendBulkAbsenceAlerts = async (courseId) => {
 
 export const sendLoginEmail = async (email, name) => {
   try {
-    const transporter = await createTransporter();
+    const transporter = createTransporter();
+
+    if (!transporter) {
+      throw new Error("Email transporter not configured");
+    }
 
     const mailOptions = {
       from: `"Attendance System" <${process.env.BREVO_USER || process.env.EMAIL_USER}>`,

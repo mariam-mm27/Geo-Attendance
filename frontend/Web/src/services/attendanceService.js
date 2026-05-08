@@ -625,18 +625,15 @@ export const recordAttendanceWeb = async (courseId, sessionId, studentId) => {
       recordedAt: serverTimestamp()
     });
 
-    // Trigger email alert check
+    // Trigger automatic email alert check after recording attendance
     try {
-      const API_BASE_URL = "http://localhost:3000/api";
-      await fetch(`${API_BASE_URL}/email/trigger-on-attendance`, {
+      await fetch("http://localhost:5000/api/email/auto-check", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ studentId, courseId }),
       });
     } catch (error) {
-      console.error("Error triggering email check:", error);
+      console.log("⚠️ Could not trigger email alert (backend may be offline):", error.message);
     }
     
     return {
