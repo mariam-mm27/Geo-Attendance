@@ -1,22 +1,43 @@
 import { db } from "../config/firebase.js";
-import { collection, query, where, getDocs, getDoc, doc, addDoc, updateDoc, serverTimestamp, orderBy, limit } from "firebase/firestore";
+
+// ── Admin SDK helpers (same API as Client SDK) ──
+const getDoc = async (ref) => ref.get();
+const getDocs = async (q) => q.get();
+const collection = (_, name) => db.collection(name);
+const doc = (_, col, id) => db.collection(col).doc(id);
+const addDoc = async (colRef, data) => colRef.add(data);
+const serverTimestamp = () => new Date();
+const where = (field, op, value) => ({ field, op, value });
+const orderBy = (field, dir = "asc") => ({ field, dir, _type: "orderBy" });
+const limit = (n) => ({ n, _type: "limit" });
+
+const query = (colRef, ...constraints) => {
+  let q = colRef;
+  for (const c of constraints) {
+    if (!c) continue;
+    if (c._type === "orderBy") q = q.orderBy(c.field, c.dir);
+    else if (c._type === "limit") q = q.limit(c.n);
+    else if (c.field !== undefined && c.op !== undefined) q = q.where(c.field, c.op, c.value);
+  }
+  return q;
+};
 
 /**
  * Intelligent Chatbot Service
- * Provides context-aware, role-based responses with real database integration
- * Supports admin actions for system management
  */
 
-/**
- * Get comprehensive user context
- */
 export const getUserContext = async (userId) => {
   try {
-    const userDoc = await getDoc(doc(db, "users", userId));
-    if (!userDoc.exists()) return null;
+    if (!userId) throw new Error("USER_ID_MISSING: User ID is required to fetch context");
+
+    const userDoc = await db.collection("users").doc(userId).get();
+    if (!userDoc.exists) throw new Error(`USER_NOT_FOUND: No user found with ID ${userId}`);
 
     const userData = userDoc.data();
     const userRole = userData.role?.toLowerCase();
+
+    if (!userRole) throw new Error("USER_ROLE_MISSING: User role is not defined in the database");
+
     const context = {
       userId,
       name: userData.name || "User",
@@ -26,132 +47,133 @@ export const getUserContext = async (userId) => {
     };
 
     if (userRole === "student") {
-      // Get student's courses with attendance
-      const coursesSnapshot = await getDocs(
-        query(collection(db, "courses"), where("enrolledStudents", "array-contains", userId))
-      );
+      try {
+        const coursesSnapshot = await db.collection("courses")
+          .where("enrolledStudents", "array-contains", userId).get();
 
-      context.data.courses = [];
-      for (const courseDoc of coursesSnapshot.docs) {
-        const courseData = courseDoc.data();
-        const attendance = await calculateAttendance(userId, courseDoc.id);
-        context.data.courses.push({
-          id: courseDoc.id,
-          name: courseData.name,
-          code: courseData.code,
-          professor: courseData.professorName,
-          ...attendance
-        });
+        context.data.courses = [];
+        for (const courseDoc of coursesSnapshot.docs) {
+          const courseData = courseDoc.data();
+          const attendance = await calculateAttendance(userId, courseDoc.id);
+          context.data.courses.push({
+            id: courseDoc.id,
+            name: courseData.name || "Unnamed Course",
+            code: courseData.code || "N/A",
+            professor: courseData.professorName || "TBA",
+            ...attendance
+          });
+        }
+      } catch (error) {
+        throw new Error(`COURSES_FETCH_FAILED: Unable to retrieve courses - ${error.message}`);
       }
 
-      // Get active sessions
-      const sessionsSnapshot = await getDocs(
-        query(collection(db, "sessions"), where("active", "==", true))
-      );
-
-      context.data.activeSessions = [];
-      for (const sessionDoc of sessionsSnapshot.docs) {
-        const sessionData = sessionDoc.data();
-        const courseDoc = await getDoc(doc(db, "courses", sessionData.courseId));
-        if (courseDoc.exists()) {
-          const courseData = courseDoc.data();
-          if ((courseData.enrolledStudents || []).includes(userId)) {
-            context.data.activeSessions.push({
-              sessionId: sessionData.sessionId,
-              courseName: courseData.name,
-              courseCode: courseData.code,
-              lectureNumber: sessionData.lectureNumber
-            });
+      try {
+        const sessionsSnapshot = await db.collection("sessions").where("active", "==", true).get();
+        context.data.activeSessions = [];
+        for (const sessionDoc of sessionsSnapshot.docs) {
+          const sessionData = sessionDoc.data();
+          if (!sessionData.courseId) continue;
+          const courseDoc = await db.collection("courses").doc(sessionData.courseId).get();
+          if (courseDoc.exists) {
+            const courseData = courseDoc.data();
+            if ((courseData.enrolledStudents || []).includes(userId)) {
+              context.data.activeSessions.push({
+                sessionId: sessionData.sessionId || sessionDoc.id,
+                courseName: courseData.name || "Unknown Course",
+                courseCode: courseData.code || "N/A",
+                lectureNumber: sessionData.lectureNumber || 1
+              });
+            }
           }
         }
+      } catch (error) {
+        context.data.activeSessions = [];
       }
 
-      // Get recent notifications
-      const notifSnapshot = await getDocs(
-        query(
-          collection(db, "notifications"),
-          where("userId", "==", userId),
-          orderBy("createdAt", "desc"),
-          limit(5)
-        )
-      );
-      context.data.notifications = notifSnapshot.docs.map(d => d.data());
+      try {
+        const notifSnapshot = await db.collection("notifications")
+          .where("userId", "==", userId)
+          .orderBy("createdAt", "desc")
+          .limit(5).get();
+        context.data.notifications = notifSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (error) {
+        context.data.notifications = [];
+      }
 
     } else if (userRole === "professor") {
-      // Get professor's courses
-      const coursesSnapshot = await getDocs(
-        query(collection(db, "courses"), where("professorId", "==", userId))
-      );
+      try {
+        const coursesSnapshot = await db.collection("courses")
+          .where("professorId", "==", userId).get();
 
-      context.data.courses = [];
-      for (const courseDoc of coursesSnapshot.docs) {
-        const courseData = courseDoc.data();
-        const stats = await getProfessorCourseStats(courseDoc.id);
-        context.data.courses.push({
-          id: courseDoc.id,
-          name: courseData.name,
-          code: courseData.code,
-          enrolledStudents: courseData.enrolledStudents?.length || 0,
-          ...stats
-        });
+        context.data.courses = [];
+        for (const courseDoc of coursesSnapshot.docs) {
+          const courseData = courseDoc.data();
+          const stats = await getProfessorCourseStats(courseDoc.id);
+          context.data.courses.push({
+            id: courseDoc.id,
+            name: courseData.name || "Unnamed Course",
+            code: courseData.code || "N/A",
+            enrolledStudents: courseData.enrolledStudents?.length || 0,
+            ...stats
+          });
+        }
+      } catch (error) {
+        throw new Error(`PROFESSOR_COURSES_FETCH_FAILED: Unable to retrieve assigned courses - ${error.message}`);
       }
 
-      // Get active sessions
-      const sessionsSnapshot = await getDocs(
-        query(
-          collection(db, "sessions"),
-          where("professorId", "==", userId),
-          where("active", "==", true)
-        )
-      );
-      context.data.activeSessions = sessionsSnapshot.docs.map(d => d.data());
+      try {
+        const sessionsSnapshot = await db.collection("sessions")
+          .where("professorId", "==", userId)
+          .where("active", "==", true).get();
+        context.data.activeSessions = sessionsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (error) {
+        context.data.activeSessions = [];
+      }
 
     } else if (userRole === "admin") {
-      // Get system statistics
-      const usersSnapshot = await getDocs(collection(db, "users"));
-      const coursesSnapshot = await getDocs(collection(db, "courses"));
-      const sessionsSnapshot = await getDocs(collection(db, "sessions"));
+      try {
+        const usersSnapshot = await db.collection("users").get();
+        const coursesSnapshot = await db.collection("courses").get();
+        const sessionsSnapshot = await db.collection("sessions").get();
 
-      context.data.stats = {
-        totalUsers: usersSnapshot.size,
-        totalCourses: coursesSnapshot.size,
-        totalSessions: sessionsSnapshot.size,
-        activeUsers: usersSnapshot.docs.filter(d => {
-          const lastLogin = d.data().lastLogin?.toDate?.();
-          return lastLogin && new Date() - lastLogin < 24 * 60 * 60 * 1000;
-        }).length
-      };
+        context.data.stats = {
+          totalUsers: usersSnapshot.size,
+          totalCourses: coursesSnapshot.size,
+          totalSessions: sessionsSnapshot.size,
+          activeUsers: usersSnapshot.docs.filter(d => {
+            const lastLogin = d.data().lastLogin?.toDate?.();
+            return lastLogin && new Date() - lastLogin < 24 * 60 * 60 * 1000;
+          }).length
+        };
 
-      // Get recent activity
-      const recentSessions = await getDocs(
-        query(collection(db, "sessions"), orderBy("createdAt", "desc"), limit(10))
-      );
-      context.data.recentActivity = recentSessions.docs.map(d => d.data());
+        const recentSessions = await db.collection("sessions")
+          .orderBy("createdAt", "desc").limit(10).get();
+        context.data.recentActivity = recentSessions.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (error) {
+        throw new Error(`ADMIN_STATS_FETCH_FAILED: Unable to retrieve system statistics - ${error.message}`);
+      }
+    } else {
+      throw new Error(`INVALID_ROLE: Unknown user role '${userRole}'. Valid roles are: student, professor, admin`);
     }
 
     return context;
   } catch (error) {
     console.error("Error getting user context:", error);
-    return null;
+    if (error.message.startsWith("USER_") || error.message.startsWith("COURSES_") ||
+      error.message.startsWith("PROFESSOR_") || error.message.startsWith("ADMIN_") ||
+      error.message.startsWith("INVALID_")) {
+      throw error;
+    }
+    throw new Error(`CONTEXT_FETCH_FAILED: Unable to retrieve user context - ${error.message}`);
   }
 };
 
-/**
- * Calculate student attendance for a course
- */
 const calculateAttendance = async (studentId, courseId) => {
   try {
-    const sessionsSnapshot = await getDocs(
-      query(collection(db, "sessions"), where("courseId", "==", courseId))
-    );
-
-    const attendanceSnapshot = await getDocs(
-      query(
-        collection(db, "attendance"),
-        where("studentId", "==", studentId),
-        where("courseId", "==", courseId)
-      )
-    );
+    const sessionsSnapshot = await db.collection("sessions").where("courseId", "==", courseId).get();
+    const attendanceSnapshot = await db.collection("attendance")
+      .where("studentId", "==", studentId)
+      .where("courseId", "==", courseId).get();
 
     const totalSessions = sessionsSnapshot.size;
     const attendedSessions = attendanceSnapshot.size;
@@ -164,279 +186,213 @@ const calculateAttendance = async (studentId, courseId) => {
       missedSessions: totalSessions - attendedSessions
     };
   } catch (error) {
-    console.error("Error calculating attendance:", error);
     return { attendanceRate: 0, attendedSessions: 0, totalSessions: 0, missedSessions: 0 };
   }
 };
 
-/**
- * Get professor course statistics
- */
 const getProfessorCourseStats = async (courseId) => {
   try {
-    const sessionsSnapshot = await getDocs(
-      query(collection(db, "sessions"), where("courseId", "==", courseId))
-    );
+    const sessionsSnapshot = await db.collection("sessions").where("courseId", "==", courseId).get();
+    const attendanceSnapshot = await db.collection("attendance").where("courseId", "==", courseId).get();
+    const courseDoc = await db.collection("courses").doc(courseId).get();
+    const enrolledCount = courseDoc.exists ? (courseDoc.data().enrolledStudents || []).length : 0;
 
-    const attendanceSnapshot = await getDocs(
-      query(collection(db, "attendance"), where("courseId", "==", courseId))
-    );
+    const totalSessions = sessionsSnapshot.size;
+    const totalAttendance = attendanceSnapshot.size;
+    const averageAttendance = (enrolledCount > 0 && totalSessions > 0)
+      ? Math.round((totalAttendance / (totalSessions * enrolledCount)) * 100)
+      : 0;
 
-    const courseDoc = await getDoc(doc(db, "courses", courseId));
-    const enrolledCount = courseDoc.exists() ? (courseDoc.data().enrolledStudents || []).length : 0;
-
-    return {
-      totalSessions: sessionsSnapshot.size,
-      totalAttendance: attendanceSnapshot.size,
-      averageAttendance: enrolledCount > 0 ? Math.round((attendanceSnapshot.size / (sessionsSnapshot.size * enrolledCount)) * 100) : 0
-    };
+    return { totalSessions, totalAttendance, averageAttendance };
   } catch (error) {
-    console.error("Error getting professor stats:", error);
     return { totalSessions: 0, totalAttendance: 0, averageAttendance: 0 };
   }
 };
 
-/**
- * Generate intelligent AI response based on user message and context
- */
 export const generateIntelligentResponse = async (userId, userMessage) => {
   try {
-    const context = await getUserContext(userId);
-    if (!context) {
-      return "I'm having trouble accessing your data. Please try again or contact support.";
+    if (!userId) return "❌ **Error:** User ID is missing. Please log in again.";
+    if (!userMessage || userMessage.trim() === "") return "I didn't receive your message. Please type your question or request.";
+
+    let context;
+    try {
+      context = await getUserContext(userId);
+    } catch (error) {
+      if (error.message.includes("USER_NOT_FOUND")) return "❌ **Account Not Found:** Your user account doesn't exist in the system. Please contact support.";
+      if (error.message.includes("USER_ROLE_MISSING")) return "❌ **Role Not Assigned:** Your account doesn't have a role assigned. Please contact an administrator.";
+      if (error.message.includes("INVALID_ROLE")) return `❌ **Invalid Role:** ${error.message.split(":")[1]}. Please contact an administrator.`;
+      if (error.message.includes("COURSES_FETCH_FAILED")) return "❌ **Database Error:** Unable to retrieve your courses. Please try again or contact support.";
+      if (error.message.includes("PROFESSOR_COURSES_FETCH_FAILED")) return "❌ **Database Error:** Unable to retrieve your assigned courses. Please check your permissions or contact support.";
+      if (error.message.includes("ADMIN_STATS_FETCH_FAILED")) return "❌ **Database Error:** Unable to retrieve system statistics. Please check database connectivity or contact support.";
+      return `❌ **System Error:** Unable to access your data. ${error.message}. Please try again or contact support.`;
     }
 
-    const message = userMessage.toLowerCase();
-    const { name, role, data } = context;
+    const message = userMessage.toLowerCase().trim();
+    const { role, data } = context;
 
-    // STUDENT RESPONSES
     if (role === "student") {
-      // Attendance check
-      if (message.includes("attendance") || message.includes("absence") || message.includes("rate")) {
-        if (data.courses.length === 0) {
-          return `You're not enrolled in any courses yet. Visit the enrollment section to register for courses.`;
-        }
-
-        let response = `I'm your university assistant. I can help you with:\n\n`;
-        response += `• 📊 Check your attendance rates and academic progress\n`;
-        response += `• 📚 View your course schedule and enrollment\n`;
-        response += `• 📱 Find active sessions to attend\n`;
-        response += `• 🔔 Review your notifications and important alerts\n`;
-        response += `• 📈 Get personalized study tips and guidance\n\n`;
-        response += `What would you like to know about your academic journey?`;
-
-        return response;
+      if (message.includes("hello") || message.includes("hi") || message.includes("hey") || message.includes("مرحبا")) {
+        return `👋 **Hello!**\n\nI'm your university assistant. I can help you with:\n• 📊 Check attendance\n• 📚 View courses\n• 📱 Find active sessions\n• 🔔 See notifications\n\nWhat would you like to know?`;
       }
-
-      // Course information
-      if (message.includes("course") || message.includes("subject") || message.includes("schedule")) {
-        if (data.courses.length === 0) {
-          return `📚 You're not enrolled in any courses yet. Visit the enrollment section to register.`;
-        }
-
-        let response = `📚 **Your Courses**\n\n`;
+      if (message.includes("help") || message.includes("مساعدة")) {
+        return `💡 **I can help you with:**\n\n📊 **Attendance:** "show my attendance"\n📚 **Courses:** "my courses"\n📱 **Sessions:** "active sessions"\n🔔 **Notifications:** "my notifications"\n\nJust ask me in simple words!`;
+      }
+      if (message.includes("attendance") || message.includes("absence") || message.includes("حضور")) {
+        if (!data.courses || data.courses.length === 0) return `📚 **No Courses Enrolled**\n\nYou're not enrolled in any courses yet.`;
+        let response = `📊 **Your Attendance Summary**\n\n`;
         data.courses.forEach(course => {
           response += `📖 **${course.code} - ${course.name}**\n`;
-          response += `• Professor: ${course.professor || "TBA"}\n`;
-          response += `• Attendance: ${course.attendanceRate}%\n\n`;
+          response += `• Attendance Rate: ${course.attendanceRate}%\n`;
+          response += `• Attended: ${course.attendedSessions}/${course.totalSessions} sessions\n`;
+          if (course.attendanceRate < 75) response += `• ⚠️ **Warning:** Low attendance!\n`;
+          else if (course.attendanceRate >= 90) response += `• ✅ **Excellent:** Great attendance!\n`;
+          response += "\n";
         });
-
         return response;
       }
-
-      // Active sessions
-      if (message.includes("session") || message.includes("lecture") || message.includes("scan")) {
-        if (data.activeSessions.length === 0) {
-          return `📱 No active sessions right now. Check back during your class times!`;
-        }
-
-        let response = `📱 **Active Sessions**\n\n`;
-        data.activeSessions.forEach(session => {
-          response += `🎓 **${session.courseCode}** - ${session.courseName}\n`;
-          response += `• Lecture #${session.lectureNumber}\n`;
-          response += `• 👉 Tap 'Scan QR' to mark attendance\n\n`;
+      if (message.includes("course") || message.includes("subject") || message.includes("مواد")) {
+        if (!data.courses || data.courses.length === 0) return `📚 **No Courses Enrolled**\n\nYou're not enrolled in any courses yet.`;
+        let response = `📚 **Your Enrolled Courses (${data.courses.length})**\n\n`;
+        data.courses.forEach((course, index) => {
+          response += `${index + 1}. **${course.code} - ${course.name}**\n`;
+          response += `   • Professor: ${course.professor}\n`;
+          response += `   • Attendance: ${course.attendanceRate}%\n\n`;
         });
-
         return response;
       }
-
-      // Default student
-      return `I can help you with:\n• 📊 Check attendance\n• 📚 View courses\n• 📱 Find active sessions\n• 🔔 View notifications\n\nWhat would you like to know?`;
+      if (message.includes("session") || message.includes("active") || message.includes("qr") || message.includes("جلسة")) {
+        if (!data.activeSessions || data.activeSessions.length === 0) return `📱 **No Active Sessions**\n\nThere are no active sessions right now.`;
+        let response = `📱 **Active Sessions (${data.activeSessions.length})**\n\n`;
+        data.activeSessions.forEach((session, index) => {
+          response += `${index + 1}. **${session.courseCode} - ${session.courseName}**\n`;
+          response += `   • Lecture #${session.lectureNumber}\n`;
+          response += `   • 👉 Tap 'Scan QR Code' to mark attendance\n\n`;
+        });
+        return response;
+      }
+      if (message.includes("notification") || message.includes("alert")) {
+        if (!data.notifications || data.notifications.length === 0) return `🔔 **No Notifications**\n\nYou don't have any notifications at the moment.`;
+        let response = `🔔 **Recent Notifications (${data.notifications.length})**\n\n`;
+        data.notifications.forEach((notif, index) => {
+          response += `${index + 1}. ${notif.title || "Notification"}\n   ${notif.message || ""}\n\n`;
+        });
+        return response;
+      }
+      if (message.includes("thank") || message.includes("شكرا")) return `😊 **You're welcome!** I'm here to help anytime!`;
+      if (message.includes("bye") || message.includes("وداعا")) return `👋 **Goodbye!** Have a great day!`;
+      return `🤔 I can help with:\n\n• "show my attendance"\n• "my courses"\n• "active sessions"\n• "my notifications"`;
     }
 
-    // PROFESSOR RESPONSES
     if (role === "professor") {
-      // Student attendance
-      if (message.includes("student") || message.includes("attendance") || message.includes("absent")) {
-        if (data.courses.length === 0) {
-          return `👨‍🏫 You don't have any courses assigned yet.`;
-        }
-
+      if (message.includes("hello") || message.includes("hi") || message.includes("مرحبا")) {
+        return `👋 **Hello Professor!**\n\nI can help you with:\n• 📊 Monitor attendance\n• 📚 Manage courses\n• 📱 Control sessions\n\nWhat do you need?`;
+      }
+      if (message.includes("student") || message.includes("attendance") || message.includes("حضور")) {
+        if (!data.courses || data.courses.length === 0) return `👨‍🏫 **No Courses Assigned**\n\nContact the administrator to get courses assigned.`;
         let response = `👨‍🏫 **Your Courses Overview**\n\n`;
-        data.courses.forEach(course => {
-          response += `📚 **${course.code}** - ${course.name}\n`;
-          response += `• Students: ${course.enrolledStudents}\n`;
-          response += `• Avg Attendance: ${course.averageAttendance}%\n`;
-          if (course.averageAttendance < 70) {
-            response += `• ⚠️ Low attendance\n`;
-          }
-          response += "\n";
+        data.courses.forEach((course, index) => {
+          response += `${index + 1}. **${course.code} - ${course.name}**\n`;
+          response += `   • Enrolled: ${course.enrolledStudents} students\n`;
+          response += `   • Sessions: ${course.totalSessions}\n`;
+          response += `   • Avg Attendance: ${course.averageAttendance}%\n\n`;
         });
-
         return response;
       }
-
-      // Course management
-      if (message.includes("course") || message.includes("session") || message.includes("manage")) {
-        let response = `📚 **Course Management**\n\n`;
-        if (data.activeSessions.length > 0) {
-          response += `🔴 **Active Sessions:**\n`;
-          data.activeSessions.forEach(s => {
-            response += `• ${s.courseName} - Lecture #${s.lectureNumber}\n`;
-          });
-          response += "\n";
-        }
-
-        response += `**Your Courses:** ${data.courses.length}\n`;
-        response += `**Total Students:** ${data.courses.reduce((sum, c) => sum + c.enrolledStudents, 0)}\n`;
-
-        return response;
-      }
-
-      // Default professor
-      return `I can help you with:\n• 📊 Monitor student attendance\n• 📚 Manage courses\n• 📱 Create sessions\n• 🔔 Send notifications\n\nWhat do you need?`;
+      return `👨‍🏫 **Professor Dashboard**\n\n• "my courses"\n• "student attendance"\n• "active sessions"`;
     }
 
-    // ADMIN RESPONSES
     if (role === "admin") {
-      // System statistics
-      if (message.includes("system") || message.includes("statistics") || message.includes("report")) {
-        let response = `⚙️ **System Dashboard**\n\n`;
-        response += `📊 **Statistics:**\n`;
-        response += `• Users: ${data.stats.totalUsers}\n`;
-        response += `• Active (24h): ${data.stats.activeUsers}\n`;
-        response += `• Courses: ${data.stats.totalCourses}\n`;
-        response += `• Sessions: ${data.stats.totalSessions}\n`;
-
-        return response;
+      if (message.includes("hello") || message.includes("hi") || message.includes("مرحبا")) {
+        return `👋 **Hello Admin!**\n\nSystem: ${data.stats?.totalUsers || 0} users, ${data.stats?.totalCourses || 0} courses\n\nWhat would you like to manage?`;
       }
-
-      // User management
-      if (message.includes("user") || message.includes("account") || message.includes("manage")) {
-        return `👥 **User Management**\n\nTotal Users: ${data.stats.totalUsers}\nActive Users: ${data.stats.activeUsers}\n\nI can help you:\n• Add new users\n• Manage roles\n• Reset passwords\n• View user activity`;
+      if (message.includes("system") || message.includes("statistics") || message.includes("stats")) {
+        return `⚙️ **System Dashboard**\n\n• Total Users: ${data.stats?.totalUsers || 0}\n• Active Users (24h): ${data.stats?.activeUsers || 0}\n• Total Courses: ${data.stats?.totalCourses || 0}\n• Total Sessions: ${data.stats?.totalSessions || 0}`;
       }
-
-      // Default admin
-      return `**System Stats:**\n• Users: ${data.stats.totalUsers}\n• Courses: ${data.stats.totalCourses}\n• Sessions: ${data.stats.totalSessions}\n\nI can help with system management and reporting.`;
+      return `⚙️ **Admin Panel**\n\n• "system statistics"\n• "user management"\n• "recent activity"`;
     }
 
-    return `How can I assist you today?`;
+    return `👋 **Hello!**\n\nI'm your university assistant. Please contact an administrator to verify your account settings.`;
   } catch (error) {
     console.error("Error generating response:", error);
-    return "I encountered an error. Please try again.";
+    return `❌ **Unexpected Error:** ${error.message}\n\nPlease try again or contact support.`;
   }
 };
 
-/**
- * Execute admin actions from chatbot
- */
 export const executeAdminAction = async (userId, action, params) => {
   try {
+    if (!userId) return { success: false, message: "❌ User ID is required" };
+    if (!action) return { success: false, message: "❌ Action type is required" };
+
     const context = await getUserContext(userId);
     if (!context || context.role !== "admin") {
-      return { success: false, message: "Only admins can execute actions" };
+      return { success: false, message: "❌ Only administrators can execute actions" };
     }
 
     switch (action) {
       case "show_course_details":
-        const courseDoc = await getDoc(doc(db, "courses", params.courseId));
-        if (!courseDoc.exists()) {
-          return { success: false, message: "Course not found" };
-        }
+        if (!params?.courseId) return { success: false, message: "❌ Course ID is required" };
+        const courseDoc = await db.collection("courses").doc(params.courseId).get();
+        if (!courseDoc.exists) return { success: false, message: `❌ Course not found` };
         const courseData = courseDoc.data();
         return {
           success: true,
           data: {
-            name: courseData.name,
-            code: courseData.code,
-            professor: courseData.professorName,
+            id: courseDoc.id,
+            name: courseData.name || "Unnamed Course",
+            code: courseData.code || "N/A",
+            professor: courseData.professorName || "Not Assigned",
             students: courseData.enrolledStudents?.length || 0,
-            schedule: courseData.schedule
-          }
+          },
+          message: "✅ Course details retrieved successfully"
         };
-
-      case "delete_course":
-        // Implement course deletion logic
-        return { success: true, message: `Course deleted successfully` };
-
-      case "add_student":
-        // Implement student addition logic
-        return { success: true, message: `Student added successfully` };
-
-      case "update_attendance":
-        // Implement attendance update logic
-        return { success: true, message: `Attendance updated` };
-
-      case "send_warning":
-        // Implement warning sending logic
-        return { success: true, message: `Warning sent to student` };
-
-      case "generate_report":
-        // Implement report generation logic
-        return { success: true, message: `Report generated` };
-
       default:
-        return { success: false, message: "Unknown action" };
+        return { success: false, message: `❌ Unknown action: '${action}'` };
     }
   } catch (error) {
-    console.error("Error executing admin action:", error);
-    return { success: false, message: error.message };
+    return { success: false, message: `❌ Action Failed: ${error.message}` };
   }
 };
 
-/**
- * Save conversation message
- */
 export const saveMessage = async (conversationId, sender, senderName, text, userId) => {
   try {
-    const messageRef = await addDoc(collection(db, "messages"), {
+    if (!conversationId || !sender || !text || !userId) throw new Error("Missing required fields");
+
+    const messageRef = await db.collection("messages").add({
       conversationId,
       sender,
-      senderName,
-      text,
+      senderName: senderName || "Unknown",
+      text: text.trim(),
       userId,
-      timestamp: serverTimestamp(),
+      timestamp: new Date(),
       type: "text"
     });
 
     return { success: true, messageId: messageRef.id };
   } catch (error) {
     console.error("Error saving message:", error);
-    return { success: false, message: error.message };
+    return { success: false, message: `❌ Failed to save message: ${error.message}` };
   }
 };
 
-/**
- * Get personalized welcome message
- */
 export const getWelcomeMessage = async (userId) => {
   try {
-    const context = await getUserContext(userId);
-    if (!context) return "I'm your university assistant. I can help you with:\n\n• 📊 Check your attendance rates and academic progress\n• 📚 View your course schedule and enrollment\n• 📱 Find active sessions to attend\n• 🔔 Review your notifications and important alerts\n• 📈 Get personalized study tips and guidance\n\nWhat would you like to know about your academic journey?";
+    if (!userId) return "👋 **Welcome!**\n\nI'm your university assistant. Please log in to access personalized features.";
 
-    const { name, role, data } = context;
+    let context;
+    try {
+      context = await getUserContext(userId);
+    } catch (error) {
+      return "👋 **Welcome!**\n\nI'm your university assistant. How can I help you today?";
+    }
 
     const welcomeMessages = {
-      student: `I'm your university assistant. I can help you with:\n\n• 📊 Check your attendance rates and academic progress\n• 📚 View your course schedule and enrollment\n• 📱 Find active sessions to attend\n• 🔔 Review your notifications and important alerts\n• 📈 Get personalized study tips and guidance\n\nWhat would you like to know about your academic journey?`,
-
-      professor: `I'm here to assist you with:\n\n• 📊 Monitor student attendance\n• 👥 Identify students at risk\n• 📚 Manage your courses\n• 📱 Create and manage sessions\n• 🔔 Send student notifications\n• 📈 Generate performance reports\n\nHow can I help you today?`,
-
-      admin: `As an administrator, I can help you with:\n\n• 📊 System-wide attendance monitoring\n• 👥 User and course management\n• 📱 Session oversight and configuration\n• 🔔 Notification system management\n• 📈 Comprehensive reporting\n• 🚨 System alerts and issues\n\nWhat administrative task can I assist with?`
+      student: `👋 **Welcome, Student!**\n\nI can help you with:\n\n• 📊 Check your attendance\n• 📚 View your courses\n• 📱 Find active sessions\n• 🔔 See your notifications\n\nType "help" to see all commands!`,
+      professor: `👋 **Welcome, Professor!**\n\nI can help you with:\n\n• 📊 Monitor student attendance\n• 📚 Manage your courses\n• 📱 Control sessions\n\nType "help" to see all commands!`,
+      admin: `👋 **Welcome, Administrator!**\n\nI can help you with:\n\n• 📊 System monitoring\n• 👥 User management\n• 📚 Course management\n\nType "system statistics" for an overview!`
     };
 
-    return welcomeMessages[role] || `I'm your university assistant. I can help you with:\n\n• 📊 Check your attendance rates and academic progress\n• 📚 View your course schedule and enrollment\n• 📱 Find active sessions to attend\n• 🔔 Review your notifications and important alerts\n• 📈 Get personalized study tips and guidance\n\nWhat would you like to know about your academic journey?`;
+    return welcomeMessages[context.role] || "👋 **Welcome!**\n\nHow can I help you today?";
   } catch (error) {
-    console.error("Error getting welcome message:", error);
-    return "I'm your university assistant. I can help you with:\n\n• 📊 Check your attendance rates and academic progress\n• 📚 View your course schedule and enrollment\n• 📱 Find active sessions to attend\n• 🔔 Review your notifications and important alerts\n• 📈 Get personalized study tips and guidance\n\nWhat would you like to know about your academic journey?";
+    return "👋 **Welcome!**\n\nI'm your university assistant. How can I help you today?";
   }
 };

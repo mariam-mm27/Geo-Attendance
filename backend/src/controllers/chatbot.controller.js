@@ -6,7 +6,7 @@ import {
   getUserContext
 } from "../services/intelligentChatbot.service.js";
 import { db } from "../config/firebase.js";
-import { doc, getDoc, addDoc, collection, query, where, getDocs, orderBy, limit, updateDoc } from "firebase/firestore";
+
 
 /**
  * Get or create conversation
@@ -20,8 +20,8 @@ export const getOrCreateConversation = async (req, res) => {
     }
 
     // Check if user exists
-    const userDoc = await getDoc(doc(db, "users", userId));
-    if (!userDoc.exists()) {
+    const userDoc = await db.collection("users").doc(userId).get();
+    if (!userDoc.exists) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
@@ -31,7 +31,6 @@ export const getOrCreateConversation = async (req, res) => {
         collection(db, "conversations"),
         where("participants", "array-contains", userId),
         where("type", "==", "ai_chat"),
-        orderBy("updatedAt", "desc"),
         limit(1)
       )
     );
@@ -56,7 +55,7 @@ export const getOrCreateConversation = async (req, res) => {
 
       conversationId = conversationRef.id;
 
-      // Add welcome message
+      // Add welcome message - getWelcomeMessage handles errors internally
       const welcomeMessage = await getWelcomeMessage(userId);
       await addDoc(collection(db, "messages"), {
         conversationId,
@@ -76,7 +75,11 @@ export const getOrCreateConversation = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in getOrCreateConversation:", error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Unable to create conversation. Please try again or contact support.",
+      error: error.message
+    });
   }
 };
 
@@ -111,7 +114,7 @@ export const sendMessage = async (req, res) => {
       type: "text"
     });
 
-    // Generate AI response
+    // Generate AI response - this now handles errors internally and returns user-friendly messages
     const aiResponse = await generateIntelligentResponse(userId, message);
 
     // Save AI response
@@ -142,7 +145,13 @@ export const sendMessage = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in sendMessage:", error);
-    res.status(500).json({ success: false, message: error.message });
+
+    // Return user-friendly error message
+    res.status(500).json({
+      success: false,
+      message: "Unable to process your message. Please try again or contact support.",
+      error: error.message
+    });
   }
 };
 
@@ -215,9 +224,6 @@ export const getUserContextData = async (req, res) => {
     }
 
     const context = await getUserContext(userId);
-    if (!context) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
 
     res.json({
       success: true,
@@ -225,6 +231,18 @@ export const getUserContextData = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in getUserContextData:", error);
+
+    // Handle specific error types
+    if (error.message.includes("USER_NOT_FOUND")) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    if (error.message.includes("USER_ROLE_MISSING")) {
+      return res.status(400).json({ success: false, message: "User role not assigned" });
+    }
+    if (error.message.includes("INVALID_ROLE")) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
     res.status(500).json({ success: false, message: error.message });
   }
 };
