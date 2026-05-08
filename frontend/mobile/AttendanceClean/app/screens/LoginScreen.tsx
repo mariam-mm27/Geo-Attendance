@@ -119,18 +119,15 @@ export default function LoginScreen({ navigation }: Props) {
       }
 
       try {
-      await fetch("http://192.168.100.89:5000/api/email/send-login-email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: cleanEmail,
-          name: userData.name || "User",
-        }),
+      const functions = getFunctions();
+      const sendLoginEmail = httpsCallable(functions, "sendLoginEmail");
+
+      await sendLoginEmail({
+        email: cred.user.email,
+        name: userData.name || "User"
       });
-    } catch (err) {
-      console.log("Mobile login email failed:", err);
+    } catch (e) {
+      console.log("Email error:", e);
     }
 
       setUser(auth.currentUser);
