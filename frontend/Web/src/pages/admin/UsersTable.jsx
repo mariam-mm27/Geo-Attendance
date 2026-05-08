@@ -235,7 +235,7 @@ const UsersTable = ({ data, onDelete, type = "students", allCourses = [], onConf
                 <td style={{ ...styles.td, textAlign: "center" }}>
                   <button 
                     style={styles.viewBtn} 
-                    onClick={() => handleView(item.id)}
+                    onClick={() => handleView(item)}
                   >
                     View
                   </button>
