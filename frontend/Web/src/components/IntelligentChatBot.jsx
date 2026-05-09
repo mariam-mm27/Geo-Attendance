@@ -5,18 +5,27 @@ import { db } from '../firebase';
 import './IntelligentChatBot.css';
 
 const IntelligentChatBot = ({ isOpen, onClose }) => {
+  const auth = getAuth();
+  const user = auth.currentUser;
+  
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [userName, setUserName] = useState('');
+  const [userId, setUserId] = useState(user?.uid || null); // Set immediately from user
   const [isMinimized, setIsMinimized] = useState(false);
   const messagesEndRef = useRef(null);
-  const auth = getAuth();
-  const user = auth.currentUser;
 
   const API_BASE_URL = "http://localhost:5000/api/chatbot";
+
+  // Update userId when user changes
+  useEffect(() => {
+    if (user?.uid) {
+      setUserId(user.uid);
+    }
+  }, [user?.uid]);
 
   // Scroll to bottom
   const scrollToBottom = () => {
@@ -30,7 +39,11 @@ const IntelligentChatBot = ({ isOpen, onClose }) => {
   // Get user info and initialize conversation
   useEffect(() => {
     const initializeChat = async () => {
-      if (!isOpen || !user || messages.length > 0) return;
+      // Only initialize once when chat opens and we don't have messages yet
+      if (!isOpen || !user) return;
+      
+      // Skip if already initialized (has messages or conversationId)
+      if (messages.length > 0 || conversationId) return;
 
       try {
         // Get user info
@@ -94,7 +107,7 @@ const IntelligentChatBot = ({ isOpen, onClose }) => {
     };
 
     initializeChat();
-  }, [isOpen, user]);
+  }, [isOpen]); // ONLY depend on isOpen, not user!
 
   // Send message
   const handleSendMessage = async (e) => {
@@ -103,13 +116,14 @@ const IntelligentChatBot = ({ isOpen, onClose }) => {
 
     const userMessage = {
       id: `user-${Date.now()}`,
-      sender: user?.uid,
+      sender: userId,
       senderName: userName,
       text: inputMessage.trim(),
       timestamp: new Date()
     };
-
+    
     setMessages(prev => [...prev, userMessage]);
+    
     const messageText = inputMessage.trim();
     setInputMessage('');
     setLoading(true);
@@ -247,19 +261,22 @@ const IntelligentChatBot = ({ isOpen, onClose }) => {
         {!isMinimized && (
           <>
             <div className="chatbot-messages">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`message-wrapper ${message.sender === user?.uid ? 'user' : 'ai'}`}
-                >
-                  <div className="message-bubble">
-                    <div className="message-text">
-                      {renderMessageContent(message.text)}
+              {messages.map((message) => {
+                const isUserMessage = message.sender === userId;
+                return (
+                  <div
+                    key={message.id}
+                    className={`message-wrapper ${isUserMessage ? 'user' : 'ai'}`}
+                  >
+                    <div className="message-bubble">
+                      <div className="message-text">
+                        {renderMessageContent(message.text)}
+                      </div>
+                      <div className="message-time">{formatTime(message.timestamp)}</div>
                     </div>
-                    <div className="message-time">{formatTime(message.timestamp)}</div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {loading && (
                 <div className="message-wrapper ai">

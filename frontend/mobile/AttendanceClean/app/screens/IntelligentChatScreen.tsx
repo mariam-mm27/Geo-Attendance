@@ -27,20 +27,32 @@ interface Message {
 }
 
 export default function IntelligentChatScreen({ navigation }: any) {
+  const auth = getAuth();
+  const user = auth.currentUser;
+  
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [userName, setUserName] = useState("User");
+  const [userId, setUserId] = useState<string | null>(user?.uid || null); // Set immediately from user
   const [userRole, setUserRole] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
-  const auth = getAuth();
-  const user = auth.currentUser;
+
+  // Update userId when user changes
+  useEffect(() => {
+    if (user?.uid) {
+      setUserId(user.uid);
+    }
+  }, [user?.uid]);
 
   // Initialize chat
   useEffect(() => {
     const initializeChat = async () => {
       if (!user) return;
+      
+      // Skip if already initialized
+      if (messages.length > 0 || conversationId) return;
 
       try {
         // Get user info
@@ -86,7 +98,7 @@ export default function IntelligentChatScreen({ navigation }: any) {
     };
 
     initializeChat();
-  }, [user]);
+  }, []); // Only run once on mount
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -101,7 +113,7 @@ export default function IntelligentChatScreen({ navigation }: any) {
 
     const userMessage = {
       id: `user-${Date.now()}`,
-      sender: user.uid,
+      sender: userId || user.uid,
       senderName: userName,
       text: inputMessage.trim(),
       timestamp: new Date()
@@ -164,7 +176,7 @@ export default function IntelligentChatScreen({ navigation }: any) {
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
-    const isUserMessage = item.sender === user?.uid;
+    const isUserMessage = item.sender === userId;
 
     return (
       <View style={[styles.messageWrapper, isUserMessage ? styles.userMessage : styles.aiMessage]}>
