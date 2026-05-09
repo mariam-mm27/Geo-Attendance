@@ -24,6 +24,18 @@ export const validateRegister = ({
     return "Password must be at least 6 characters.";
   }
 
+  if (!/[A-Z]/.test(password)) {
+    return "Password must contain at least one uppercase letter.";
+  }
+
+  if (!/[a-z]/.test(password)) {
+    return "Password must contain at least one lowercase letter.";
+  }
+
+  if (!/[0-9]/.test(password)) {
+    return "Password must contain at least one number.";
+  }
+
   // Student ID validation
   if (role === "student") {
     const idRegex = /^[0-9]+$/;

@@ -4,7 +4,6 @@ export const loginUser = async (
   password: string
 ) => {
 
-  // Fake logic
   if (role === 'student') {
     return { success: true, role: 'student' }
   }

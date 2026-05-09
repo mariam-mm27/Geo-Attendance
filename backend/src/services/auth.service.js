@@ -1,17 +1,16 @@
-import admin from "../config/firebase.js";
+/**
+ * Note: Firebase Auth is disabled in mock/test mode.
+ * These functions require a valid serviceAccount.json to work.
+ */
 
 export const registerStudent = async (email, password) => {
   try {
-    const userRecord = await admin.auth().createUser({
-      email,
-      password,
-    });
-
-    console.log("User created in Firebase Auth:", userRecord.uid);
-
-    return userRecord.uid;
-  } catch (err) {
-    console.error("Auth error:", err.message);
-    throw err;
+    return {
+      success: false,
+      error: "Firebase Auth is not available in mock mode. Requires serviceAccount.json",
+      uid: null
+    };
+  } catch (error) {
+    return { success: false, error: error.message, uid: null };
   }
 };

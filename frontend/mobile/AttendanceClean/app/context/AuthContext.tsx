@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged, User , signOut  } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import { View, ActivityIndicator, StyleSheet } from "react-native";
 
 type Role = "professor" | "student" | null;
 
@@ -22,54 +23,68 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-<<<<<<< HEAD
-=======
+      try {
+        if (firebaseUser) {
+          await firebaseUser.reload();
 
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
-      if (firebaseUser) {
-        setUser(firebaseUser);
+           if (!firebaseUser.emailVerified) {
+          await signOut(auth);
+          setUser(null);
+          setRole(null);
+          return;
+           }
 
-        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+           
+          setUser(firebaseUser);
 
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          setRole(data.role as Role);
+          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            setRole(data.role?.toLowerCase() as Role);
+          } else {
+            setRole(null);
+          }
         } else {
+          setUser(null);
           setRole(null);
         }
-<<<<<<< HEAD
-=======
-
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
-      } else {
+      } catch (error) {
+        console.error("Auth state change error:", error);
         setUser(null);
         setRole(null);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
-<<<<<<< HEAD
     });
 
     return unsubscribe;
-=======
-
-    });
-
-    return unsubscribe;
-
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
   }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#173B66" />
+      </View>
+    );
+  }
 
   return (
     <AuthContext.Provider value={{ user, role, loading, setUser, setRole }}>
-<<<<<<< HEAD
       {children}
-=======
-      {loading ? null : children}
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
     </AuthContext.Provider>
   );
 };
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+  },
+});
+
 
 export const useAuth = () => {
   const context = useContext(AuthContext);

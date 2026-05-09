@@ -3,6 +3,7 @@
     "name": "AttendanceClean",
     "slug": "AttendanceClean",
     "version": "1.0.0",
+    "sdkVersion": "55.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -25,13 +26,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-<<<<<<< HEAD
-    }
-=======
     },
     "plugins": [
-      "expo-barcode-scanner"
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera for QR code scanning."
+        }
+      ],
+      "expo-web-browser"
     ]
->>>>>>> 8b9578bc1e2302e3a75ac27510a86a584aaa425f
   }
 }

@@ -5,13 +5,21 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-  "dev": "nodemon src/app.js",
-  "start": "node src/app.js"
-},
+    "dev": "nodemon src/app.js",
+    "start": "node src/app.js"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "nodemon": "^3.1.14"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^4.18.2",
+    "firebase": "^12.12.1",
+    "firebase-admin": "^13.7.0",
+    "nodemailer": "^6.9.16"
   }
 }

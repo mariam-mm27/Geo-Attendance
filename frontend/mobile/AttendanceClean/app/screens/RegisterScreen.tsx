@@ -1,21 +1,16 @@
-import React, { useState } from "react";
-import {
-  TextInput,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-} from "react-native";
+import React, { useState, useEffect } from "react";
+import { TextInput, StyleSheet, Text, TouchableOpacity } from "react-native";
 import AuthLayout from "../components/AuthInput";
-import RolePicker from "../components/RoleSelector";
 import { COLORS } from "../theme/color";
-import { signOut } from "firebase/auth";
-
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { auth, db } from "../firebase";
+import {
+  createUserWithEmailAndPassword,
+  signOut,
+  sendEmailVerification,
+} from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "../firebase"; // عدلي المسار لو مختلف
 
 export default function RegisterScreen({ navigation }: any) {
-  const [role, setRole] = useState("");
   const [name, setName] = useState("");
   const [id, setId] = useState("");
   const [email, setEmail] = useState("");
@@ -23,81 +18,121 @@ export default function RegisterScreen({ navigation }: any) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    const clearFields = () => {
+      setName("");
+      setId("");
+      setEmail("");
+      setPassword("");
+      setError("");
+    };
+
+    clearFields();
+
+    const unsubscribe = navigation.addListener("focus", clearFields);
+    return unsubscribe;
+  }, [navigation]);
+
+  const detectRoleFromEmail = (
+    email: string,
+  ): "student" | "professor" | null => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (cleanEmail.endsWith("@std.sci.cu.edu.eg")) return "student";
+    if (cleanEmail.endsWith("@sci.cu.edu.eg")) return "professor";
+    return null;
+  };
+
   const handleRegister = async () => {
-  setError("");
+    setError("");
+    const role = detectRoleFromEmail(email);
+    if (!role) {
+      setError("Invalid email domain.");
+      return;
+    }
+    if (!name || !email || !password || (role === "student" && !id)) {
+      setError("All fields are required.");
+      return;
+    }
 
-  if (!role || !name || !email || !password || (role === "student" && !id)) {
-    setError("All fields are required.");
-    return;
-  }
+    try {
+      setLoading(true);
 
-  if (role === "student" && !email.endsWith("@std.sci.cu.edu.eg")) {
-    setError("Student email must end with @std.sci.cu.edu.eg");
-    return;
-  }
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password,
+      );
 
-  if (role === "professor" && !email.endsWith("@sci.cu.edu.eg")) {
-    setError("Professor email must end with @sci.cu.edu.eg");
-    return;
-  }
+      const user = userCredential.user;
 
-  try {
-    setLoading(true);
+      await user.reload();
 
-    // ✅ 1- تسجيل في Firebase Auth
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      email.trim(),
-      password
-    );
+      try {
+        await sendEmailVerification(user);
+      } catch (emailErr) {
+        console.log("Email verification error:", emailErr);
+      }
 
-    const user = userCredential.user;
+      // 1️⃣ Save in "users" collection
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        name: name.trim(),
+        email: email.trim(),
+        role,
+        studentId: role === "student" ? id : null,
+        createdAt: serverTimestamp(),
+      });
 
-    // ✅ 2- تخزين في Firestore وربطه بالـ UID
-    await setDoc(doc(db, "users", user.uid), {
-      uid: user.uid,
-      name: name.trim(),
-      email: email.trim(),
-      role: role,
-      studentId: role === "student" ? id : null,
-      createdAt: serverTimestamp(),
-    });
+      // 2️⃣ Save in role-specific collection
+      if (role === "student") {
+        await setDoc(doc(db, "students", user.uid), {
+          name,
+          email,
+          code: id,
+          attendance: "0%",
+          createdAt: serverTimestamp(),
+        });
+      } else if (role === "professor") {
+        await setDoc(doc(db, "professors", user.uid), {
+          name,
+          email,
+          courses: 0,
+          attendance: "0%",
+          createdAt: serverTimestamp(),
+        });
+      }
 
-    console.log("User registered & saved successfully");
+      console.log("User registered successfully");
 
-    // ✅ 3- Logout علشان ميحولكيش على Home
-    await signOut(auth);
 
-    // ✅ 4- يروح Login
-    navigation.replace("Login");
+      setName("");
+      setId("");
+      setEmail("");
+      setPassword("");
 
-  } catch (error: any) {
-    console.log("Register Error:", error.code);
-    setError(error.message);
-  } finally {
-    setLoading(false);
-  }
-};
+    
+      alert(
+        "Registration successful! Please check your email to verify your account before logging in.",
+      );
+      await signOut(auth);
+      navigation.replace("Login");
+    } catch (err: any) {
+      console.log("Register Error:", err);
+      setError(err.message || "Registration failed");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <AuthLayout>
-      <RolePicker role={role} setRole={setRole} />
-
       <TextInput
         placeholder="Name"
         style={styles.input}
         value={name}
         onChangeText={setName}
+        autoCapitalize="words"
       />
-
-      {role === "student" && (
-        <TextInput
-          placeholder="ID"
-          style={styles.input}
-          value={id}
-          onChangeText={setId}
-        />
-      )}
 
       <TextInput
         placeholder="Email"
@@ -107,12 +142,23 @@ export default function RegisterScreen({ navigation }: any) {
         autoCapitalize="none"
       />
 
+      {detectRoleFromEmail(email) === "student" && (
+        <TextInput
+          placeholder="Student ID"
+          style={styles.input}
+          value={id}
+          onChangeText={setId}
+          autoCapitalize="none"
+        />
+      )}
+
       <TextInput
         placeholder="Password"
-        secureTextEntry
         style={styles.input}
+        secureTextEntry
         value={password}
         onChangeText={setPassword}
+        autoCapitalize="none"
       />
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
