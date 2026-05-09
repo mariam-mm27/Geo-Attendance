@@ -298,22 +298,15 @@ let timer: ReturnType<typeof setInterval>;
   };
 
   const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setUserData({ name: "", id: "", email: "" });
-      setCourses([]);
-      setSelectedCourseId(null);
-      setActiveSession(null);
-      setTimeLeft(0);
-      setLectureCounters({});
-      setUser(null);
-      setRole(null);
-      navigation.reset({ index: 0, routes: [{ name: "Login" }] });
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Failed to logout");
-    }
-  };
+  try {
+    await signOut(auth);
+    // ✅ كل الـ setState ملغي لأنه غير لازم
+    // ✅ navigation.reset ملغي
+  } catch (error) {
+    console.error(error);
+    Alert.alert("Error", "Failed to logout");
+  }
+};
 
   return (
     <SafeAreaView style={styles.container}>

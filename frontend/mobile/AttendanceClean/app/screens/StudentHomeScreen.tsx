@@ -145,16 +145,15 @@ export default function StudentHomeScreen({ navigation }: any) {
   }, [navigation]);
 
   const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setUser(null);
-      setRole(null);
-      navigation.reset({ index: 0, routes: [{ name: "Login" }] });
-    } catch (error) {
-      console.log("Logout error:", error);
-      Alert.alert("Error", "Failed to logout");
-    }
-  };
+  try {
+    await signOut(auth);
+    // ✅ لا تحتاج لـ setUser و setRole لأن onAuthStateChanged سيتولى الأمر
+    // ✅ لا تحتاج لـ navigation.reset إطلاقاً
+  } catch (error) {
+    console.log("Logout error:", error);
+    Alert.alert("Error", "Failed to logout");
+  }
+};
 
   return (
     <SafeAreaView style={styles.container}>
