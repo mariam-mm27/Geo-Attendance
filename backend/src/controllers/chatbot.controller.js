@@ -1,63 +1,41 @@
 import {
   generateIntelligentResponse,
   executeAdminAction,
-  saveMessage,
   getWelcomeMessage,
   getUserContext
 } from "../services/intelligentChatbot.service.js";
 import { db } from "../config/firebase.js";
 
-
-/**
- * Get or create conversation
- */
 export const getOrCreateConversation = async (req, res) => {
   try {
     const { userId } = req.params;
+    if (!userId) return res.status(400).json({ success: false, message: "User ID required" });
 
-    if (!userId) {
-      return res.status(400).json({ success: false, message: "User ID required" });
-    }
-
-    // Check if user exists
     const userDoc = await db.collection("users").doc(userId).get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
+    if (!userDoc.exists) return res.status(404).json({ success: false, message: "User not found" });
 
-    // Get or create conversation
-    const conversationsSnapshot = await getDocs(
-      query(
-        collection(db, "conversations"),
-        where("participants", "array-contains", userId),
-        where("type", "==", "ai_chat"),
-        limit(1)
-      )
-    );
+    const conversationsSnapshot = await db.collection("conversations")
+      .where("participants", "array-contains", userId)
+      .where("type", "==", "ai_chat")
+      .limit(1)
+      .get();
 
     let conversationId;
     if (!conversationsSnapshot.empty) {
       conversationId = conversationsSnapshot.docs[0].id;
     } else {
-      // Create new conversation
-      const conversationRef = await addDoc(collection(db, "conversations"), {
+      const conversationRef = await db.collection("conversations").add({
         participants: [userId, "ai_assistant"],
         type: "ai_chat",
         title: "AI Assistant",
         createdAt: new Date(),
         updatedAt: new Date(),
-        lastMessage: {
-          text: "Conversation started",
-          sender: "ai_assistant",
-          timestamp: new Date()
-        }
+        lastMessage: { text: "Conversation started", sender: "ai_assistant", timestamp: new Date() }
       });
-
       conversationId = conversationRef.id;
 
-      // Add welcome message - getWelcomeMessage handles errors internally
       const welcomeMessage = await getWelcomeMessage(userId);
-      await addDoc(collection(db, "messages"), {
+      await db.collection("messages").add({
         conversationId,
         sender: "ai_assistant",
         senderName: "AI Assistant",
@@ -68,24 +46,13 @@ export const getOrCreateConversation = async (req, res) => {
       });
     }
 
-    res.json({
-      success: true,
-      conversationId,
-      message: "Conversation ready"
-    });
+    res.json({ success: true, conversationId, message: "Conversation ready" });
   } catch (error) {
     console.error("Error in getOrCreateConversation:", error);
-    res.status(500).json({
-      success: false,
-      message: "Unable to create conversation. Please try again or contact support.",
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: "Unable to create conversation. Please try again or contact support.", error: error.message });
   }
 };
 
-/**
- * Send message and get AI response
- */
 export const sendMessage = async (req, res) => {
   try {
     const { conversationId, userId } = req.params;
@@ -95,16 +62,12 @@ export const sendMessage = async (req, res) => {
       return res.status(400).json({ success: false, message: "Missing required fields" });
     }
 
-    // Get user info
-    const userDoc = await getDoc(doc(db, "users", userId));
-    if (!userDoc.exists()) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
+    const userDoc = await db.collection("users").doc(userId).get();
+    if (!userDoc.exists) return res.status(404).json({ success: false, message: "User not found" });
 
     const userData = userDoc.data();
 
-    // Save user message
-    await addDoc(collection(db, "messages"), {
+    await db.collection("messages").add({
       conversationId,
       sender: userId,
       senderName: userData.name || "User",
@@ -114,11 +77,9 @@ export const sendMessage = async (req, res) => {
       type: "text"
     });
 
-    // Generate AI response - this now handles errors internally and returns user-friendly messages
     const aiResponse = await generateIntelligentResponse(userId, message);
 
-    // Save AI response
-    const aiMessageRef = await addDoc(collection(db, "messages"), {
+    const aiMessageRef = await db.collection("messages").add({
       conversationId,
       sender: "ai_assistant",
       senderName: "AI Assistant",
@@ -128,8 +89,10 @@ export const sendMessage = async (req, res) => {
       type: "text"
     });
 
-    // Update conversation
-    await updateConversation(conversationId, aiResponse);
+    await db.collection("conversations").doc(conversationId).update({
+      lastMessage: { text: aiResponse, sender: "ai_assistant", timestamp: new Date() },
+      updatedAt: new Date()
+    });
 
     res.json({
       success: true,
@@ -145,65 +108,41 @@ export const sendMessage = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in sendMessage:", error);
-
-    // Return user-friendly error message
-    res.status(500).json({
-      success: false,
-      message: "Unable to process your message. Please try again or contact support.",
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: "Unable to process your message. Please try again or contact support.", error: error.message });
   }
 };
 
-/**
- * Get conversation messages
- */
 export const getMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
     const { limit: messageLimit = 50 } = req.query;
 
-    if (!conversationId) {
-      return res.status(400).json({ success: false, message: "Conversation ID required" });
-    }
+    if (!conversationId) return res.status(400).json({ success: false, message: "Conversation ID required" });
 
-    const messagesSnapshot = await getDocs(
-      query(
-        collection(db, "messages"),
-        where("conversationId", "==", conversationId),
-        orderBy("timestamp", "asc"),
-        limit(parseInt(messageLimit))
-      )
-    );
+    const messagesSnapshot = await db.collection("messages")
+      .where("conversationId", "==", conversationId)
+      .orderBy("timestamp", "asc")
+      .limit(parseInt(messageLimit))
+      .get();
 
-    const messages = messagesSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      timestamp: doc.data().timestamp?.toDate?.() || doc.data().timestamp
+    const messages = messagesSnapshot.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      timestamp: d.data().timestamp?.toDate?.() || d.data().timestamp
     }));
 
-    res.json({
-      success: true,
-      messages
-    });
+    res.json({ success: true, messages });
   } catch (error) {
     console.error("Error in getMessages:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-/**
- * Execute admin action from chatbot
- */
 export const executeAction = async (req, res) => {
   try {
     const { userId } = req.params;
     const { action, params } = req.body;
-
-    if (!userId || !action) {
-      return res.status(400).json({ success: false, message: "Missing required fields" });
-    }
-
+    if (!userId || !action) return res.status(400).json({ success: false, message: "Missing required fields" });
     const result = await executeAdminAction(userId, action, params);
     res.json(result);
   } catch (error) {
@@ -212,79 +151,26 @@ export const executeAction = async (req, res) => {
   }
 };
 
-/**
- * Get user context for chatbot
- */
 export const getUserContextData = async (req, res) => {
   try {
     const { userId } = req.params;
-
-    if (!userId) {
-      return res.status(400).json({ success: false, message: "User ID required" });
-    }
-
+    if (!userId) return res.status(400).json({ success: false, message: "User ID required" });
     const context = await getUserContext(userId);
-
-    res.json({
-      success: true,
-      context
-    });
+    res.json({ success: true, context });
   } catch (error) {
     console.error("Error in getUserContextData:", error);
-
-    // Handle specific error types
-    if (error.message.includes("USER_NOT_FOUND")) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-    if (error.message.includes("USER_ROLE_MISSING")) {
-      return res.status(400).json({ success: false, message: "User role not assigned" });
-    }
-    if (error.message.includes("INVALID_ROLE")) {
-      return res.status(400).json({ success: false, message: error.message });
-    }
-
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-/**
- * Get welcome message
- */
 export const getWelcome = async (req, res) => {
   try {
     const { userId } = req.params;
-
-    if (!userId) {
-      return res.status(400).json({ success: false, message: "User ID required" });
-    }
-
+    if (!userId) return res.status(400).json({ success: false, message: "User ID required" });
     const welcomeMessage = await getWelcomeMessage(userId);
-
-    res.json({
-      success: true,
-      message: welcomeMessage
-    });
+    res.json({ success: true, message: welcomeMessage });
   } catch (error) {
     console.error("Error in getWelcome:", error);
     res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-/**
- * Helper: Update conversation last message
- */
-const updateConversation = async (conversationId, lastMessageText) => {
-  try {
-    const conversationRef = doc(db, "conversations", conversationId);
-    await updateDoc(conversationRef, {
-      lastMessage: {
-        text: lastMessageText,
-        sender: "ai_assistant",
-        timestamp: new Date()
-      },
-      updatedAt: new Date()
-    });
-  } catch (error) {
-    console.error("Error updating conversation:", error);
   }
 };
