@@ -87,6 +87,85 @@ router.post("/auto-check", async (req, res) => {
   }
 });
 
+// Force send denial email immediately
+router.post("/send-denial-email", async (req, res) => {
+  try {
+    const { studentId, courseId } = req.body;
+    if (!studentId || !courseId) {
+      return res.status(400).json({ success: false, message: "studentId and courseId are required" });
+    }
+    console.log(`📧 Force sending FINAL_EXAM_DENIED email to student ${studentId} in course ${courseId}`);
+    const result = await checkAndSendAbsenceAlertDirect(studentId, courseId);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error sending denial email:", error);
+    res.status(500).json({ success: false, message: "Failed to send denial email", error: error.message });
+  }
+});
+
+// Check all denied students and send emails
+router.post("/check-denied-students", async (req, res) => {
+  try {
+    console.log("🔍 Checking for denied students and sending emails...");
+    const { backgroundJobService } = await import("../services/backgroundJob.service.js");
+    const result = await backgroundJobService.checkAndSendDenialEmails();
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error checking denied students:", error);
+    res.status(500).json({ success: false, message: "Failed to check denied students", error: error.message });
+  }
+});
+
+// Send denial email to specific student
+router.post("/send-denial-to-student", async (req, res) => {
+  try {
+    const { studentEmail, studentName, courseName, totalSessions, attendedSessions } = req.body;
+    
+    if (!studentEmail || !studentName || !courseName) {
+      return res.status(400).json({ success: false, message: "studentEmail, studentName, and courseName are required" });
+    }
+
+    console.log(`📧 Sending FINAL_EXAM_DENIED email to ${studentEmail}...`);
+    
+    const { sendWarningEmail } = await import("../services/simpleEmailSender.js");
+    
+    const missedSessions = totalSessions - attendedSessions;
+    const absenceRate = totalSessions > 0 ? (missedSessions / totalSessions) * 100 : 0;
+    
+    const result = await sendWarningEmail(
+      studentEmail,
+      studentName,
+      courseName,
+      {
+        totalSessions: totalSessions || 0,
+        attendedSessions: attendedSessions || 0,
+        missedSessions: missedSessions || 0,
+        attendanceRate: totalSessions > 0 ? (attendedSessions / totalSessions) * 100 : 0,
+        absenceRate: absenceRate
+      },
+      "FINAL_EXAM_DENIED"
+    );
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: "Denial email sent successfully",
+        messageId: result.messageId,
+        recipient: studentEmail
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: "Failed to send denial email",
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error("Error sending denial email:", error);
+    res.status(500).json({ success: false, message: "Failed to send denial email", error: error.message });
+  }
+});
+
 // ─── History & Reporting ─────────────────────────────────────────────────────
 
 router.get("/history/:studentId", getEmailHistory);

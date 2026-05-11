@@ -242,18 +242,27 @@ function Login() {
         alert("Role mismatch.");
         return;
       }
-      fetch("http://localhost:5000/api/email/send-login-email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: email.trim(),
-          name: userSnap.data().name || "User",
-        }),
-      }).catch((err) => {
-        console.log("Login email failed:", err);
-      });
+      // Send login hello email
+      try {
+        const emailResponse = await fetch("http://localhost:5000/api/email-sender/send-login-hello", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: email.trim(),
+            name: userSnap.data().name || "User",
+          }),
+        });
+        const emailData = await emailResponse.json();
+        if (emailData.success) {
+          console.log("✅ Login hello email sent successfully");
+        } else {
+          console.log("⚠️ Login email failed:", emailData.message);
+        }
+      } catch (err) {
+        console.log("❌ Login email error:", err);
+      }
 
       redirectUser(userData, cleanEmail);
     } catch (err) {

@@ -5,8 +5,7 @@
 
 import { realtimeWarningService } from './realtimeWarning.service.js';
 import { WarningHistory } from '../models/warningHistory.model.js';
-import { db } from '../config/firebase-client.js';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { db } from '../config/firebase.js';
 
 export class BackgroundJobService {
   constructor() {
@@ -310,6 +309,85 @@ export class BackgroundJobService {
       processed: results.length,
       results: results
     };
+  }
+
+  /**
+   * Check for denied students and send them emails
+   */
+  async checkAndSendDenialEmails() {
+    try {
+      console.log('🔍 Checking for denied students...');
+      
+      // Get all courses
+      const coursesSnapshot = await db.collection("courses").get();
+      let denialEmailsSent = 0;
+
+      for (const courseDoc of coursesSnapshot.docs) {
+        const courseData = courseDoc.data();
+        const courseId = courseDoc.id;
+        const enrolledStudents = courseData.enrolledStudents || [];
+
+        // Check each student
+        for (const studentId of enrolledStudents) {
+          try {
+            // Get student data
+            const studentDoc = await db.collection("users").doc(studentId).get();
+            if (!studentDoc.exists) continue;
+            
+            const studentData = studentDoc.data();
+
+            // Calculate attendance
+            const attendanceSnapshot = await db.collection("attendance")
+              .where("studentId", "==", studentId)
+              .where("courseId", "==", courseId)
+              .get();
+
+            const sessionsSnapshot = await db.collection("sessions")
+              .where("courseId", "==", courseId)
+              .get();
+
+            const totalSessions = sessionsSnapshot.size;
+            const attendedSessions = attendanceSnapshot.size;
+            const absenceRate = totalSessions > 0 ? ((totalSessions - attendedSessions) / totalSessions) * 100 : 0;
+
+            // If absence >= 25%, send denial email
+            if (absenceRate >= 25) {
+              console.log(`📧 Sending FINAL_EXAM_DENIED email to ${studentData.email} (${absenceRate.toFixed(1)}% absence)`);
+              
+              // Import email sender
+              const { sendWarningEmail } = await import('./simpleEmailSender.js');
+              
+              const emailResult = await sendWarningEmail(
+                studentData.email,
+                studentData.name,
+                courseData.name,
+                {
+                  totalSessions,
+                  attendedSessions,
+                  missedSessions: totalSessions - attendedSessions,
+                  attendanceRate: (attendedSessions / totalSessions) * 100,
+                  absenceRate
+                },
+                "FINAL_EXAM_DENIED"
+              );
+
+              if (emailResult.success) {
+                denialEmailsSent++;
+                console.log(`✅ Denial email sent to ${studentData.email}`);
+              }
+            }
+          } catch (error) {
+            console.error(`Error checking student ${studentId}:`, error);
+          }
+        }
+      }
+
+      console.log(`✅ Denial email check complete - ${denialEmailsSent} emails sent`);
+      return { success: true, emailsSent: denialEmailsSent };
+    } catch (error) {
+      console.error('❌ Error checking denial emails:', error);
+      return { success: false, error: error.message };
+    }
   }
 }
 

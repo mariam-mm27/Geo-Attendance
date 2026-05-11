@@ -119,19 +119,25 @@ export default function LoginScreen({ navigation }: Props) {
       }
 
       try {
-      await fetch("http://192.168.1.2:5000/api/email/send-login-email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: cleanEmail,
-          name: userData.name || "User",
-        }),
-      });
-    } catch (err) {
-      console.log("Mobile login email failed:", err);
-    }
+        const emailResponse = await fetch("http://192.168.1.2:5000/api/email-sender/send-login-hello", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: cleanEmail,
+            name: userData.name || "User",
+          }),
+        });
+        const emailData = await emailResponse.json();
+        if (emailData.success) {
+          console.log("✅ Login hello email sent successfully");
+        } else {
+          console.log("⚠️ Login email failed:", emailData.message);
+        }
+      } catch (err) {
+        console.log("❌ Login email error:", err);
+      }
 
       setUser(auth.currentUser);
       setUserRole(userData.role?.toLowerCase());

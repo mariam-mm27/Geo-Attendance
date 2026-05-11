@@ -6,6 +6,8 @@
 import { db } from "../config/firebase.js";
 import { realtimeWarningService } from "../services/realtimeWarning.service.js";
 import { sendWarningEmailAndNotification, wasWarningSentRecently } from "../services/autoNotificationEmail.service.js";
+import { sendWarningEmail } from "../services/warningEmailService.js";
+import { sendAttendanceWarningEmail } from "../services/emailSender.service.js";
 import {
   collection,
   addDoc,
@@ -90,6 +92,30 @@ export const recordAttendanceWithWarnings = async (studentId, sessionId, session
           attendanceRate: warningResult.attendanceData?.attendanceRate || 0,
           absenceRate: warningResult.attendanceData?.absenceRate || 0
         };
+
+        // Get student and course data for email using Admin SDK
+        const studentDoc = await db.collection("users").doc(studentId).get();
+        const courseDoc = await db.collection("courses").doc(sessionData.courseId).get();
+
+        if (studentDoc.exists && courseDoc.exists) {
+          const studentData = studentDoc.data();
+          const courseData = courseDoc.data();
+
+          // Send warning email
+          if (studentData.email) {
+            console.log(`📧 Sending warning email to ${studentData.email}...`);
+            const emailResult = await sendAttendanceWarningEmail(
+              studentData.email,
+              studentData.name || "Student",
+              courseData.name || "Course",
+              metrics.attendanceRate,
+              metrics.absenceRate,
+              metrics.missedSessions,
+              metrics.totalSessions
+            );
+            console.log(`📧 Warning email result:`, emailResult);
+          }
+        }
 
         // Send email and notification
         const notificationResult = await sendWarningEmailAndNotification(
