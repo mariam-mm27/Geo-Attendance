@@ -1,7 +1,6 @@
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
-import { db } from "../config/firebase-client.js";
-import { collection, doc, getDoc, getDocs, query, where, addDoc } from "firebase/firestore";
+import { db } from "../config/firebase.js";
 import { sendWarningEmail } from "./simpleEmailSender.js";
 
 dotenv.config();
@@ -11,12 +10,10 @@ dotenv.config();
  */
 const getEnrollmentDate = async (studentId, courseId) => {
   try {
-    const enrollmentQuery = query(
-      collection(db, "enrollments"),
-      where("studentId", "==", studentId),
-      where("courseId", "==", courseId)
-    );
-    const enrollmentSnapshot = await getDocs(enrollmentQuery);
+    const enrollmentSnapshot = await db.collection("enrollments")
+      .where("studentId", "==", studentId)
+      .where("courseId", "==", courseId)
+      .get();
 
     if (!enrollmentSnapshot.empty) {
       const enrollmentData = enrollmentSnapshot.docs[0].data();
@@ -39,11 +36,9 @@ const calculateAttendanceFromEnrollment = async (studentId, courseId) => {
     console.log(`📅 Student ${studentId} enrolled on:`, enrollmentDate);
 
     // Get all sessions for this course
-    const sessionsQuery = query(
-      collection(db, "sessions"),
-      where("courseId", "==", courseId)
-    );
-    const sessionsSnapshot = await getDocs(sessionsQuery);
+    const sessionsSnapshot = await db.collection("sessions")
+      .where("courseId", "==", courseId)
+      .get();
 
     // Filter sessions to only count those after enrollment date
     let totalSessions = 0;
@@ -64,12 +59,10 @@ const calculateAttendanceFromEnrollment = async (studentId, courseId) => {
     console.log(`📊 Total sessions after enrollment: ${totalSessions} (out of ${sessionsSnapshot.size} total)`);
 
     // Get attendance records for sessions after enrollment
-    const attendanceQuery = query(
-      collection(db, "attendance"),
-      where("studentId", "==", studentId),
-      where("courseId", "==", courseId)
-    );
-    const attendanceSnapshot = await getDocs(attendanceQuery);
+    const attendanceSnapshot = await db.collection("attendance")
+      .where("studentId", "==", studentId)
+      .where("courseId", "==", courseId)
+      .get();
 
     let attendedSessions = 0;
 
@@ -295,11 +288,10 @@ export const sendAbsenceAlertDirect = async (req, res) => {
       });
     }
 
-    // Get student data using Client SDK
-    const studentDocRef = doc(db, "users", studentId);
-    const studentDoc = await getDoc(studentDocRef);
+    // Get student data using Admin SDK
+    const studentDoc = await db.collection("users").doc(studentId).get();
     
-    if (!studentDoc.exists()) {
+    if (!studentDoc.exists) {
       return res.status(404).json({
         success: false,
         message: "Student not found",
@@ -308,11 +300,10 @@ export const sendAbsenceAlertDirect = async (req, res) => {
 
     const studentData = studentDoc.data();
 
-    // Get course data using Client SDK
-    const courseDocRef = doc(db, "courses", courseId);
-    const courseDoc = await getDoc(courseDocRef);
+    // Get course data using Admin SDK
+    const courseDoc = await db.collection("courses").doc(courseId).get();
     
-    if (!courseDoc.exists()) {
+    if (!courseDoc.exists) {
       return res.status(404).json({
         success: false,
         message: "Course not found",
@@ -584,16 +575,14 @@ export const checkAndSendAbsenceAlertDirect = async (studentId, courseId) => {
   try {
     console.log(`🔍 Checking attendance for student ${studentId} in course ${courseId}`);
     
-    const studentDocRef = doc(db, "users", studentId);
-    const studentDoc = await getDoc(studentDocRef);
-    if (!studentDoc.exists()) {
+    const studentDoc = await db.collection("users").doc(studentId).get();
+    if (!studentDoc.exists) {
       return { success: false, message: "Student not found" };
     }
     const studentData = studentDoc.data();
 
-    const courseDocRef = doc(db, "courses", courseId);
-    const courseDoc = await getDoc(courseDocRef);
-    if (!courseDoc.exists()) {
+    const courseDoc = await db.collection("courses").doc(courseId).get();
+    if (!courseDoc.exists) {
       return { success: false, message: "Course not found" };
     }
     const courseData = courseDoc.data();
@@ -624,20 +613,16 @@ export const checkAndSendAbsenceAlertDirect = async (studentId, courseId) => {
     }
 
     // ── Cooldown: only block if this EXACT level was sent within the last 24 hours ──
-    // This means: crossing a NEW threshold always sends immediately.
-    // Re-sending the same level is blocked for 24h to prevent spam.
-    const allNotificationsQuery = query(
-      collection(db, "notifications"),
-      where("userId", "==", studentId),
-      where("courseId", "==", courseId),
-      where("alertLevel", "==", currentAlertLevel)
-    );
-    const existingSnapshot = await getDocs(allNotificationsQuery);
+    const allNotificationsSnapshot = await db.collection("notifications")
+      .where("userId", "==", studentId)
+      .where("courseId", "==", courseId)
+      .where("alertLevel", "==", currentAlertLevel)
+      .get();
 
-    if (!existingSnapshot.empty) {
+    if (!allNotificationsSnapshot.empty) {
       // Find the most recent notification of this level
       let mostRecentDate = null;
-      existingSnapshot.docs.forEach(d => {
+      allNotificationsSnapshot.docs.forEach(d => {
         const data = d.data();
         const alertDate = data.createdAt?.toDate?.() 
           || (data.createdAt?.seconds ? new Date(data.createdAt.seconds * 1000) : null);
@@ -661,14 +646,6 @@ export const checkAndSendAbsenceAlertDirect = async (studentId, courseId) => {
     } else {
       console.log(`🆕 First time ${currentAlertLevel} for this student/course — sending now`);
     }
-
-    // ── Build email ──────────────────────────────────────────────────────────────
-    const configs = {
-      FIRST_WARNING:     { color: "#EAB308", title: "⚡ FIRST WARNING",          msg: "Your absence rate has exceeded 10%. Please attend upcoming sessions." },
-      SECOND_WARNING:    { color: "#F59E0B", title: "⚠️ SECOND WARNING",         msg: "Your absence rate has exceeded 20%. Take immediate action to avoid exam denial." },
-      FINAL_EXAM_DENIED: { color: "#DC2626", title: "🚫 DENIED FROM FINAL EXAM", msg: "Your absence rate has exceeded 25%. You have been denied from the final exam." },
-    };
-    const { color, title, msg } = configs[currentAlertLevel];
 
     console.log(`🚨 Sending ${currentAlertLevel} to ${studentData.email}`);
 
@@ -695,12 +672,24 @@ export const checkAndSendAbsenceAlertDirect = async (studentId, courseId) => {
       FINAL_EXAM_DENIED: "absence_deprivation",
     };
 
-    await addDoc(collection(db, "notifications"), {
+    const titleMap = {
+      FIRST_WARNING: "⚡ FIRST WARNING",
+      SECOND_WARNING: "⚠️ SECOND WARNING",
+      FINAL_EXAM_DENIED: "🚫 DENIED FROM FINAL EXAM",
+    };
+
+    const messageMap = {
+      FIRST_WARNING: "Your absence rate has exceeded 10%. Please attend upcoming sessions.",
+      SECOND_WARNING: "Your absence rate has exceeded 20%. Take immediate action to avoid exam denial.",
+      FINAL_EXAM_DENIED: "Your absence rate has exceeded 25%. You have been denied from the final exam.",
+    };
+
+    await db.collection("notifications").add({
       userId: studentId,
       type: typeMap[currentAlertLevel],
       alertLevel: currentAlertLevel,
-      title,
-      message: `${msg} Your attendance in ${courseData.name} is ${attendanceRate.toFixed(1)}%. Missed ${missedSessions} of ${totalSessions} sessions.`,
+      title: titleMap[currentAlertLevel],
+      message: `${messageMap[currentAlertLevel]} Your attendance in ${courseData.name} is ${attendanceRate.toFixed(1)}%. Missed ${missedSessions} of ${totalSessions} sessions.`,
       courseId,
       courseName: courseData.name,
       attendanceRate: parseFloat(attendanceRate.toFixed(2)),
@@ -738,7 +727,7 @@ export const checkAndSendAbsenceAlertDirect = async (studentId, courseId) => {
 export const checkAllCoursesDirect = async (req, res) => {
   try {
     console.log("🚀 Starting checkAllCoursesDirect - checking real thresholds");
-    const coursesSnapshot = await getDocs(collection(db, "courses"));
+    const coursesSnapshot = await db.collection("courses").get();
     console.log(`📚 Found ${coursesSnapshot.size} courses to check`);
 
     let totalAlerts = 0;
