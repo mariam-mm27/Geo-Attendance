@@ -1,0 +1,219 @@
+import { useState } from "react";
+import { validateLogin } from "../utils/validation";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../firebase";
+import { useNavigate } from "react-router-dom";
+import Modal from "../components/Modal";
+import { useModal } from "../hooks/useModal";
+import { getFunctions, httpsCallable } from "firebase/functions";
+
+function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("");
+  const { modalState, closeModal, showError, showWarning } = useModal();
+
+  const navigate = useNavigate();
+
+  const handleLogin = async () => {
+    // UI validation
+    if (!role) {
+      showWarning("Please select a role");
+      return;
+    }
+
+    const error = validateLogin({ email, password });
+    if (error) {
+      showWarning(error);
+      return;
+    }
+
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+
+        await cred.user.reload();
+
+    if (!cred.user.emailVerified) {
+      showWarning("Please verify your email first");
+      return;
+    }
+
+      const userRef = doc(db, "users", cred.user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        showError("Account not registered properly.");
+        return;
+      }
+
+      const userData = userSnap.data();
+      const realRole = userData.role;
+
+      if (realRole !== role.toLowerCase()) {
+        showError("Selected role does not match your account.");
+        return;
+      }
+
+       try {
+      const functions = getFunctions();
+      const sendLoginEmail = httpsCallable(functions, "sendLoginEmail");
+
+      await sendLoginEmail({
+        email: cred.user.email,
+        name: userData.name || "User"
+      });
+    } catch (e) {
+      console.log("Email error:", e);
+    }
+
+      if (realRole === "admin") {
+        navigate("/admin");
+      } else if (realRole === "professor") {
+        navigate("/professor");
+      } else {
+        navigate("/student");
+      }
+
+    } catch (err) {
+      console.log(err);
+      showError("Invalid email or password.");
+    }
+  };
+
+  return (
+    <div style={{
+      background: "#F8FAFC",
+      height: "100vh",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center"
+    }}>
+      <div style={{
+        width: "350px",
+        padding: "30px",
+        borderRadius: "12px",
+        border: "1px solid #CBD5E1",
+        background: "white"
+      }}>
+
+        <div style={{ textAlign: "center" }}>
+          <h1 style={{
+            color: "#173B66",
+            marginBottom: "5px",
+            fontSize: "32px"
+          }}>
+            Attendance
+          </h1>
+
+          <h2 style={{
+            color: "#173B66",
+            fontSize: "24px"
+          }}>
+            Login
+          </h2>
+        </div>
+
+        {/* Role */}
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "10px",
+            marginTop: "20px",
+            borderRadius: "8px",
+            border: "1px solid #CBD5E1"
+          }}
+        >
+          <option value="">Select Role</option>
+          <option value="student">Student</option>
+          <option value="professor">Professor</option>
+          <option value="admin">Admin</option>
+        </select>
+
+        {/* Email */}
+        <input
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "10px",
+            marginTop: "15px",
+            borderRadius: "8px",
+            border: "1px solid #CBD5E1"
+          }}
+        />
+
+        {/* Password */}
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "10px",
+            marginTop: "15px",
+            borderRadius: "8px",
+            border: "1px solid #CBD5E1"
+          }}
+        />
+
+        {/* Login Button */}
+        <button
+          onClick={handleLogin}
+          style={{
+            width: "100%",
+            marginTop: "20px",
+            padding: "10px",
+            borderRadius: "8px",
+            background: "#173B66",
+            color: "white",
+            border: "none",
+            cursor: "pointer"
+          }}
+        >
+          Login
+        </button>
+
+        <button
+          onClick={() => alert("Google Login (Firebase not connected yet)")}
+          style={{
+            width: "100%",
+            marginTop: "15px",
+            padding: "10px",
+            borderRadius: "8px",
+            background: "#1B8F85",
+            color: "white",
+            border: "none",
+            cursor: "pointer",
+            fontWeight: "bold"
+          }}
+        >
+          Login with Google
+        </button>
+
+        <p style={{ textAlign: "center", marginTop: "15px" }}>
+          Don't have account?{" "}
+          <a href="/register" style={{ color: "#E68A45" }}>
+            Register here
+          </a>
+        </p>
+
+      </div>
+      <Modal 
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        title={modalState.title}
+        message={modalState.message}
+        type={modalState.type}
+        confirmText={modalState.confirmText}
+        onConfirm={modalState.onConfirm}
+      />
+    </div>
+  );
+}
+
+export default Login;
