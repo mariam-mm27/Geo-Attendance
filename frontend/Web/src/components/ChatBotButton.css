@@ -1,0 +1,69 @@
+/* Floating Chat Icon Button */
+.chatbot-icon-button {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  font-size: 28px;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  transition: all 0.3s ease;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.chatbot-icon-button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 30px rgba(102, 126, 234, 0.6);
+}
+
+.chatbot-icon-button:active {
+  transform: scale(0.95);
+}
+
+.chatbot-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 28px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .chatbot-icon-button {
+    bottom: 16px;
+    right: 16px;
+    width: 52px;
+    height: 52px;
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .chatbot-icon-button {
+    bottom: 12px;
+    right: 12px;
+    width: 48px;
+    height: 48px;
+    font-size: 22px;
+  }
+}

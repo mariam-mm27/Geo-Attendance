@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
@@ -21,3 +22,28 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+=======
+# dependencies
+node_modules/
+
+# environment variables
+.env
+
+# logs
+logs
+*.log
+npm-debug.log*
+
+# build folders
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+backend/geo-attendance-f0d04-firebase-adminsdk-fbsvc-09b2e10fe1.json
+
+
+backend/serviceAccount.json
+>>>>>>> 54fa9fe4da2a97b239570732b87e40711df2a882
